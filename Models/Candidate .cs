@@ -47,6 +47,7 @@ namespace TalentHub.Models
         // Navigation properties
         public ICollection<CandidateDocument> Documents { get; set; } = new List<CandidateDocument>();
         public ICollection<Application> Applications { get; set; } = new List<Application>();
+        public ICollection<CandidateSkill> CandidateSkills { get; set; } = new List<CandidateSkill>();
         public TalentPool? TalentPoolEntry { get; set; }
     }
 }

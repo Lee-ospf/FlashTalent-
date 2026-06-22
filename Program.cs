@@ -1,8 +1,9 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;;
+using Microsoft.IdentityModel.Tokens;
 using TalentHub.Data;
+using TalentHub.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +60,8 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IDocumentValidationService, DocumentValidationService>();
 
 var app = builder.Build();
 
