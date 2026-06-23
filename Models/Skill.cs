@@ -1,6 +1,6 @@
-﻿
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+
 namespace TalentHub.Models
 {
     [Table("Skills")]
@@ -10,15 +10,16 @@ namespace TalentHub.Models
         public int SkillId { get; set; }
 
         [Required, MaxLength(100)]
-        public string? Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
-        [MaxLength(100)]
-        public string? Category { get; set; }
+        // e.g. "Technical", "Soft Skills", "Languages" - free text for now so
+        // Admin isn't locked into a fixed category enum; can tighten to an enum
+        // later if the category list stabilizes.
+        [Required, MaxLength(50)]
+        public string Category { get; set; } = string.Empty;
 
-        [MaxLength(500)]
-        public string? Description { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        // Navigation
-        public ICollection<Vacancy> Vacancies { get; set; } = new List<Vacancy>();
+        public ICollection<CandidateSkill> CandidateSkills { get; set; } = new List<CandidateSkill>();
     }
 }

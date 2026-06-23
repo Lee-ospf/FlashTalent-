@@ -20,11 +20,35 @@ namespace TalentHub.Data
 
         public DbSet<Vacancy> Vacancies => Set<Vacancy>();
         public DbSet<Interview> Interviews => Set<Interview>();
+        public DbSet<Skill> Skills => Set<Skill>();
+        public DbSet<CandidateSkill> CandidateSkills => Set<CandidateSkill>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
+            // ---------- CandidateSkill: many-to-many join between Candidate and Skill ----------
+            modelBuilder.Entity<CandidateSkill>()
+                .HasOne(cs => cs.Candidate)
+                .WithMany(c => c.CandidateSkills)
+                .HasForeignKey(cs => cs.CandidateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CandidateSkill>()
+                .HasOne(cs => cs.Skill)
+                .WithMany(s => s.CandidateSkills)
+                .HasForeignKey(cs => cs.SkillId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // A candidate can't have the same skill listed twice
+            modelBuilder.Entity<CandidateSkill>()
+                .HasIndex(cs => new { cs.CandidateId, cs.SkillId })
+                .IsUnique();
+
+            // A skill name must be unique (no duplicate "C#" entries created by Admin)
+            modelBuilder.Entity<Skill>()
+                .HasIndex(s => s.Name)
+                .IsUnique();
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Email)
                 .IsUnique();
