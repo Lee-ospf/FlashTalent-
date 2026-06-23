@@ -12,8 +12,8 @@ using TalentHub.Data;
 namespace TalentHub.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260621183901_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260622121834_FirstCreate")]
+    partial class FirstCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
