@@ -36,6 +36,7 @@ namespace TalentHub.Controllers
                     SkillId = cs.SkillId,
                     SkillName = cs.Skill!.Name,
                     Category = cs.Skill!.Category,
+                    ProficiencyLevel = cs.ProficiencyLevel.ToString(),
                     AddedAt = cs.AddedAt
                 })
                 .OrderBy(s => s.Category)
@@ -46,10 +47,8 @@ namespace TalentHub.Controllers
         }
 
         // POST api/candidates/{candidateId}/skills
-        // Body: { "skillIds": [1, 4, 7] } - adds any of these not already assigned.
-        // Skills already on the candidate's profile are silently skipped (no error),
-        // so the frontend can resubmit a full selected-skills list without needing
-        // to diff it against what's already saved.
+        // Body: { "skills": [{ "skillId": 1, "proficiencyLevel": "Intermediate" }, ...] }
+        // If a skill is already assigned, its proficiency level is updated rather than duplicated.
         [HttpPost]
         public async Task<ActionResult<List<CandidateSkillResponse>>> AssignSkills(int candidateId, AssignSkillsRequest request)
         {
@@ -59,7 +58,7 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
 
-            var requestedIds = request.SkillIds.Distinct().ToList();
+            var requestedIds = request.Skills.Select(s => s.SkillId).Distinct().ToList();
 
             var validSkillIds = await _db.Skills
                 .Where(s => requestedIds.Contains(s.SkillId))
@@ -72,21 +71,33 @@ namespace TalentHub.Controllers
                 return BadRequest(new { message = $"Unknown SkillId(s): {string.Join(", ", invalidIds)}." });
             }
 
-            var alreadyAssignedIds = await _db.CandidateSkills
+            var existingLinks = await _db.CandidateSkills
                 .Where(cs => cs.CandidateId == candidateId && validSkillIds.Contains(cs.SkillId))
-                .Select(cs => cs.SkillId)
                 .ToListAsync();
 
-            var toAdd = validSkillIds.Except(alreadyAssignedIds).ToList();
-
-            foreach (var skillId in toAdd)
+            foreach (var item in request.Skills)
             {
-                _db.CandidateSkills.Add(new CandidateSkill
+                if (!Enum.TryParse<ProficiencyLevel>(item.ProficiencyLevel, true, out var level))
                 {
-                    CandidateId = candidateId,
-                    SkillId = skillId,
-                    AddedAt = DateTime.UtcNow
-                });
+                    var validLevels = string.Join(", ", Enum.GetNames(typeof(ProficiencyLevel)));
+                    return BadRequest(new { message = $"Invalid proficiency level '{item.ProficiencyLevel}'. Valid values: {validLevels}." });
+                }
+
+                var existing = existingLinks.FirstOrDefault(e => e.SkillId == item.SkillId);
+                if (existing != null)
+                {
+                    existing.ProficiencyLevel = level; // update level if it changed
+                }
+                else
+                {
+                    _db.CandidateSkills.Add(new CandidateSkill
+                    {
+                        CandidateId = candidateId,
+                        SkillId = item.SkillId,
+                        ProficiencyLevel = level,
+                        AddedAt = DateTime.UtcNow
+                    });
+                }
             }
 
             await _db.SaveChangesAsync();

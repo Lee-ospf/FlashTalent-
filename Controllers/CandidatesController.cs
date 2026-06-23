@@ -43,9 +43,7 @@ namespace TalentHub.Controllers
                 Nationality = request.Nationality,
                 Address = request.Address,
                 DateOfBirth = request.DateOfBirth,
-                SkillsSummary = request.SkillsSummary,
-                ExperienceSummary = request.ExperienceSummary,
-                QualificationsSummary = request.QualificationsSummary,
+                
                 RegisteredAt = DateTime.UtcNow
             };
 
@@ -110,9 +108,7 @@ namespace TalentHub.Controllers
             candidate.Nationality = request.Nationality;
             candidate.Address = request.Address;
             candidate.DateOfBirth = request.DateOfBirth;
-            candidate.SkillsSummary = request.SkillsSummary;
-            candidate.ExperienceSummary = request.ExperienceSummary;
-            candidate.QualificationsSummary = request.QualificationsSummary;
+            
 
             await _db.SaveChangesAsync();
 
@@ -135,9 +131,7 @@ namespace TalentHub.Controllers
                 Nationality = c.Nationality,
                 Address = c.Address,
                 DateOfBirth = c.DateOfBirth,
-                SkillsSummary = c.SkillsSummary,
-                ExperienceSummary = c.ExperienceSummary,
-                QualificationsSummary = c.QualificationsSummary,
+               
                 RegisteredAt = c.RegisteredAt,
                 UploadedDocumentTypes = documentTypes
             };

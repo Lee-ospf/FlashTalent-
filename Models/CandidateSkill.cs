@@ -3,6 +3,13 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TalentHub.Models
 {
+    public enum ProficiencyLevel
+    {
+        Beginner,
+        Intermediate,
+        Expert
+    }
+
     [Table("CandidateSkills")]
     public class CandidateSkill
     {
@@ -18,6 +25,9 @@ namespace TalentHub.Models
         public int SkillId { get; set; }
 
         public Skill? Skill { get; set; }
+
+        [Required]
+        public ProficiencyLevel ProficiencyLevel { get; set; } = ProficiencyLevel.Beginner;
 
         public DateTime AddedAt { get; set; } = DateTime.UtcNow;
     }

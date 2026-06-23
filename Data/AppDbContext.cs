@@ -24,10 +24,37 @@ namespace TalentHub.Data
         public DbSet<Interview> Interviews => Set<Interview>();
         public DbSet<Skill> Skills => Set<Skill>();
         public DbSet<CandidateSkill> CandidateSkills => Set<CandidateSkill>();
+        public DbSet<CandidateQualification> CandidateQualifications => Set<CandidateQualification>();
+        public DbSet<CandidateExperience> CandidateExperiences => Set<CandidateExperience>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // ---------- CandidateQualification ----------
+            modelBuilder.Entity<CandidateQualification>()
+                .HasOne(q => q.Candidate)
+                .WithMany(c => c.Qualifications)
+                .HasForeignKey(q => q.CandidateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CandidateQualification>()
+                .Property(q => q.QualificationType)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            // ---------- CandidateExperience ----------
+            modelBuilder.Entity<CandidateExperience>()
+                .HasOne(e => e.Candidate)
+                .WithMany(c => c.Experiences)
+                .HasForeignKey(e => e.CandidateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // ---------- CandidateSkill: store proficiency as readable text ----------
+            modelBuilder.Entity<CandidateSkill>()
+                .Property(cs => cs.ProficiencyLevel)
+                .HasConversion<string>()
+                .HasMaxLength(20);
 
             // ---------- CandidateSkill: many-to-many join between Candidate and Skill ----------
             modelBuilder.Entity<CandidateSkill>()

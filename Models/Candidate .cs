@@ -33,14 +33,8 @@ namespace TalentHub.Models
 
         public DateTime? DateOfBirth { get; set; }
 
-        // Free-text summary fields captured at registration (D2 in scope doc)
-        // Skills/experience/qualifications kept simple as text for this deliverable -
-        // no separate Skill table needed since AI matching is out of scope.
-        public string? SkillsSummary { get; set; }
-
-        public string? ExperienceSummary { get; set; }
-
-        public string? QualificationsSummary { get; set; }
+        
+        
 
         public DateTime RegisteredAt { get; set; } = DateTime.UtcNow;
 
@@ -48,6 +42,8 @@ namespace TalentHub.Models
         public ICollection<CandidateDocument> Documents { get; set; } = new List<CandidateDocument>();
         public ICollection<Application> Applications { get; set; } = new List<Application>();
         public ICollection<CandidateSkill> CandidateSkills { get; set; } = new List<CandidateSkill>();
+        public ICollection<CandidateQualification> Qualifications { get; set; } = new List<CandidateQualification>();
+        public ICollection<CandidateExperience> Experiences { get; set; } = new List<CandidateExperience>();
         public TalentPool? TalentPoolEntry { get; set; }
     }
 }

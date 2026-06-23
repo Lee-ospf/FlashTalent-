@@ -27,10 +27,19 @@ namespace TalentHub.DTOs
         public string Category { get; set; } = string.Empty;
     }
 
+    public class AssignSkillRequest
+    {
+        [Required]
+        public int SkillId { get; set; }
+
+        [Required]
+        public string ProficiencyLevel { get; set; } = "Beginner";
+    }
+
     public class AssignSkillsRequest
     {
         [Required]
-        public List<int> SkillIds { get; set; } = new();
+        public List<AssignSkillRequest> Skills { get; set; } = new();
     }
 
     public class CandidateSkillResponse
@@ -39,6 +48,7 @@ namespace TalentHub.DTOs
         public int SkillId { get; set; }
         public string SkillName { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
+        public string ProficiencyLevel { get; set; } = string.Empty;
         public DateTime AddedAt { get; set; }
     }
 }
