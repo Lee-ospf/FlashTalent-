@@ -6,7 +6,7 @@ namespace TalentHub.Models
     public enum VacancyType
     {
         Internal,
-        ClientPlacement
+        ClientPlacement  //External
     }
 
     public enum VacancyStatus
@@ -27,6 +27,11 @@ namespace TalentHub.Models
     {
         [Key]
         public int VacancyId { get; set; }
+
+        [Required, ForeignKey(nameof(Recruiter))]
+        public int CreatedByRecruiterId { get; set; }
+
+        public Recruiter? Recruiter { get; set; }
 
         [Required, MaxLength(200)]
         public string Title { get; set; } = string.Empty;
@@ -56,13 +61,13 @@ namespace TalentHub.Models
 
             public DateTime? ClosingDate { get; set; }
 
-            public int CreatedByRecruiterId { get; set; }
+            
 
             public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
             public DateTime? PublishedAt { get; set; }
 
-            // Required skills (many-to-many, implicit join table)
-            public ICollection<Skill> RequiredSkills { get; set; }= new List<Skill>();
+            // Navigation
+            public ICollection<VacancySkill> VacancySkills { get; set; }= new List<VacancySkill>();
         }
 
 

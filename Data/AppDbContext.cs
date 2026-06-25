@@ -170,7 +170,7 @@ namespace TalentHub.Data
                 .HasOne(t => t.LastVacancy)
                 .WithMany()
                 .HasForeignKey(t => t.LastVacancyId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.ClientSetNull);
 
             modelBuilder.Entity<User>().Property(u => u.Role).HasConversion<string>().HasMaxLength(20);
             modelBuilder.Entity<CandidateDocument>().Property(d => d.DocumentType).HasConversion<string>().HasMaxLength(30);
