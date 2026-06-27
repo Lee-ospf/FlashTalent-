@@ -54,7 +54,7 @@ namespace TalentHub.Migrations
                     b.HasIndex("CandidateId", "VacancyId")
                         .IsUnique();
 
-                    b.ToTable("Applications", (string)null);
+                    b.ToTable("Applications");
                 });
 
             modelBuilder.Entity("TalentHub.Models.ApplicationStatusHistory", b =>
@@ -90,7 +90,7 @@ namespace TalentHub.Migrations
 
                     b.HasIndex("ChangedByUserId");
 
-                    b.ToTable("ApplicationStatusHistories", (string)null);
+                    b.ToTable("ApplicationStatusHistories");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Candidate", b =>
@@ -135,7 +135,7 @@ namespace TalentHub.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Candidates", (string)null);
+                    b.ToTable("Candidates");
                 });
 
             modelBuilder.Entity("TalentHub.Models.CandidateDocument", b =>
@@ -171,7 +171,7 @@ namespace TalentHub.Migrations
 
                     b.HasIndex("CandidateId");
 
-                    b.ToTable("CandidateDocuments", (string)null);
+                    b.ToTable("CandidateDocuments");
                 });
 
             modelBuilder.Entity("TalentHub.Models.CandidateExperience", b =>
@@ -282,7 +282,7 @@ namespace TalentHub.Migrations
                     b.HasIndex("CandidateId", "SkillId")
                         .IsUnique();
 
-                    b.ToTable("CandidateSkills", (string)null);
+                    b.ToTable("CandidateSkills");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Client", b =>
@@ -318,7 +318,28 @@ namespace TalentHub.Migrations
 
                     b.HasKey("ClientId");
 
-                    b.ToTable("Clients", (string)null);
+                    b.ToTable("Clients");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.Department", b =>
+                {
+                    b.Property<int>("DepartmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DepartmentId"));
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("DepartmentId");
+
+                    b.ToTable("Departments");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Employee", b =>
@@ -385,7 +406,7 @@ namespace TalentHub.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Employees", (string)null);
+                    b.ToTable("Employees");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Interview", b =>
@@ -414,7 +435,7 @@ namespace TalentHub.Migrations
 
                     b.HasIndex("ApplicationId");
 
-                    b.ToTable("Interviews", (string)null);
+                    b.ToTable("Interviews");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Notification", b =>
@@ -452,7 +473,7 @@ namespace TalentHub.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Notifications", (string)null);
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Prescreening", b =>
@@ -489,7 +510,7 @@ namespace TalentHub.Migrations
                     b.HasIndex("ApplicationId")
                         .IsUnique();
 
-                    b.ToTable("Prescreenings", (string)null);
+                    b.ToTable("Prescreenings");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Recruiter", b =>
@@ -510,9 +531,10 @@ namespace TalentHub.Migrations
 
                     b.HasKey("RecruiterId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .IsUnique();
 
-                    b.ToTable("Recruiters", (string)null);
+                    b.ToTable("Recruiters");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Skill", b =>
@@ -541,7 +563,7 @@ namespace TalentHub.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Skills", (string)null);
+                    b.ToTable("Skills");
                 });
 
             modelBuilder.Entity("TalentHub.Models.TalentPool", b =>
@@ -571,7 +593,7 @@ namespace TalentHub.Migrations
 
                     b.HasIndex("LastVacancyId");
 
-                    b.ToTable("TalentPoolEntries", (string)null);
+                    b.ToTable("TalentPoolEntries");
                 });
 
             modelBuilder.Entity("TalentHub.Models.User", b =>
@@ -620,7 +642,7 @@ namespace TalentHub.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Vacancy", b =>
@@ -643,24 +665,40 @@ namespace TalentHub.Migrations
                     b.Property<int>("CreatedByRecruiterId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("DepartmentId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("IsPublished")
-                        .HasColumnType("bit");
+                    b.Property<int>("EmploymentType")
+                        .HasColumnType("int");
 
                     b.Property<string>("Location")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("MinYearsExperience")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("RequiredQualifications")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Requirements")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("SalaryMax")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("SalaryMin")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -679,7 +717,33 @@ namespace TalentHub.Migrations
 
                     b.HasIndex("CreatedByRecruiterId");
 
-                    b.ToTable("Vacancies", (string)null);
+                    b.HasIndex("DepartmentId");
+
+                    b.ToTable("Vacancies");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.VacancyDocument", b =>
+                {
+                    b.Property<int>("VacancyDocumentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("VacancyDocumentId"));
+
+                    b.Property<int>("DocumentType")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsMandatory")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("VacancyId")
+                        .HasColumnType("int");
+
+                    b.HasKey("VacancyDocumentId");
+
+                    b.HasIndex("VacancyId");
+
+                    b.ToTable("VacancyDocument");
                 });
 
             modelBuilder.Entity("TalentHub.Models.VacancySkill", b =>
@@ -713,7 +777,7 @@ namespace TalentHub.Migrations
 
                     b.HasIndex("VacancyId");
 
-                    b.ToTable("VacancySkills", (string)null);
+                    b.ToTable("VacancySkills");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Application", b =>
@@ -871,8 +935,8 @@ namespace TalentHub.Migrations
             modelBuilder.Entity("TalentHub.Models.Recruiter", b =>
                 {
                     b.HasOne("TalentHub.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
+                        .WithOne("Recruiter")
+                        .HasForeignKey("TalentHub.Models.Recruiter", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -889,8 +953,7 @@ namespace TalentHub.Migrations
 
                     b.HasOne("TalentHub.Models.Vacancy", "LastVacancy")
                         .WithMany()
-                        .HasForeignKey("LastVacancyId")
-                        .OnDelete(DeleteBehavior.ClientSetNull);
+                        .HasForeignKey("LastVacancyId");
 
                     b.Navigation("Candidate");
 
@@ -909,9 +972,26 @@ namespace TalentHub.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("TalentHub.Models.Department", "Department")
+                        .WithMany("Vacancies")
+                        .HasForeignKey("DepartmentId");
+
                     b.Navigation("Client");
 
+                    b.Navigation("Department");
+
                     b.Navigation("Recruiter");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.VacancyDocument", b =>
+                {
+                    b.HasOne("TalentHub.Models.Vacancy", "Vacancy")
+                        .WithMany("RequiredDocuments")
+                        .HasForeignKey("VacancyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vacancy");
                 });
 
             modelBuilder.Entity("TalentHub.Models.VacancySkill", b =>
@@ -962,6 +1042,11 @@ namespace TalentHub.Migrations
                     b.Navigation("Vacancies");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.Department", b =>
+                {
+                    b.Navigation("Vacancies");
+                });
+
             modelBuilder.Entity("TalentHub.Models.Recruiter", b =>
                 {
                     b.Navigation("VacanciesCreated");
@@ -975,11 +1060,15 @@ namespace TalentHub.Migrations
             modelBuilder.Entity("TalentHub.Models.User", b =>
                 {
                     b.Navigation("Candidate");
+
+                    b.Navigation("Recruiter");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Vacancy", b =>
                 {
                     b.Navigation("Applications");
+
+                    b.Navigation("RequiredDocuments");
 
                     b.Navigation("VacancySkills");
                 });

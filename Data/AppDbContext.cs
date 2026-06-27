@@ -17,14 +17,15 @@ namespace TalentHub.Data
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<Employee> Employees => Set<Employee>();
         public DbSet<TalentPool> TalentPoolEntries => Set<TalentPool>();
-
+        public DbSet<Recruiter> Recruiters => Set<Recruiter>();
         public DbSet<Vacancy> Vacancies => Set<Vacancy>();
         public DbSet<Interview> Interviews => Set<Interview>();
         public DbSet<Skill> Skills => Set<Skill>();
         public DbSet<CandidateSkill> CandidateSkills => Set<CandidateSkill>();
         public DbSet<CandidateQualification> CandidateQualifications => Set<CandidateQualification>();
         public DbSet<CandidateExperience> CandidateExperiences => Set<CandidateExperience>();
-
+        public DbSet<Client> Clients => Set<Client>();
+        public DbSet<Department> Departments => Set<Department>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
