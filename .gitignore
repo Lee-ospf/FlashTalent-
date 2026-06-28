@@ -11,3 +11,7 @@ Uploads/*
 ## Rider/VS Code (in case teammates use these)
 .idea/
 .vscode/
+
+## Entity Framework Core migrations (ignore files but keep folder)
+**/Migrations/*
+!**/Migrations/.gitkeep

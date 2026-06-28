@@ -40,5 +40,6 @@ namespace TalentHub.Models
 
         // Navigation: one User has at most one Candidate profile
         public Candidate? Candidate { get; set; }
+        public Recruiter? Recruiter { get; set; }
     }
 }

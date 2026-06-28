@@ -46,10 +46,11 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No vacancy found with VacancyId {request.VacancyId}." });
             }
 
-            if (!vacancy.IsPublished)
-            {
-                return BadRequest(new { message = "Cannot apply to a vacancy that has not been published." });
-            }
+            //A vacancy that is not published shouldn't be visible to candidates
+            //if (!vacancy.IsPublished)
+            //{
+            //    return BadRequest(new { message = "Cannot apply to a vacancy that has not been published." });
+            //}
 
             var duplicateExists = await _db.Applications
                 .AnyAsync(a => a.CandidateId == request.CandidateId && a.VacancyId == request.VacancyId);
