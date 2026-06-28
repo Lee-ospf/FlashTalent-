@@ -17,7 +17,7 @@ namespace TalentHub.Data
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<Employee> Employees => Set<Employee>();
         public DbSet<TalentPool> TalentPoolEntries => Set<TalentPool>();
-
+        public DbSet<Address> Addresses => Set<Address>();
         public DbSet<Vacancy> Vacancies => Set<Vacancy>();
         public DbSet<Interview> Interviews => Set<Interview>();
         public DbSet<Skill> Skills => Set<Skill>();
@@ -28,6 +28,23 @@ namespace TalentHub.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // ---------- Address: one-to-many from Candidate, type-flagged ----------
+            modelBuilder.Entity<Address>()
+                .HasOne(a => a.Candidate)
+                .WithMany(c => c.Addresses)
+                .HasForeignKey(a => a.CandidateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Address>()
+                .Property(a => a.AddressType)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            // A candidate can only have one address of each type (one Residential, one Postal)
+            modelBuilder.Entity<Address>()
+                .HasIndex(a => new { a.CandidateId, a.AddressType })
+                .IsUnique();
 
             // ---------- CandidateQualification ----------
             modelBuilder.Entity<CandidateQualification>()
