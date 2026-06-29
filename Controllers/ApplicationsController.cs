@@ -62,14 +62,32 @@ namespace TalentHub.Controllers
                 return Conflict(new { message = "This candidate has already applied to this vacancy." });
             }
 
-            var docStatus = await _docValidation.GetMandatoryStatusAsync(request.CandidateId);
-            if (!docStatus.AllMandatoryDocumentsPresent)
+            var requiredDocTypes = await _db.Set<VacancyDocument>()
+     .Where(vd => vd.VacancyId == request.VacancyId && vd.IsMandatory)
+     .Select(vd => vd.DocumentType)
+     .ToListAsync();
+
+            if (requiredDocTypes.Count > 0)
             {
-                return BadRequest(new
+                var candidateUploadedTypes = await _db.CandidateDocuments
+                    .Where(cd => cd.CandidateId == request.CandidateId)
+                    .Select(cd => cd.DocumentType)
+                    .ToListAsync();
+
+                var missingTypes = requiredDocTypes
+                    .Where(rt => !candidateUploadedTypes.Contains(rt))
+                    .Select(rt => rt.ToString())
+                    .Distinct()
+                    .ToList();
+
+                if (missingTypes.Count > 0)
                 {
-                    message = "Application blocked: mandatory documents are missing.",
-                    missingDocumentTypes = docStatus.MissingDocumentTypes
-                });
+                    return BadRequest(new
+                    {
+                        message = "Application blocked: this vacancy requires documents that are missing from your profile.",
+                        missingDocumentTypes = missingTypes
+                    });
+                }
             }
 
             var application = new Application
