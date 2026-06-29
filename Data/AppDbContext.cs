@@ -132,6 +132,12 @@ namespace TalentHub.Data
                 .HasIndex(a => new { a.CandidateId, a.VacancyId })
                 .IsUnique();
 
+            modelBuilder.Entity<Vacancy>()
+    .HasOne(v => v.Recruiter)
+    .WithMany(r => r.VacanciesCreated)
+    .HasForeignKey(v => v.CreatedByRecruiterId)
+    .OnDelete(DeleteBehavior.Restrict);
+
             modelBuilder.Entity<ApplicationStatusHistory>()
                 .HasOne(h => h.Application)
                 .WithMany(a => a.StatusHistory)
