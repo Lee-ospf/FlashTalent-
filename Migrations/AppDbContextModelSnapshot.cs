@@ -22,6 +22,65 @@ namespace TalentHub.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("TalentHub.Models.Address", b =>
+                {
+                    b.Property<int>("AddressId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AddressId"));
+
+                    b.Property<string>("AddressType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("CandidateId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Country")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Line1")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Line2")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PostalCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Province")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("AddressId");
+
+                    b.HasIndex("CandidateId", "AddressType")
+                        .IsUnique();
+
+                    b.ToTable("Addresses");
+                });
+
             modelBuilder.Entity("TalentHub.Models.Application", b =>
                 {
                     b.Property<int>("ApplicationId")
@@ -100,10 +159,6 @@ namespace TalentHub.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CandidateId"));
-
-                    b.Property<string>("Address")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
 
                     b.Property<DateTime?>("DateOfBirth")
                         .HasColumnType("datetime2");
@@ -780,6 +835,17 @@ namespace TalentHub.Migrations
                     b.ToTable("VacancySkills");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.Address", b =>
+                {
+                    b.HasOne("TalentHub.Models.Candidate", "Candidate")
+                        .WithMany("Addresses")
+                        .HasForeignKey("CandidateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Candidate");
+                });
+
             modelBuilder.Entity("TalentHub.Models.Application", b =>
                 {
                     b.HasOne("TalentHub.Models.Candidate", "Candidate")
@@ -969,7 +1035,7 @@ namespace TalentHub.Migrations
                     b.HasOne("TalentHub.Models.Recruiter", "Recruiter")
                         .WithMany("VacanciesCreated")
                         .HasForeignKey("CreatedByRecruiterId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("TalentHub.Models.Department", "Department")
@@ -1024,6 +1090,8 @@ namespace TalentHub.Migrations
 
             modelBuilder.Entity("TalentHub.Models.Candidate", b =>
                 {
+                    b.Navigation("Addresses");
+
                     b.Navigation("Applications");
 
                     b.Navigation("CandidateSkills");

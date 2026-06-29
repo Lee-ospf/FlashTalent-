@@ -41,7 +41,7 @@ namespace TalentHub.Controllers
                 Gender = request.Gender,
                 Race = request.Race,
                 Nationality = request.Nationality,
-                Address = request.Address,
+  
                 DateOfBirth = request.DateOfBirth,
                 
                 RegisteredAt = DateTime.UtcNow
@@ -106,7 +106,7 @@ namespace TalentHub.Controllers
             candidate.Gender = request.Gender;
             candidate.Race = request.Race;
             candidate.Nationality = request.Nationality;
-            candidate.Address = request.Address;
+           
             candidate.DateOfBirth = request.DateOfBirth;
             
 
@@ -129,7 +129,7 @@ namespace TalentHub.Controllers
                 Gender = c.Gender,
                 Race = c.Race,
                 Nationality = c.Nationality,
-                Address = c.Address,
+             
                 DateOfBirth = c.DateOfBirth,
                
                 RegisteredAt = c.RegisteredAt,

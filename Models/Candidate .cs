@@ -28,8 +28,7 @@ namespace TalentHub.Models
         [MaxLength(50)]
         public string? Nationality { get; set; }
 
-        [MaxLength(300)]
-        public string? Address { get; set; }
+        
 
         public DateTime? DateOfBirth { get; set; }
 
@@ -44,6 +43,8 @@ namespace TalentHub.Models
         public ICollection<CandidateSkill> CandidateSkills { get; set; } = new List<CandidateSkill>();
         public ICollection<CandidateQualification> Qualifications { get; set; } = new List<CandidateQualification>();
         public ICollection<CandidateExperience> Experiences { get; set; } = new List<CandidateExperience>();
+        public ICollection<Address> Addresses { get; set; } = new List<Address>();
+
         public TalentPool? TalentPoolEntry { get; set; }
     }
 }

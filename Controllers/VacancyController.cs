@@ -85,9 +85,8 @@ namespace TalentHub.Controllers
                     .Where(s => dto.SkillIds.Contains(s.SkillId))
                     .Select(s => s.SkillId)
                     .ToListAsync();
-
                 vacancy.VacancySkills = validSkillIds
-                    .Select(id => new VacancySkill { SkillId = id })
+                    .Select(id => new VacancySkill { SkillId = id, ProficiencyLevel = "Intermediate" })
                     .ToList();
             
 
@@ -237,8 +236,8 @@ namespace TalentHub.Controllers
 
             vacancy.VacancySkills.Clear();
             vacancy.VacancySkills = validSkillIds
-                .Select(skillId => new VacancySkill { VacancyId = vacancy.VacancyId, SkillId = skillId })
-                .ToList();
+    .Select(skillId => new VacancySkill { VacancyId = vacancy.VacancyId, SkillId = skillId, ProficiencyLevel = "Intermediate" })
+    .ToList();
 
             // Replace required documents entirely
             vacancy.RequiredDocuments.Clear();

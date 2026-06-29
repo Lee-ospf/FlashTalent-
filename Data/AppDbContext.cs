@@ -18,6 +18,7 @@ namespace TalentHub.Data
         public DbSet<Employee> Employees => Set<Employee>();
         public DbSet<TalentPool> TalentPoolEntries => Set<TalentPool>();
         public DbSet<Recruiter> Recruiters => Set<Recruiter>();
+
         public DbSet<Vacancy> Vacancies => Set<Vacancy>();
         public DbSet<Interview> Interviews => Set<Interview>();
         public DbSet<Skill> Skills => Set<Skill>();
@@ -25,10 +26,28 @@ namespace TalentHub.Data
         public DbSet<CandidateQualification> CandidateQualifications => Set<CandidateQualification>();
         public DbSet<CandidateExperience> CandidateExperiences => Set<CandidateExperience>();
         public DbSet<Client> Clients => Set<Client>();
+        public DbSet<Address> Addresses => Set<Address>();
         public DbSet<Department> Departments => Set<Department>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // ---------- Address: one-to-many from Candidate, type-flagged ----------
+            modelBuilder.Entity<Address>()
+                .HasOne(a => a.Candidate)
+                .WithMany(c => c.Addresses)
+                .HasForeignKey(a => a.CandidateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Address>()
+                .Property(a => a.AddressType)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            // A candidate can only have one address of each type (one Residential, one Postal)
+            modelBuilder.Entity<Address>()
+                .HasIndex(a => new { a.CandidateId, a.AddressType })
+                .IsUnique();
 
             // ---------- CandidateQualification ----------
             modelBuilder.Entity<CandidateQualification>()
@@ -112,6 +131,12 @@ namespace TalentHub.Data
             modelBuilder.Entity<Application>()
                 .HasIndex(a => new { a.CandidateId, a.VacancyId })
                 .IsUnique();
+
+            modelBuilder.Entity<Vacancy>()
+    .HasOne(v => v.Recruiter)
+    .WithMany(r => r.VacanciesCreated)
+    .HasForeignKey(v => v.CreatedByRecruiterId)
+    .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<ApplicationStatusHistory>()
                 .HasOne(h => h.Application)
