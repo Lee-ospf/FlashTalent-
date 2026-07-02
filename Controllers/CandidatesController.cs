@@ -33,7 +33,18 @@ namespace TalentHub.Controllers
             {
                 return Conflict(new { message = "This user already has a candidate profile." });
             }
+            if (request.DateOfBirth > DateTime.UtcNow)
+            {
+                return BadRequest(new { message = "Date of Birth cannot be in the future." });
+            }
 
+            var age = DateTime.UtcNow.Year - request.DateOfBirth.Year;
+            if (request.DateOfBirth.Date > DateTime.UtcNow.AddYears(-age).Date) age--;
+
+            if (age < 18)
+            {
+                return BadRequest(new { message = "Candidates must be at least 18 years old to register." });
+            }
             var candidate = new Candidate
             {
                 UserId = request.UserId,
@@ -101,6 +112,19 @@ namespace TalentHub.Controllers
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {id}." });
             }
+            if (request.DateOfBirth > DateTime.UtcNow)
+            {
+                return BadRequest(new { message = "Date of Birth cannot be in the future." });
+            }
+
+            var age = DateTime.UtcNow.Year - request.DateOfBirth.Year;
+            if (request.DateOfBirth.Date > DateTime.UtcNow.AddYears(-age).Date) age--;
+
+            if (age < 18)
+            {
+                return BadRequest(new { message = "Candidates must be at least 18 years old to register." });
+            }
+
 
             candidate.Phone = request.Phone;
             candidate.Gender = request.Gender;
