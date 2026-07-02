@@ -47,6 +47,20 @@ namespace TalentHub.Controllers
                 if (!clientExists)
                     return BadRequest($"Client with ID {dto.ClientId} does not exist.");
             }
+            if (string.IsNullOrWhiteSpace(dto.Location))
+                return BadRequest("Location is required.");
+
+            if (dto.ClosingDate is null)
+                return BadRequest("Closing Date is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.RequiredQualifications))
+                return BadRequest("Qualifications are required.");
+
+            if (dto.MinYearsExperience is null)
+                return BadRequest("Experience is required.");
+
+            if (dto.SkillIds is null || !dto.SkillIds.Any())
+                return BadRequest("At least one required skill must be specified.");
             var vacancy = new Vacancy
             {
                 Title = dto.Title,
@@ -66,8 +80,7 @@ namespace TalentHub.Controllers
                 Status = VacancyStatus.Draft
             };
 
-            if (dto.SkillIds.Any())
-            {
+      
                 var validSkillIds = await _context.Skills
                     .Where(s => dto.SkillIds.Contains(s.SkillId))
                     .Select(s => s.SkillId)
@@ -75,7 +88,7 @@ namespace TalentHub.Controllers
                 vacancy.VacancySkills = validSkillIds
                     .Select(id => new VacancySkill { SkillId = id, ProficiencyLevel = "Intermediate" })
                     .ToList();
-            }
+            
 
             vacancy.RequiredDocuments = dto.RequiredDocuments
                 .Select(rd => new VacancyDocument
@@ -186,6 +199,21 @@ namespace TalentHub.Controllers
 
             if (dto.SalaryMin.HasValue && dto.SalaryMax.HasValue && dto.SalaryMin > dto.SalaryMax)
                 return BadRequest("SalaryMin cannot be greater than SalaryMax.");
+            if (string.IsNullOrWhiteSpace(dto.Location))
+                return BadRequest("Location is required.");
+
+            if (dto.ClosingDate is null)
+                return BadRequest("Closing Date is required.");
+
+            if (string.IsNullOrWhiteSpace(dto.RequiredQualifications))
+                return BadRequest("Qualifications are required.");
+
+            if (dto.MinYearsExperience is null)
+                return BadRequest("Experience is required.");
+
+            if (dto.SkillIds is null || !dto.SkillIds.Any())
+                return BadRequest("At least one required skill must be specified.");
+
             vacancy.Title = dto.Title;
             vacancy.Description = dto.Description;
             vacancy.VacancyType = dto.VacancyType;
@@ -227,10 +255,7 @@ namespace TalentHub.Controllers
             return Ok(MapToResponse(vacancy));
         }
         // GET: api/Vacancy
-        // Optional ?status= query param lets callers filter by lifecycle state.
-        // Candidate-facing frontend should call GET /api/Vacancy?status=Published
-        // (only live postings). Recruiter-facing frontend omits the filter to see
-        // Draft/Published/Closed for managing their own postings.
+        // Returns all the vacancies(draft, published or closed, this is to accessed by recruiter, admin or HR
         [HttpGet]
         public async Task<ActionResult<List<VacancyResponse>>> GetAllVacancies([FromQuery] VacancyStatus? status = null)
         {
@@ -261,6 +286,22 @@ namespace TalentHub.Controllers
 
             return Ok(MapToResponse(vacancy));
         }
+        // GET: api/Vacancy/published
+        // Candidate-facing endpoint. Returns only the published jobs this is to be accessed by candidates.
+        
+        [HttpGet("published")]
+        public async Task<ActionResult<List<VacancyResponse>>> GetPublishedVacancies()
+        {
+            var vacancies = await _context.Vacancies
+                .Include(v => v.VacancySkills)
+                .Include(v => v.RequiredDocuments)
+                .Where(v => v.Status == VacancyStatus.Published)
+                .ToListAsync();
+
+            var result = vacancies.Select(v => MapToResponse(v)).ToList();
+
+            return Ok(result);
+        }
         private static VacancyResponse MapToResponse(Vacancy v)
         {
             return new VacancyResponse
@@ -282,6 +323,7 @@ namespace TalentHub.Controllers
                 Status = v.Status.ToString(),
                 CreatedByRecruiterId = v.CreatedByRecruiterId,
                 CreatedAt = v.CreatedAt,
+                PublishedAt = v.PublishedAt,
                 SkillIds = v.VacancySkills?.Select(vs => vs.SkillId).ToList() ?? new(),
                 RequiredDocuments = v.RequiredDocuments?.Select(rd => new RequiredDocumentDto
                 {

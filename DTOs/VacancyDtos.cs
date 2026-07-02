@@ -65,10 +65,10 @@ namespace TalentHub.DTOs
         public string Status { get; set; }
         public int CreatedByRecruiterId { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DateTime? PublishedAt { get; set; }
         public List<int> SkillIds { get; set; } = new();
         public List<RequiredDocumentDto> RequiredDocuments { get; set; } = new();
     }
-
     public class UpdateVacancyDto
     {
         public string Title { get; set; }
