@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;//for converting enums to string when they are saved in the database
 using TalentHub.Models;
 
 namespace TalentHub.Data
@@ -197,6 +198,20 @@ namespace TalentHub.Data
                 .WithMany()
                 .HasForeignKey(t => t.LastVacancyId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+
+            // convert all enums to strings in the database for readability
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType.IsEnum)
+                    {
+                        var converterType = typeof(EnumToStringConverter<>).MakeGenericType(property.ClrType);
+                        var converter = (ValueConverter)Activator.CreateInstance(converterType, (ConverterMappingHints?)null)!;
+                        property.SetValueConverter(converter);
+                    }
+                }
+            }
 
             modelBuilder.Entity<User>().Property(u => u.Role).HasConversion<string>().HasMaxLength(20);
             modelBuilder.Entity<CandidateDocument>().Property(d => d.DocumentType).HasConversion<string>().HasMaxLength(30);

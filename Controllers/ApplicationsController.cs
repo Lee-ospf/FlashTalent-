@@ -250,6 +250,52 @@ namespace TalentHub.Controllers
             return Ok(history);
         }
 
+        [HttpPut("{id}/changeStatus")]
+        public async Task<ActionResult<ApplicationResponse>> StartReview(int id, [FromQuery] int changedByUserId)
+        {
+            var application = await _db.Applications
+                .Include(a => a.Candidate).ThenInclude(c => c!.User)
+                .Include(a => a.Vacancy)
+                .FirstOrDefaultAsync(a => a.ApplicationId == id);
+
+            if (application == null || application.Candidate == null || application.Vacancy == null)
+            {
+                return NotFound(new { message = $"No application found with ApplicationId {id}." });
+            }
+
+            var changedByUser = await _db.Users.FindAsync(changedByUserId);
+            if (changedByUser == null)
+            {
+                return BadRequest(new { message = $"No user found with ChangedByUserId {changedByUserId}." });
+            }
+
+            var oldStatus = application.Status;
+            const ApplicationStatus newStatus = ApplicationStatus.UnderReview;
+
+            if (!_statusRules.IsValidTransition(oldStatus, newStatus))
+            {
+                return BadRequest(new
+                {
+                    message = $"Cannot move application from '{oldStatus}' to '{newStatus}'. This is not a valid pipeline transition."
+                });
+            }
+
+            application.Status = newStatus;
+            application.UpdatedAt = DateTime.UtcNow;
+
+            _db.ApplicationStatusHistories.Add(new ApplicationStatusHistory
+            {
+                ApplicationId = application.ApplicationId,
+                OldStatus = oldStatus,
+                NewStatus = newStatus,
+                ChangedByUserId = changedByUserId,
+                ChangedAt = DateTime.UtcNow
+            });
+
+            await _db.SaveChangesAsync();
+
+            return Ok(MapToResponse(application, application.Candidate, application.Vacancy));
+        }
         private static ApplicationResponse MapToResponse(Application a, Candidate c, Vacancy v)
         {
             return new ApplicationResponse
