@@ -28,9 +28,9 @@ namespace TalentHub.Models
         [MaxLength(50)]
         public string? Nationality { get; set; }
 
-        
 
-        public DateTime? DateOfBirth { get; set; }
+        [Required]
+        public DateTime DateOfBirth { get; set; }
 
         
         
