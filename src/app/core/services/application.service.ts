@@ -27,7 +27,10 @@ export class ApplicationService {
     return this.http.get<ApplicationResponse>(`${this.base}/${id}`)
       .pipe(catchError(this.handleError));
   }
-
+getByVacancy(vacancyId: number): Observable<ApplicationResponse[]> {
+  return this.http.get<ApplicationResponse[]>(`${this.base}/vacancy/${vacancyId}`)
+    .pipe(catchError(this.handleError));
+}
   getHistory(applicationId: number): Observable<ApplicationStatusHistoryResponse[]> {
     return this.http.get<ApplicationStatusHistoryResponse[]>(`${this.base}/${applicationId}/history`)
       .pipe(catchError(this.handleError));

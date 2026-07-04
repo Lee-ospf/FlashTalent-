@@ -48,6 +48,24 @@ interface NavItem {
             }
           </a>
         }
+
+        @if (isAdmin()) {
+          <div class="nav-section-title">Recruitment</div>
+
+          @for (item of adminNavItems; track item.route) {
+            <a class="nav-link"
+               [routerLink]="item.route"
+               routerLinkActive="active"
+               [matTooltip]="collapsed ? item.label : ''"
+               matTooltipPosition="right">
+              <i class="ti {{ item.icon }}"></i>
+              <span class="nav-label">{{ item.label }}</span>
+              @if (item.badge) {
+                <span class="nav-badge">{{ item.badge }}</span>
+              }
+            </a>
+          }
+        }
       </nav>
 
       <!-- Footer -->
@@ -55,7 +73,7 @@ interface NavItem {
         <div class="sidebar-footer-avatar">{{ initials() }}</div>
         <div class="sidebar-footer-user">
           <div class="fu-name">{{ fullName() }}</div>
-          <div class="fu-role">Candidate</div>
+          <div class="fu-role">{{ auth.currentUser()?.role }}</div>
         </div>
         <button class="sidebar-footer-logout"
                 (click)="logout()"
@@ -71,7 +89,7 @@ export class SidebarComponent {
   @Input() collapsed = false;
   @Output() toggleSidebar = new EventEmitter<void>();
 
-  private auth = inject(AuthService);
+  auth = inject(AuthService);
   private state = inject(CandidateStateService);
   private router = inject(Router);
 
@@ -81,7 +99,23 @@ export class SidebarComponent {
     { label: 'Documents',        icon: 'ti-files',             route: '/documents' },
     { label: 'Vacancies',        icon: 'ti-briefcase',         route: '/vacancies' },
     { label: 'My Applications',  icon: 'ti-file-check',        route: '/applications' },
+    { label: 'My Skills', icon: 'ti-bulb', route: '/skills' },
+{ label: 'Experience', icon: 'ti-briefcase', route: '/experience' },
+{ label: 'Qualifications', icon: 'ti-school', route: '/qualifications' },
   ];
+
+  adminNavItems: NavItem[] = [
+  { label: 'Manage Vacancies', icon: 'ti-briefcase-2', route: '/admin/vacancies' },
+  { label: 'Manage Skills', icon: 'ti-tools', route: '/admin/skills' },
+  { label: 'Manage Departments', icon: 'ti-building-community', route: '/admin/departments' },
+  { label: 'Manage Applications', icon: 'ti-chart-arrows-vertical', route: '/admin/applications' },
+  { label: 'Manage Clients', icon: 'ti-building-bank', route: '/admin/clients' },
+  { label: 'Manage Recruiters', icon: 'ti-user-star', route: '/admin/recruiters' },
+];
+
+  isAdmin(): boolean {
+    return this.auth.currentUser()?.role === 'Admin';
+  }
 
   fullName = () => {
     const u = this.auth.currentUser();

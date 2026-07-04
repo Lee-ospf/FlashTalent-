@@ -134,7 +134,7 @@ export interface VacancyResponse {
   status: string;               // 'Draft' | 'Published' | 'Closed'
   createdByRecruiterId: number;
   createdAt: string;
-  skillIds: number[];
+  skills: VacancySkillDto[];
   requiredDocuments: RequiredDocumentDto[];   // ← NEW: recruiter-defined docs for this specific vacancy
 }
 
@@ -143,7 +143,11 @@ export interface CreateApplicationRequest {
   candidateId: number;
   vacancyId: number;
 }
-
+export interface VacancySkillDto {
+  skillId: number;
+  isRequired: boolean;
+  proficiencyLevel: string;
+}
 export interface ApplicationResponse {
   applicationId: number;
   candidateId: number;
@@ -172,4 +176,121 @@ export interface ApplicationStatusHistoryResponse {
 export interface ApiError {
   message: string;
   missingDocumentTypes?: string[];
+}
+export interface VacancySkillInput {
+  skillId: number;
+  isRequired: boolean;
+  proficiencyLevel: string;
+}
+
+export interface RequiredDocumentInput {
+  documentType: string;
+  isMandatory: boolean;
+}
+
+export interface CreateVacancyRequest {
+  recruiterId: number;
+  title: string;
+  description: string;
+  vacancyType: 'Internal' | 'ClientPlacement';
+  departmentId?: number;
+  clientId?: number;
+  employmentType: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  location: string;
+  closingDate: string;
+  minYearsExperience: number;
+  requiredQualifications: string;
+  requirements?: string;
+  skills: VacancySkillInput[];
+  requiredDocuments: RequiredDocumentInput[];
+}
+
+export interface UpdateVacancyRequest extends Omit<CreateVacancyRequest, 'recruiterId'> {}
+export interface SkillResponse {
+  skillId: number;
+  name: string;
+  category: string;
+}
+
+export interface DepartmentResponse {
+  departmentId: number;
+  name: string;
+  isActive: boolean;
+}
+
+export interface ClientResponse {
+  clientId: number;
+  clientName: string;
+  contactPerson?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+}
+
+export interface RecruiterResponse {
+  recruiterId: number;
+  userId: number;
+  jobTitle?: string;
+  fullName?: string;
+  email?: string;
+}
+// ── Client (admin) ──────────────────────────────────────────────
+export interface CreateClientRequest {
+  clientName: string;
+  contactPerson?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+}
+
+// ── Candidate Skills ─────────────────────────────────────────────
+export interface CandidateSkillResponse {
+  candidateSkillId: number;
+  skillId: number;
+  skillName: string;
+  category: string;
+  proficiencyLevel: string;
+  addedAt: string;
+}
+
+export interface AssignSkillsRequest {
+  skills: { skillId: number; proficiencyLevel: string }[];
+}
+
+// ── Candidate Experience ──────────────────────────────────────────
+export interface CreateExperienceRequest {
+  company: string;
+  role: string;
+  startDate: string;
+  endDate?: string;
+  projectsAndDuties?: string;
+}
+
+export interface ExperienceResponse {
+  candidateExperienceId: number;
+  candidateId: number;
+  company: string;
+  role: string;
+  startDate: string;
+  endDate?: string;
+  projectsAndDuties?: string;
+}
+
+// ── Candidate Qualifications ──────────────────────────────────────
+export type QualificationType = 'Education' | 'Certification';
+
+export interface CreateQualificationRequest {
+  qualificationType: QualificationType;
+  name: string;
+  institution: string;
+  yearCompleted: string; // ISO date string — backend stores this as DateTime, not a plain year
+}
+
+export interface QualificationResponse {
+  candidateQualificationId: number;
+  candidateId: number;
+  qualificationType: string;
+  name: string;
+  institution: string;
+  yearCompleted: string;
 }

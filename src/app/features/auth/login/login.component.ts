@@ -33,7 +33,7 @@ import { ToastService } from '../../../core/services/toast.service';
 
         <div class="auth-tagline">
           <h2>Your career journey<br>starts here</h2>
-          <p>Apply for positions, track your applications, and manage your documents — all in one place.</p>
+      
         </div>
 
         <div class="auth-features">
@@ -95,7 +95,7 @@ import { ToastService } from '../../../core/services/toast.service';
           </form>
 
           <p class="auth-footer">
-            No account yet? <a routerLink="/register">Create one — it's free</a>
+            No account yet? <a routerLink="/register">Create one </a>
           </p>
         </div>
       </div>
