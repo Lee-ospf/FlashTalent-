@@ -19,7 +19,7 @@ namespace TalentHub.Models
 
         public bool IsRequired { get; set; } = true;
 
-        // e.g. Beginner / Intermediate / Advanced — could be an enum
+        // e.g. Beginner / Intermediate / Advanced
         [MaxLength(50)]
         public string ProficiencyLevel { get; set; }
 

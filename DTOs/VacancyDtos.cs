@@ -5,7 +5,7 @@ namespace TalentHub.DTOs
 {
     public class RequiredDocumentDto
     {
-        public DocumentType DocumentType { get; set; }
+        public string DocumentType { get; set; } = string.Empty;
         public bool IsMandatory { get; set; } = true;
     }
 
@@ -20,7 +20,7 @@ namespace TalentHub.DTOs
         public string Description { get; set; }
 
         [Required]
-        public VacancyType VacancyType { get; set; }
+        public string VacancyType { get; set; } = string.Empty;
 
         public int? DepartmentId { get; set; }     // required if Internal
         public int? ClientId { get; set; }         // required if ClientPlacement
@@ -42,7 +42,7 @@ namespace TalentHub.DTOs
 
         public string Requirements { get; set; }
 
-        public List<int> SkillIds { get; set; } = new();
+        public List<VacancySkillDto> Skills { get; set; } = new();
 
         public List<RequiredDocumentDto> RequiredDocuments { get; set; } = new();
     }
@@ -66,14 +66,14 @@ namespace TalentHub.DTOs
         public int CreatedByRecruiterId { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? PublishedAt { get; set; }
-        public List<int> SkillIds { get; set; } = new();
+        public List<VacancySkillDto> Skills { get; set; } = new();
         public List<RequiredDocumentDto> RequiredDocuments { get; set; } = new();
     }
     public class UpdateVacancyDto
     {
         public string Title { get; set; }
         public string Description { get; set; }
-        public VacancyType VacancyType { get; set; }
+        public string VacancyType { get; set; }
         public int? DepartmentId { get; set; }
         public int? ClientId { get; set; }
         public EmploymentType EmploymentType { get; set; }
@@ -84,7 +84,7 @@ namespace TalentHub.DTOs
         public int? MinYearsExperience { get; set; }
         public string RequiredQualifications { get; set; } 
         public string Requirements { get; set; }
-        public List<int> SkillIds { get; set; } = new();
+        public List<VacancySkillDto> Skills { get; set; } = new();
         public List<RequiredDocumentDto> RequiredDocuments { get; set; } = new();
     }
 }

@@ -250,7 +250,7 @@ namespace TalentHub.Controllers
             return Ok(history);
         }
 
-        private static ApplicationResponse MapToResponse(Application a, Candidate c, Vacancy v)
+      private static ApplicationResponse MapToResponse(Application a, Candidate c, Vacancy v)
         {
             return new ApplicationResponse
             {

@@ -8,8 +8,12 @@ using TalentHub.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // ---------- Services ----------
-
-builder.Services.AddControllers();
+//convert enum to string in json
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 
 // EF Core + SQL Server (LocalDB)
 builder.Services.AddDbContext<AppDbContext>(options =>
