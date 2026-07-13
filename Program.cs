@@ -63,6 +63,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IDocumentValidationService, DocumentValidationService>();
 builder.Services.AddScoped<IApplicationStatusRules, ApplicationStatusRules>();
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 

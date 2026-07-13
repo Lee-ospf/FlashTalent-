@@ -10,10 +10,14 @@ namespace TalentHub.DTOs
         [Required, MaxLength(100)]
         public string LastName { get; set; } = string.Empty;
 
-        [Required, EmailAddress, MaxLength(150)]
+        [Required, MaxLength(150)]
+        [RegularExpression(@"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
+    ErrorMessage = "Invalid Email Address format.")]
         public string Email { get; set; } = string.Empty;
 
-        [Required, MinLength(8)]
+        [Required]
+        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}|;':"",./<>?]).{8,}$",
+    ErrorMessage = "Password must be at least 8 characters and contain at least one uppercase letter, one lowercase letter, one number, and one special character (!@#$%^&* etc).")]
         public string Password { get; set; } = string.Empty;
     }
 

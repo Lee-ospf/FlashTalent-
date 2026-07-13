@@ -8,7 +8,7 @@ namespace TalentHub.DTOs
         public int UserId { get; set; }
 
         [RegularExpression(@"^(\+?27|0)[6-8][0-9]{8}$",
-    ErrorMessage = "Phone number must be a valid South African mobile number (e.g. 0821234567 or +27821234567).")]
+        ErrorMessage = "Phone number must be a valid South African mobile number (e.g. 0821234567 or +27821234567).")]
         public string? Phone { get; set; }
 
         [MaxLength(20)]
@@ -20,8 +20,7 @@ namespace TalentHub.DTOs
         [MaxLength(50)]
         public string? Nationality { get; set; }
 
-        [MaxLength(300)]
-        //public string? Address { get; set; }
+        
 
         [Required]
         public DateTime DateOfBirth { get; set; }
@@ -44,8 +43,7 @@ namespace TalentHub.DTOs
         [MaxLength(50)]
         public string? Nationality { get; set; }
 
-        [MaxLength(300)]
-        //public string? Address { get; set; }
+       
 
         [Required]
         public DateTime DateOfBirth { get; set; }

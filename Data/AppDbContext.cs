@@ -94,6 +94,10 @@ namespace TalentHub.Data
 
             // A skill name must be unique (no duplicate "C#" entries created by Admin)
             modelBuilder.Entity<Skill>()
+               .Property(s => s.Category)
+               .HasConversion<string>()
+               .HasMaxLength(20);
+            modelBuilder.Entity<Skill>()
                 .HasIndex(s => s.Name)
                 .IsUnique();
             modelBuilder.Entity<User>()

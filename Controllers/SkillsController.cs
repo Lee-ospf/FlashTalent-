@@ -26,9 +26,12 @@ namespace TalentHub.Controllers
 
             if (!string.IsNullOrWhiteSpace(category))
             {
-                query = query.Where(s => s.Category == category);
+                if (!Enum.TryParse<SkillCategory>(category, true, out var parsedCategory))
+                {
+                    return BadRequest(new { message = $"Invalid category '{category}'. Valid values: Technical, SoftSkill." });
+                }
+                query = query.Where(s => s.Category == parsedCategory);
             }
-
             var skills = await query
                 .OrderBy(s => s.Category)
                 .ThenBy(s => s.Name)
@@ -36,7 +39,7 @@ namespace TalentHub.Controllers
                 {
                     SkillId = s.SkillId,
                     Name = s.Name,
-                    Category = s.Category
+                    Category = s.Category.ToString()
                 })
                 .ToListAsync();
 
@@ -53,7 +56,7 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No skill found with SkillId {id}." });
             }
 
-            return Ok(new SkillResponse { SkillId = skill.SkillId, Name = skill.Name, Category = skill.Category });
+            return Ok(new SkillResponse { SkillId = skill.SkillId, Name = skill.Name, Category = skill.Category.ToString() });
         }
 
         // POST api/skills
@@ -66,17 +69,22 @@ namespace TalentHub.Controllers
                 return Conflict(new { message = $"A skill named '{request.Name}' already exists." });
             }
 
+            if (!Enum.TryParse<SkillCategory>(request.Category, true, out var parsedCategory))
+            {
+                return BadRequest(new { message = $"Invalid category '{request.Category}'. Valid values: Technical, SoftSkill." });
+            }
+
             var skill = new Skill
             {
                 Name = request.Name,
-                Category = request.Category,
+                Category = parsedCategory,
                 CreatedAt = DateTime.UtcNow
             };
 
             _db.Skills.Add(skill);
             await _db.SaveChangesAsync();
 
-            return Ok(new SkillResponse { SkillId = skill.SkillId, Name = skill.Name, Category = skill.Category });
+            return Ok(new SkillResponse { SkillId = skill.SkillId, Name = skill.Name, Category = skill.Category.ToString() });
         }
 
         // PUT api/skills/{id}
@@ -95,11 +103,16 @@ namespace TalentHub.Controllers
                 return Conflict(new { message = $"A different skill named '{request.Name}' already exists." });
             }
 
+            if (!Enum.TryParse<SkillCategory>(request.Category, true, out var parsedCategory))
+            {
+                return BadRequest(new { message = $"Invalid category '{request.Category}'. Valid values: Technical, SoftSkill." });
+            }
+
             skill.Name = request.Name;
-            skill.Category = request.Category;
+            skill.Category = parsedCategory;
             await _db.SaveChangesAsync();
 
-            return Ok(new SkillResponse { SkillId = skill.SkillId, Name = skill.Name, Category = skill.Category });
+            return Ok(new SkillResponse { SkillId = skill.SkillId, Name = skill.Name, Category = skill.Category.ToString() });
         }
 
         // DELETE api/skills/{id}

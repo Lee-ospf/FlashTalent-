@@ -3,6 +3,13 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TalentHub.Models
 {
+
+    public enum SkillCategory
+    {
+        Technical,
+        SoftSkill
+    }
+
     [Table("Skills")]
     public class Skill
     {
@@ -15,8 +22,8 @@ namespace TalentHub.Models
         // e.g. "Technical", "Soft Skills", "Languages" - free text for now so
         // Admin isn't locked into a fixed category enum; can tighten to an enum
         // later if the category list stabilizes.
-        [Required, MaxLength(50)]
-        public string Category { get; set; } = string.Empty;
+        [Required]
+        public SkillCategory Category { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

@@ -35,7 +35,7 @@ namespace TalentHub.Controllers
                     CandidateSkillId = cs.CandidateSkillId,
                     SkillId = cs.SkillId,
                     SkillName = cs.Skill!.Name,
-                    Category = cs.Skill!.Category,
+                    Category = cs.Skill!.Category.ToString(),
                     ProficiencyLevel = cs.ProficiencyLevel.ToString(),
                     AddedAt = cs.AddedAt
                 })
@@ -45,7 +45,7 @@ namespace TalentHub.Controllers
 
             return Ok(skills);
         }
-
+       
         // POST api/candidates/{candidateId}/skills
         // Body: { "skills": [{ "skillId": 1, "proficiencyLevel": "Intermediate" }, ...] }
         // If a skill is already assigned, its proficiency level is updated rather than duplicated.
