@@ -27,6 +27,11 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentTypeKey, string> = {
 // System-wide mandatory docs (always required, regardless of vacancy)
 export const GLOBAL_MANDATORY: DocumentTypeKey[] = ['CV', 'MatricCertificate'];
 
+// Types selectable via the generic "upload another document" dropdown on the Documents page.
+// 'Qualification' and 'Certification' are deliberately excluded here - those are now uploaded
+// in context from the Qualifications page (attached to a specific qualification entry) instead.
+export const FREE_UPLOAD_DOC_TYPES: DocumentTypeKey[] = ['Other'];
+
 // Client-side file validation — mirrors backend AllowedExtensions + MaxFileSizeBytes
 const ALLOWED_EXT   = ['.pdf', '.doc', '.docx'];
 const MAX_BYTES     = 5 * 1024 * 1024;
@@ -48,16 +53,25 @@ export class DocumentService {
     return `${environment.apiUrl}/candidates/${candidateId}/documents`;
   }
 
-  upload(candidateId: number, documentType: DocumentTypeKey, file: File): Observable<CandidateDocumentResponse> {
+  // qualificationId is optional - pass it when this file is proof/attachment for a specific
+  // qualification entry (e.g. a degree certificate), omit it for general standalone uploads.
+  upload(candidateId: number, documentType: DocumentTypeKey, file: File, qualificationId?: number): Observable<CandidateDocumentResponse> {
     const form = new FormData();
     form.append('documentType', documentType);
     form.append('file', file, file.name);
+    if (qualificationId != null) {
+      form.append('qualificationId', String(qualificationId));
+    }
     return this.http.post<CandidateDocumentResponse>(this.base(candidateId), form)
       .pipe(catchError(this.handleError));
   }
 
-  getAll(candidateId: number): Observable<CandidateDocumentResponse[]> {
-    return this.http.get<CandidateDocumentResponse[]>(this.base(candidateId))
+  // Optional qualificationId filter - pass it to get only documents attached to that qualification.
+  getAll(candidateId: number, qualificationId?: number): Observable<CandidateDocumentResponse[]> {
+    const url = qualificationId != null
+      ? `${this.base(candidateId)}?qualificationId=${qualificationId}`
+      : this.base(candidateId);
+    return this.http.get<CandidateDocumentResponse[]>(url)
       .pipe(catchError(this.handleError));
   }
 

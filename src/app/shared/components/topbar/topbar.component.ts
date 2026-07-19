@@ -10,11 +10,20 @@ import { CandidateStateService } from '../../../core/services/candidate-state.se
 import { filter, map } from 'rxjs/operators';
 
 const ROUTE_TITLES: Record<string, string> = {
-  '/dashboard':    'Dashboard',
-  '/profile':      'My Profile',
-  '/documents':    'Supporting Documents',
-  '/vacancies':    'Browse Vacancies',
-  '/applications': 'My Applications',
+  '/dashboard':          'Dashboard',
+  '/profile':            'My Profile',
+  '/documents':          'Supporting Documents',
+  '/vacancies':          'Browse Vacancies',
+  '/applications':       'My Applications',
+  '/skills':              'My Skills',
+  '/experience':          'Experience',
+  '/qualifications':      'Qualifications',
+  '/admin/vacancies':     'Manage Vacancies',
+  '/admin/applications':  'Manage Applications',
+  '/admin/skills':        'Manage Skills',
+  '/admin/departments':   'Manage Departments',
+  '/admin/clients':       'Manage Clients',
+  '/admin/recruiters':    'Manage Recruiters',
 };
 
 @Component({
@@ -34,7 +43,7 @@ const ROUTE_TITLES: Record<string, string> = {
           <div class="topbar-avatar">{{ initials() }}</div>
           <div style="text-align:left; margin-left: 8px">
             <div class="user-name">{{ fullName() }}</div>
-            <div class="user-role">Candidate</div>
+            <div class="user-role">{{ role() }}</div>
           </div>
           <i class="ti ti-chevron-down" style="font-size:14px;color:var(--text-muted);margin-left:4px"></i>
         </button>
@@ -44,12 +53,14 @@ const ROUTE_TITLES: Record<string, string> = {
             <div style="font-size:13px;font-weight:600">{{ fullName() }}</div>
             <div style="font-size:11px;color:var(--text-muted)">{{ email() }}</div>
           </div>
-          <button mat-menu-item routerLink="/profile">
-            <i class="ti ti-user" style="margin-right:10px;font-size:16px"></i> My Profile
-          </button>
-          <button mat-menu-item routerLink="/documents">
-            <i class="ti ti-files" style="margin-right:10px;font-size:16px"></i> Documents
-          </button>
+          @if (isCandidate()) {
+            <button mat-menu-item routerLink="/profile">
+              <i class="ti ti-user" style="margin-right:10px;font-size:16px"></i> My Profile
+            </button>
+            <button mat-menu-item routerLink="/documents">
+              <i class="ti ti-files" style="margin-right:10px;font-size:16px"></i> Documents
+            </button>
+          }
           <mat-divider></mat-divider>
           <button mat-menu-item (click)="logout()" style="color:var(--red)">
             <i class="ti ti-logout" style="margin-right:10px;font-size:16px"></i> Sign out
@@ -93,6 +104,11 @@ export class TopbarComponent {
   fullName = () => { const u = this.auth.currentUser(); return u ? `${u.firstName} ${u.lastName}` : ''; };
   initials = () => { const u = this.auth.currentUser(); return u ? (u.firstName[0] + u.lastName[0]).toUpperCase() : ''; };
   email    = () => this.auth.currentUser()?.email ?? '';
+  role     = () => this.auth.currentUser()?.role ?? '';
+
+  isCandidate(): boolean {
+    return this.auth.currentUser()?.role === 'Candidate';
+  }
 
   logout(): void {
     this.auth.logout();

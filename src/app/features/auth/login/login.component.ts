@@ -119,19 +119,25 @@ export class LoginComponent {
   });
 
   submit(): void {
-    this.form.markAllAsTouched();
-    this.apiError = '';
-    if (this.form.invalid) return;
-    this.loading = true;
-    const { email, password } = this.form.value;
-    this.auth.login({ email: email!, password: password! }).subscribe({
-      next: () => {
+  this.form.markAllAsTouched();
+  this.apiError = '';
+  if (this.form.invalid) return;
+  this.loading = true;
+  const { email, password } = this.form.value;
+  this.auth.login({ email: email!, password: password! }).subscribe({
+    next: () => {
+      const role = this.auth.currentUser()?.role;
+      if (role === 'Candidate') {
         this.state.loadMyProfile().subscribe({
           next: () => { this.loading = false; this.router.navigate(['/dashboard']); },
           error: () => { this.loading = false; this.router.navigate(['/dashboard']); }
         });
-      },
-      error: (err: Error) => { this.loading = false; this.apiError = err.message; }
-    });
-  }
+      } else {
+        this.loading = false;
+        this.router.navigate(['/dashboard']);
+      }
+    },
+    error: (err: Error) => { this.loading = false; this.apiError = err.message; }
+  });
+}
 }

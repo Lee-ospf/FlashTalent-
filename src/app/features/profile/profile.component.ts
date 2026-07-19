@@ -15,6 +15,10 @@ import { CandidateStateService } from '../../core/services/candidate-state.servi
 import { AddressService } from '../../core/services/address.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AddressResponse, AddressType } from '../../core/models';
+import { AddressAutocompleteService } from '../../core/services/address-autocomplete.service';
+import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+import { Subject, of } from 'rxjs';
+
 
 @Component({
   selector: 'app-profile',
@@ -147,11 +151,38 @@ import { AddressResponse, AddressType } from '../../core/models';
                 </div>
 
                 <div class="field-grid">
-                  <mat-form-field appearance="outline" style="width:100%">
-                    <mat-label>Address line 1</mat-label>
-                    <input matInput formControlName="line1" placeholder="Street address">
-                    @if (addrInvalid('line1')) { <mat-error>Required</mat-error> }
-                  </mat-form-field>
+                  <div style="position:relative;width:100%">
+                    <mat-form-field appearance="outline" style="width:100%">
+                      <mat-label>Address line 1</mat-label>
+                      <input matInput formControlName="line1"
+                        placeholder="Start typing your street address..."
+                        (input)="onAddressInput($any($event.target).value)"
+                        (blur)="hideSuggestionsDelayed()"
+                        autocomplete="off">
+                      @if (addrInvalid('line1')) { <mat-error>Required</mat-error> }
+                    </mat-form-field>
+
+                    @if (showSuggestions() && suggestions().length) {
+                      <div class="suggestions-dropdown">
+                        @for (s of suggestions(); track s.placeId) {
+                          <div class="suggestion-item"
+                            (mousedown)="selectSuggestion(s)">
+                            <i class="ti ti-map-pin" style="color:#1565c0;margin-right:8px"></i>
+                            <div>
+                              <div style="font-size:14px;font-weight:500">
+                                {{ s.placePrediction?.text?.text ?? s.description }}
+                              </div>
+                              @if (s.placePrediction?.structuredFormat?.secondaryText?.text) {
+                                <div style="font-size:12px;color:#888">
+                                  {{ s.placePrediction.structuredFormat.secondaryText.text }}
+                                </div>
+                              }
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
 
                   <mat-form-field appearance="outline" style="width:100%">
                     <mat-label>Address line 2</mat-label>
@@ -302,6 +333,31 @@ import { AddressResponse, AddressType } from '../../core/models';
         </form>
       }
     </div>
+    <style>
+      .suggestions-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        z-index: 1000;
+        max-height: 240px;
+        overflow-y: auto;
+      }
+      .suggestion-item {
+        display: flex;
+        align-items: center;
+        padding: 10px 14px;
+        cursor: pointer;
+        border-bottom: 1px solid #f5f5f5;
+        transition: background 0.1s;
+      }
+      .suggestion-item:last-child { border-bottom: none; }
+      .suggestion-item:hover { background: #f0f7ff; }
+    </style>
   `
 })
 export class ProfileComponent implements OnInit {
@@ -311,6 +367,11 @@ export class ProfileComponent implements OnInit {
   private addressService = inject(AddressService);
   state = inject(CandidateStateService);
   private toast = inject(ToastService);
+  private autocomplete = inject(AddressAutocompleteService);
+
+  suggestions = signal<any[]>([]);
+  showSuggestions = signal(false);
+  private searchInput$ = new Subject<string>();
 
   isEdit = false;
   loading = false;
@@ -366,6 +427,17 @@ export class ProfileComponent implements OnInit {
       this.initialLoading.set(false);
       this.loadAddresses();
     }
+
+    this.searchInput$.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(input => input.length >= 3
+        ? this.autocomplete.getSuggestions(input)
+        : of({ suggestions: [] }))
+    ).subscribe(response => {
+      this.suggestions.set(response?.suggestions ?? []);
+      this.showSuggestions.set(this.suggestions().length > 0);
+    });
   }
 
   private loadAddresses(): void {
@@ -396,6 +468,49 @@ export class ProfileComponent implements OnInit {
   cancelAddressEdit(): void {
     this.addressForm = { editing: false, mode: 'add', type: 'Residential' };
     this.addressApiError = '';
+  }
+
+  onAddressInput(value: string): void {
+    this.addrForm.patchValue({ line1: value });
+    this.searchInput$.next(value);
+  }
+
+  hideSuggestionsDelayed(): void {
+    // Small delay so mousedown on suggestion fires before blur hides the list
+    setTimeout(() => this.showSuggestions.set(false), 200);
+  }
+
+  selectSuggestion(suggestion: any): void {
+    const text = suggestion.placePrediction?.text?.text
+      ?? suggestion.description
+      ?? '';
+
+    // Extract structured parts if available
+    const structured = suggestion.placePrediction?.structuredFormat;
+    const mainText = structured?.mainText?.text ?? text;
+    const secondaryText = structured?.secondaryText?.text ?? '';
+
+    // Auto-fill line1 from the suggestion's main text (street + number)
+    this.addrForm.patchValue({ line1: mainText });
+
+    // Try to extract city and province from secondary text
+    // Google formats this as "City, Province, South Africa"
+    if (secondaryText) {
+      const parts = secondaryText.split(',').map((p: string) => p.trim());
+      if (parts.length >= 1) this.addrForm.patchValue({ city: parts[0] });
+      if (parts.length >= 2) {
+        // Match against known SA provinces
+        const provinces = ['Gauteng','Western Cape','KwaZulu-Natal','Eastern Cape',
+          'Free State','Limpopo','Mpumalanga','North West','Northern Cape'];
+        const matchedProvince = provinces.find(p =>
+          parts[1].toLowerCase().includes(p.toLowerCase())
+        );
+        if (matchedProvince) this.addrForm.patchValue({ province: matchedProvince });
+      }
+    }
+
+    this.showSuggestions.set(false);
+    this.suggestions.set([]);
   }
 
   addrInvalid(field: string): boolean {

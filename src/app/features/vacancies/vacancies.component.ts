@@ -80,7 +80,7 @@ import { VacancyResponse, ApplicationResponse, CandidateDocumentResponse } from 
               <mat-card-content style="padding:18px 20px">
                 <div class="vc-header">
                   <div class="vc-left">
-                    <div class="vc-title">{{ v.title }}</div>
+                    <a [routerLink]="['/vacancies', v.vacancyId]" class="vc-title vc-title-link">{{ v.title }}</a>
                     <div class="vc-ref">JDF-VAC-{{ v.vacancyId }}</div>
                   </div>
                   <div class="vc-pills">
@@ -140,6 +140,10 @@ import { VacancyResponse, ApplicationResponse, CandidateDocumentResponse } from 
                 <mat-divider style="margin:12px 0"></mat-divider>
 
                 <div class="vc-footer">
+                  <a [routerLink]="['/vacancies', v.vacancyId]" class="card-link" style="font-size:12px">
+                    View details <i class="ti ti-arrow-right"></i>
+                  </a>
+
                   @if (hasApplied(v.vacancyId)) {
                     <span class="applied-tag">
                       <i class="ti ti-circle-check"></i> Applied
@@ -174,6 +178,11 @@ import { VacancyResponse, ApplicationResponse, CandidateDocumentResponse } from 
         </div>
       }
     </div>
+    <style>
+      .vc-title-link { color: var(--text); text-decoration: none; cursor: pointer; }
+      .vc-title-link:hover { color: var(--navy); text-decoration: underline; }
+      .vc-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    </style>
   `
 })
 export class VacanciesComponent implements OnInit {
@@ -208,8 +217,6 @@ export class VacanciesComponent implements OnInit {
     const p = this.state.profile();
     if (p) {
       this.appService.getByCandidate(p.candidateId).subscribe({ next: a => this.myApplications.set(a) });
-      // Full document list (not just the mandatory-status summary) — needed to check
-      // vacancy-specific requirements like Qualification/Certification, not just CV/Matric.
       this.docService.getAll(p.candidateId).subscribe({ next: d => this.myDocs.set(d) });
     }
   }
@@ -238,7 +245,6 @@ export class VacanciesComponent implements OnInit {
     return (DOCUMENT_TYPE_LABELS as Record<string, string>)[type] ?? type;
   }
 
-  // Every mandatory document this specific vacancy requires, that the candidate hasn't uploaded yet.
   missingDocsFor(v: VacancyResponse): string[] {
     return (v.requiredDocuments ?? [])
       .filter(rd => rd.isMandatory && !this.hasDoc(rd.documentType))

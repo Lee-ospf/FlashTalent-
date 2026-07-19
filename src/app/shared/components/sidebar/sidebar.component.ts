@@ -35,7 +35,7 @@ interface NavItem {
       <nav class="sidebar-nav">
         <div class="nav-section-title">Main</div>
 
-        @for (item of navItems; track item.route) {
+        @for (item of commonNavItems; track item.route) {
           <a class="nav-link"
              [routerLink]="item.route"
              routerLinkActive="active"
@@ -49,10 +49,28 @@ interface NavItem {
           </a>
         }
 
-        @if (isAdmin()) {
+        @if (isCandidate()) {
+          <div class="nav-section-title">My Career</div>
+
+          @for (item of candidateNavItems; track item.route) {
+            <a class="nav-link"
+               [routerLink]="item.route"
+               routerLinkActive="active"
+               [matTooltip]="collapsed ? item.label : ''"
+               matTooltipPosition="right">
+              <i class="ti {{ item.icon }}"></i>
+              <span class="nav-label">{{ item.label }}</span>
+              @if (item.badge) {
+                <span class="nav-badge">{{ item.badge }}</span>
+              }
+            </a>
+          }
+        }
+
+        @if (isStaff()) {
           <div class="nav-section-title">Recruitment</div>
 
-          @for (item of adminNavItems; track item.route) {
+          @for (item of staffNavItems; track item.route) {
             <a class="nav-link"
                [routerLink]="item.route"
                routerLinkActive="active"
@@ -93,28 +111,39 @@ export class SidebarComponent {
   private state = inject(CandidateStateService);
   private router = inject(Router);
 
-  navItems: NavItem[] = [
-    { label: 'Dashboard',        icon: 'ti-layout-dashboard', route: '/dashboard' },
-    { label: 'My Profile',       icon: 'ti-user-circle',      route: '/profile' },
-    { label: 'Documents',        icon: 'ti-files',             route: '/documents' },
-    { label: 'Vacancies',        icon: 'ti-briefcase',         route: '/vacancies' },
-    { label: 'My Applications',  icon: 'ti-file-check',        route: '/applications' },
-    { label: 'My Skills', icon: 'ti-bulb', route: '/skills' },
-{ label: 'Experience', icon: 'ti-briefcase', route: '/experience' },
-{ label: 'Qualifications', icon: 'ti-school', route: '/qualifications' },
+  // Visible to every logged-in role
+  commonNavItems: NavItem[] = [
+    { label: 'Dashboard', icon: 'ti-layout-dashboard', route: '/dashboard' },
   ];
 
-  adminNavItems: NavItem[] = [
-  { label: 'Manage Vacancies', icon: 'ti-briefcase-2', route: '/admin/vacancies' },
-  { label: 'Manage Skills', icon: 'ti-tools', route: '/admin/skills' },
-  { label: 'Manage Departments', icon: 'ti-building-community', route: '/admin/departments' },
-  { label: 'Manage Applications', icon: 'ti-chart-arrows-vertical', route: '/admin/applications' },
-  { label: 'Manage Clients', icon: 'ti-building-bank', route: '/admin/clients' },
-  { label: 'Manage Recruiters', icon: 'ti-user-star', route: '/admin/recruiters' },
-];
+  // Candidate only - self-service pages tied to "my own" candidate record
+  candidateNavItems: NavItem[] = [
+    { label: 'Vacancies',       icon: 'ti-briefcase',     route: '/vacancies' },
+    { label: 'My Profile',      icon: 'ti-user-circle', route: '/profile' },
+    { label: 'Documents',       icon: 'ti-files',        route: '/documents' },
+    { label: 'My Applications', icon: 'ti-file-check',   route: '/applications' },
+    { label: 'My Skills',       icon: 'ti-bulb',          route: '/skills' },
+    { label: 'Experience',      icon: 'ti-briefcase',     route: '/experience' },
+    { label: 'Qualifications',  icon: 'ti-school',        route: '/qualifications' },
+  ];
 
-  isAdmin(): boolean {
-    return this.auth.currentUser()?.role === 'Admin';
+  // Recruiter + Admin - shared team management pages
+  staffNavItems: NavItem[] = [
+    { label: 'Manage Vacancies',     icon: 'ti-briefcase-2',            route: '/admin/vacancies' },
+    { label: 'Manage Applications',  icon: 'ti-chart-arrows-vertical',  route: '/admin/applications' },
+    { label: 'Manage Skills',        icon: 'ti-tools',                   route: '/admin/skills' },
+    { label: 'Manage Departments',   icon: 'ti-building-community',      route: '/admin/departments' },
+    { label: 'Manage Clients',       icon: 'ti-building-bank',           route: '/admin/clients' },
+    { label: 'Manage Recruiters',    icon: 'ti-user-star',               route: '/admin/recruiters' },
+  ];
+
+  isCandidate(): boolean {
+    return this.auth.currentUser()?.role === 'Candidate';
+  }
+
+  isStaff(): boolean {
+    const role = this.auth.currentUser()?.role;
+    return role === 'Recruiter' || role === 'Admin';
   }
 
   fullName = () => {

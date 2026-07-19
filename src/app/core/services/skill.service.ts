@@ -14,9 +14,13 @@ export class SkillService {
   private http = inject(HttpClient);
   private base = `${environment.apiUrl}/Skills`;
 
-  getAll(): Observable<SkillResponse[]> {
-    return this.http.get<SkillResponse[]>(this.base).pipe(catchError(this.handleError));
-  }
+ getAll(): Observable<SkillResponse[]> {
+  return this.http.get<SkillResponse[]>(this.base).pipe(catchError(this.handleError));
+}
+
+getByCategory(category: 'Technical' | 'SoftSkill'): Observable<SkillResponse[]> {
+  return this.http.get<SkillResponse[]>(`${this.base}?category=${category}`).pipe(catchError(this.handleError));
+}
 
   create(req: CreateSkillRequest): Observable<SkillResponse> {
     return this.http.post<SkillResponse>(this.base, req).pipe(catchError(this.handleError));

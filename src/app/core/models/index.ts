@@ -100,6 +100,7 @@ export interface CandidateDocumentResponse {
   fileUrl: string;
   originalFileName: string;
   uploadedAt: string;
+  qualificationId?: number;
 }
 
 export interface MandatoryDocumentsStatusResponse {
@@ -161,7 +162,10 @@ export interface ApplicationResponse {
 
 export interface UpdateApplicationStatusRequest {
   newStatus: string;
-  changedByUserId: number;
+  // Optional - the backend now derives who made the change from the logged-in user's
+  // token, not from this field. Kept optional rather than removed in case anything
+  // else still references it, but it's safe to omit when calling updateStatus().
+  changedByUserId?: number;
 }
 
 export interface ApplicationStatusHistoryResponse {

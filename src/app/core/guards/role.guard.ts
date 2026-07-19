@@ -2,21 +2,28 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
-export const adminGuard: CanActivateFn = () => {
-  const auth = inject(AuthService);
-  const router = inject(Router);
+/**
+ * Usage: canActivate: [roleGuard(['Recruiter', 'Admin'])]
+ * Redirects to /login if not authenticated, or /dashboard if authenticated
+ * but not one of the allowed roles.
+ */
+export function roleGuard(allowedRoles: string[]): CanActivateFn {
+  return () => {
+    const auth = inject(AuthService);
+    const router = inject(Router);
 
-  const user = auth.currentUser();
+    const user = auth.currentUser();
 
-  if (!user) {
-    router.navigate(['/login']);
-    return false;
-  }
+    if (!user) {
+      router.navigate(['/login']);
+      return false;
+    }
 
-  if (user.role !== 'Admin') {
-    router.navigate(['/dashboard']);
-    return false;
-  }
+    if (!allowedRoles.includes(user.role)) {
+      router.navigate(['/dashboard']);
+      return false;
+    }
 
-  return true;
-};
+    return true;
+  };
+}

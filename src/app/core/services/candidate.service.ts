@@ -13,11 +13,16 @@ export class CandidateService {
     return this.http.post<CandidateResponse>(this.base, req).pipe(catchError(this.handleError));
   }
 
+  // Resolves the logged-in Candidate's own profile - no candidateId needed, no Recruiter/Admin role required.
+  getMyProfile(): Observable<CandidateResponse> {
+    return this.http.get<CandidateResponse>(`${this.base}/me`).pipe(catchError(this.handleError));
+  }
+
   getById(id: number): Observable<CandidateResponse> {
     return this.http.get<CandidateResponse>(`${this.base}/${id}`).pipe(catchError(this.handleError));
   }
 
-  // Find candidate profile by userId (the API returns all; we filter client-side)
+  // Recruiter/Admin only on the backend - talent pool browsing, not for resolving "my own" profile.
   getAll(): Observable<CandidateResponse[]> {
     return this.http.get<CandidateResponse[]>(this.base).pipe(catchError(this.handleError));
   }

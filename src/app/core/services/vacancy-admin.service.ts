@@ -4,6 +4,16 @@ import { Observable, catchError, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { CreateVacancyRequest, UpdateVacancyRequest, VacancyResponse } from '../models';
 
+export interface VacancyChangeHistoryEntry {
+  vacancyChangeHistoryId: number;
+  vacancyId: number;
+  vacancyTitle: string;
+  action: string;
+  details?: string;
+  changedByName: string;
+  changedAt: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class VacancyAdminService {
   private http = inject(HttpClient);
@@ -36,6 +46,11 @@ export class VacancyAdminService {
 
   getById(id: number): Observable<VacancyResponse> {
     return this.http.get<VacancyResponse>(`${this.base}/${id}`)
+      .pipe(catchError(this.handleError));
+  }
+
+  getHistory(id: number): Observable<VacancyChangeHistoryEntry[]> {
+    return this.http.get<VacancyChangeHistoryEntry[]>(`${this.base}/${id}/history`)
       .pipe(catchError(this.handleError));
   }
 

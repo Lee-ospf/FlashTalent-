@@ -15,7 +15,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { CandidateStateService } from '../../core/services/candidate-state.service';
 import {
   DocumentService, DocumentTypeKey, DOCUMENT_TYPE_LABELS,
-  ALL_DOC_TYPES, GLOBAL_MANDATORY, validateFileClient
+  ALL_DOC_TYPES, FREE_UPLOAD_DOC_TYPES, GLOBAL_MANDATORY, validateFileClient
 } from '../../core/services/document.service';
 import { VacancyService } from '../../core/services/vacancy.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -159,6 +159,10 @@ interface RequiredSlot {
             <div class="card-header"><i class="ti ti-plus"></i> Upload another document</div>
             <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">
               Select what type of document this is, then choose a file.
+              <span style="display:block;margin-top:4px">
+                <i class="ti ti-info-circle"></i> Uploading a qualification certificate or transcript? Add it from the
+                <a routerLink="/qualifications">Qualifications</a> page instead, attached to that specific entry.
+              </span>
             </p>
 
             <div class="additional-upload-row">
@@ -313,10 +317,11 @@ export class DocumentsComponent implements OnInit {
     return slots;
   });
 
-  // Dropdown only offers types NOT already shown as a required slot
+  // Dropdown only offers types NOT already shown as a required slot, and excludes
+  // Qualification/Certification - those are uploaded via the Qualifications page instead.
   dropdownTypes = computed<DocumentTypeKey[]>(() => {
     const requiredTypes = new Set(this.requiredSlots().map(s => s.type));
-    return ALL_DOC_TYPES.filter(t => !requiredTypes.has(t));
+    return FREE_UPLOAD_DOC_TYPES.filter(t => !requiredTypes.has(t));
   });
 
   // Uploaded documents whose type isn't one of the required slots (shown as a read-only list)

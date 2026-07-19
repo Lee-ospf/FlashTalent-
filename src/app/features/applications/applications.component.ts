@@ -1,5 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -26,7 +27,7 @@ const STATUS_LABEL: Record<string, string> = {
   selector: 'app-applications',
   standalone: true,
   imports: [
-    CommonModule, MatCardModule, MatButtonModule,
+    CommonModule, RouterLink, MatCardModule, MatButtonModule,
     MatIconModule, MatDividerModule, MatProgressSpinnerModule, MatChipsModule
   ],
   template: `
@@ -39,6 +40,17 @@ const STATUS_LABEL: Record<string, string> = {
           </p>
         </div>
       </div>
+
+      @if (!state.profile()) {
+        <div class="info-banner warn">
+          <i class="ti ti-alert-triangle"></i>
+          Create your <a routerLink="/profile">candidate profile</a> first to start applying and tracking applications.
+        </div>
+      }
+
+      @if (loadError()) {
+        <div class="api-error"><i class="ti ti-alert-circle"></i> {{ loadError() }}</div>
+      }
 
       <!-- Metrics -->
       <div class="metrics-grid" style="grid-template-columns:repeat(4,minmax(0,1fr))">
@@ -74,12 +86,12 @@ const STATUS_LABEL: Record<string, string> = {
 
       @if (loading()) {
         <div class="empty-state"><i class="ti ti-loader"></i><p>Loading applications…</p></div>
-      } @else if (!apps().length) {
+      } @else if (!apps().length && !loadError()) {
         <div class="empty-state">
           <i class="ti ti-clipboard-list"></i>
           <p>No applications yet.<br>Browse vacancies to apply.</p>
         </div>
-      } @else {
+      } @else if (apps().length) {
         <div class="app-list">
           @for (app of apps(); track app.applicationId) {
             <mat-card class="mat-elevation-z1 app-card" style="border-radius:12px;padding:0">
@@ -185,8 +197,9 @@ export class ApplicationsComponent implements OnInit {
   private appService = inject(ApplicationService);
   state = inject(CandidateStateService);
 
-  apps    = signal<ApplicationResponse[]>([]);
-  loading = signal(false);
+  apps      = signal<ApplicationResponse[]>([]);
+  loading   = signal(false);
+  loadError = signal('');
 
   private expanded     = signal<Set<number>>(new Set());
   historyLoading       = signal<Set<number>>(new Set());
@@ -194,11 +207,12 @@ export class ApplicationsComponent implements OnInit {
 
   ngOnInit(): void {
     const p = this.state.profile();
-    if (!p) return;
+    if (!p) return; // banner in the template covers this case, nothing to load yet
+
     this.loading.set(true);
     this.appService.getByCandidate(p.candidateId).subscribe({
       next: a => { this.apps.set(a); this.loading.set(false); },
-      error: () => this.loading.set(false)
+      error: (err: Error) => { this.loadError.set(err.message); this.loading.set(false); }
     });
   }
 
