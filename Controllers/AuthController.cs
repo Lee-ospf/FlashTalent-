@@ -4,6 +4,7 @@ using TalentHub.Data;
 using TalentHub.DTOs;
 using TalentHub.Models;
 using TalentHub.Services;
+using Microsoft.AspNetCore.Authorization;
 
 namespace TalentHub.Controllers
 {
@@ -20,6 +21,7 @@ namespace TalentHub.Controllers
             _tokenService = tokenService;
         }
 
+        
         // POST api/auth/register
         [HttpPost("register")]
         public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request)
@@ -36,11 +38,21 @@ namespace TalentHub.Controllers
                 LastName = request.LastName,
                 Email = request.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                Role = UserRole.Admin,
+                Role = UserRole.Candidate,
+                MustChangePassword = false,
                 CreatedAt = DateTime.UtcNow
             };
 
             _db.Users.Add(user);
+            await _db.SaveChangesAsync();
+            var candidate = new Candidate
+            {
+                UserId = user.UserId,
+                RegisteredAt = DateTime.UtcNow,
+
+            };
+
+            _db.Candidates.Add(candidate);
             await _db.SaveChangesAsync();
 
             var (token, expiresAt) = _tokenService.GenerateToken(user);
@@ -53,7 +65,8 @@ namespace TalentHub.Controllers
                 Email = user.Email,
                 Role = user.Role.ToString(),
                 Token = token,
-                ExpiresAt = expiresAt
+                ExpiresAt = expiresAt,
+                MustChangePassword = user.MustChangePassword
             });
         }
 
@@ -83,7 +96,98 @@ namespace TalentHub.Controllers
                 Email = user.Email,
                 Role = user.Role.ToString(),
                 Token = token,
-                ExpiresAt = expiresAt
+                ExpiresAt = expiresAt,
+                MustChangePassword = user.MustChangePassword
+            });
+        }
+        [Authorize(Roles = "Admin")]
+        [HttpPost("create-recruiter")]
+        public async Task<IActionResult> CreateRecruiter(CreateUserRequest request)
+        {
+            var exists = await _db.Users.AnyAsync(x => x.Email == request.Email);
+
+            if (exists)
+                return Conflict(new { message = "Email already exists." });
+
+            var user = new User
+            {
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Email = request.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                Role = UserRole.Recruiter,
+                MustChangePassword = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
+
+            var recruiter = new Recruiter
+            {
+                UserId = user.UserId,
+                JobTitle = request.JobTitle
+            };
+
+            _db.Recruiters.Add(recruiter);
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Recruiter created successfully."
+            });
+        }
+        [Authorize(Roles = "Admin")]
+        [HttpPost("create-admin")]
+        public async Task<IActionResult> CreateAdmin(CreateUserRequest request)
+        {
+            var exists = await _db.Users.AnyAsync(x => x.Email == request.Email);
+
+            if (exists)
+                return Conflict(new { message = "Email already exists." });
+
+            var user = new User
+            {
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Email = request.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                Role = UserRole.Admin,
+                MustChangePassword = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Admin created successfully."
+            });
+        }
+        [Authorize]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
+        {
+            var userId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+
+            var user = await _db.Users.FindAsync(userId);
+
+            if (user == null)
+                return NotFound();
+
+            if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+                return BadRequest(new { message = "Current password is incorrect." });
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            user.MustChangePassword = false;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Password changed successfully."
             });
         }
     }

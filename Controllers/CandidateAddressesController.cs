@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
 using TalentHub.DTOs;
@@ -8,24 +9,24 @@ namespace TalentHub.Controllers
 {
     [ApiController]
     [Route("api/candidates/{candidateId}/addresses")]
-    public class CandidateAddressesController : ControllerBase
+    [Authorize]
+    public class CandidateAddressesController : TalentHubControllerBase
     {
-        private readonly AppDbContext _db;
-
-        public CandidateAddressesController(AppDbContext db)
+        public CandidateAddressesController(AppDbContext db) : base(db)
         {
-            _db = db;
         }
 
         // GET api/candidates/{candidateId}/addresses
         [HttpGet]
         public async Task<ActionResult<List<AddressResponse>>> GetAll(int candidateId)
         {
-            var candidateExists = await _db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
+            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
             if (!candidateExists)
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
 
-            var addresses = await _db.Addresses
+            if (!await IsOwnerOrPrivileged(candidateId)) return Forbid();
+
+            var addresses = await Db.Addresses
                 .Where(a => a.CandidateId == candidateId)
                 .Select(a => MapToResponse(a))
                 .ToListAsync();
@@ -37,7 +38,9 @@ namespace TalentHub.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<AddressResponse>> GetById(int candidateId, int id)
         {
-            var address = await _db.Addresses
+            if (!await IsOwnerOrPrivileged(candidateId)) return Forbid();
+
+            var address = await Db.Addresses
                 .FirstOrDefaultAsync(a => a.AddressId == id && a.CandidateId == candidateId);
 
             if (address == null)
@@ -50,15 +53,17 @@ namespace TalentHub.Controllers
         [HttpPost]
         public async Task<ActionResult<AddressResponse>> Create(int candidateId, CreateAddressRequest request)
         {
-            var candidateExists = await _db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
+            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
             if (!candidateExists)
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
+
+            if (!await IsOwnerOrAdmin(candidateId)) return Forbid();
 
             if (!Enum.TryParse<AddressType>(request.AddressType, true, out var parsedType))
                 return BadRequest(new { message = $"Invalid address type '{request.AddressType}'. Valid values: Residential, Postal." });
 
             // Enforce one address per type per candidate
-            var typeAlreadyExists = await _db.Addresses
+            var typeAlreadyExists = await Db.Addresses
                 .AnyAsync(a => a.CandidateId == candidateId && a.AddressType == parsedType);
 
             if (typeAlreadyExists)
@@ -77,8 +82,8 @@ namespace TalentHub.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
-            _db.Addresses.Add(address);
-            await _db.SaveChangesAsync();
+            Db.Addresses.Add(address);
+            await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(address));
         }
@@ -87,7 +92,9 @@ namespace TalentHub.Controllers
         [HttpPut("{id}")]
         public async Task<ActionResult<AddressResponse>> Update(int candidateId, int id, UpdateAddressRequest request)
         {
-            var address = await _db.Addresses
+            if (!await IsOwnerOrAdmin(candidateId)) return Forbid();
+
+            var address = await Db.Addresses
                 .FirstOrDefaultAsync(a => a.AddressId == id && a.CandidateId == candidateId);
 
             if (address == null)
@@ -101,7 +108,7 @@ namespace TalentHub.Controllers
             address.Country = request.Country;
             address.UpdatedAt = DateTime.UtcNow;
 
-            await _db.SaveChangesAsync();
+            await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(address));
         }
@@ -110,7 +117,9 @@ namespace TalentHub.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int candidateId, int id)
         {
-            var address = await _db.Addresses
+            if (!await IsOwnerOrAdmin(candidateId)) return Forbid();
+
+            var address = await Db.Addresses
                 .FirstOrDefaultAsync(a => a.AddressId == id && a.CandidateId == candidateId);
 
             if (address == null)
@@ -119,13 +128,13 @@ namespace TalentHub.Controllers
             // Don't allow deleting the only Residential address - it's the primary/mandatory one
             if (address.AddressType == AddressType.Residential)
             {
-                var totalAddresses = await _db.Addresses.CountAsync(a => a.CandidateId == candidateId);
+                var totalAddresses = await Db.Addresses.CountAsync(a => a.CandidateId == candidateId);
                 if (totalAddresses == 1)
                     return BadRequest(new { message = "Cannot delete the only address. A candidate must have at least one Residential address." });
             }
 
-            _db.Addresses.Remove(address);
-            await _db.SaveChangesAsync();
+            Db.Addresses.Remove(address);
+            await Db.SaveChangesAsync();
 
             return NoContent();
         }

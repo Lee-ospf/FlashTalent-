@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
 using TalentHub.DTOs;
@@ -8,26 +9,26 @@ namespace TalentHub.Controllers
 {
     [ApiController]
     [Route("api/candidates/{candidateId}/experience")]
-    public class CandidateExperiencesController : ControllerBase
+    [Authorize]
+    public class CandidateExperiencesController : TalentHubControllerBase
     {
-        private readonly AppDbContext _db;
-
-        public CandidateExperiencesController(AppDbContext db)
+        public CandidateExperiencesController(AppDbContext db) : base(db)
         {
-            _db = db;
         }
 
         // GET api/candidates/{candidateId}/experience
         [HttpGet]
         public async Task<ActionResult<List<ExperienceResponse>>> GetAll(int candidateId)
         {
-            var candidateExists = await _db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
+            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
             if (!candidateExists)
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
 
-            var results = await _db.CandidateExperiences
+            if (!await IsOwnerOrPrivileged(candidateId)) return Forbid();
+
+            var results = await Db.CandidateExperiences
                 .Where(e => e.CandidateId == candidateId)
                 .OrderByDescending(e => e.StartDate)
                 .Select(e => MapToResponse(e))
@@ -40,11 +41,13 @@ namespace TalentHub.Controllers
         [HttpPost]
         public async Task<ActionResult<ExperienceResponse>> Create(int candidateId, CreateExperienceRequest request)
         {
-            var candidateExists = await _db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
+            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
             if (!candidateExists)
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
+
+            if (!await IsOwnerOrAdmin(candidateId)) return Forbid();
 
             if (request.EndDate.HasValue && request.EndDate.Value < request.StartDate)
             {
@@ -62,8 +65,8 @@ namespace TalentHub.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
-            _db.CandidateExperiences.Add(experience);
-            await _db.SaveChangesAsync();
+            Db.CandidateExperiences.Add(experience);
+            await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(experience));
         }
@@ -72,7 +75,9 @@ namespace TalentHub.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int candidateId, int id)
         {
-            var experience = await _db.CandidateExperiences
+            if (!await IsOwnerOrAdmin(candidateId)) return Forbid();
+
+            var experience = await Db.CandidateExperiences
                 .FirstOrDefaultAsync(e => e.CandidateExperienceId == id && e.CandidateId == candidateId);
 
             if (experience == null)
@@ -80,8 +85,8 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No experience record found with id {id} for this candidate." });
             }
 
-            _db.CandidateExperiences.Remove(experience);
-            await _db.SaveChangesAsync();
+            Db.CandidateExperiences.Remove(experience);
+            await Db.SaveChangesAsync();
 
             return NoContent();
         }

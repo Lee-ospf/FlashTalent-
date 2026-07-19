@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
 using TalentHub.Models;
@@ -8,20 +9,19 @@ namespace TalentHub.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class RecruiterController : Controller
+    [Authorize(Roles = "Recruiter,Admin")]
+    public class RecruiterController : TalentHubControllerBase
     {
-        private readonly AppDbContext _context;
-
-        public RecruiterController(AppDbContext context)
+        public RecruiterController(AppDbContext db) : base(db)
         {
-            _context = context;
         }
 
         // GET: api/Recruiter
+        // Internal staff directory - Recruiter/Admin only.
         [HttpGet]
         public async Task<IActionResult> GetAllRecruiters()
         {
-            var recruiters = await _context.Recruiters
+            var recruiters = await Db.Recruiters
                 .Include(r => r.User)
                 .Select(r => new
                 {
@@ -39,7 +39,7 @@ namespace TalentHub.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetRecruiterById(int id)
         {
-            var recruiter = await _context.Recruiters
+            var recruiter = await Db.Recruiters
                 .Include(r => r.User)
                 .Where(r => r.RecruiterId == id)
                 .Select(r => new
@@ -57,13 +57,20 @@ namespace TalentHub.Controllers
 
             return Ok(recruiter);
         }
+
+        // POST: api/Recruiter
+        // Admin only. NOTE: this assumes a User row already exists with Role=Recruiter/Admin -
+        // it's a separate path from AuthController's /create-recruiter (which creates the User
+        // AND the Recruiter profile together with a temp password). Worth consolidating these
+        // two paths later so there's only one way to create a recruiter.
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> CreateRecruiter([FromBody] CreateRecruiterDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var user = await _context.Users.FindAsync(dto.UserId);
+            var user = await Db.Users.FindAsync(dto.UserId);
 
             if (user is null)
                 return BadRequest($"User with ID {dto.UserId} does not exist.");
@@ -71,7 +78,7 @@ namespace TalentHub.Controllers
             if (user.Role != UserRole.Recruiter && user.Role != UserRole.Admin)
                 return BadRequest("This user's Role must be set to Recruiter or Admin before a recruiter profile can be created.");
 
-            var alreadyExists = await _context.Recruiters.AnyAsync(r => r.UserId == dto.UserId);
+            var alreadyExists = await Db.Recruiters.AnyAsync(r => r.UserId == dto.UserId);
             if (alreadyExists)
                 return BadRequest($"User with ID {dto.UserId} already has a recruiter profile.");
 
@@ -81,10 +88,10 @@ namespace TalentHub.Controllers
                 JobTitle = dto.JobTitle
             };
 
-            _context.Recruiters.Add(recruiter);
-            await _context.SaveChangesAsync();
+            Db.Recruiters.Add(recruiter);
+            await Db.SaveChangesAsync();
 
-            return Ok(MapToResponse(recruiter, user));   
+            return Ok(MapToResponse(recruiter, user));
         }
 
         private static RecruiterResponse MapToResponse(Recruiter r, User u)

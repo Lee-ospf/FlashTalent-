@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
 using TalentHub.DTOs;
@@ -8,20 +9,19 @@ namespace TalentHub.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class DepartmentController : Controller
+    [Authorize(Roles = "Recruiter,Admin")]
+    public class DepartmentController : TalentHubControllerBase
     {
-        private readonly AppDbContext _context;
-
-        public DepartmentController(AppDbContext context)
+        public DepartmentController(AppDbContext db) : base(db)
         {
-            _context = context;
         }
 
         // GET: api/Department
+        // Recruiter/Admin - needed when creating an internal vacancy.
         [HttpGet]
         public async Task<ActionResult<List<DepartmentResponse>>> GetAllDepartments()
         {
-            var departments = await _context.Departments.ToListAsync();
+            var departments = await Db.Departments.ToListAsync();
             var result = departments.Select(d => MapToResponse(d)).ToList();
 
             return Ok(result);
@@ -31,7 +31,7 @@ namespace TalentHub.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<DepartmentResponse>> GetDepartmentById(int id)
         {
-            var department = await _context.Departments.FindAsync(id);
+            var department = await Db.Departments.FindAsync(id);
 
             if (department is null)
                 return NotFound($"Department with ID {id} not found.");
@@ -40,13 +40,15 @@ namespace TalentHub.Controllers
         }
 
         // POST: api/Department
+        // Admin only - managing the department list.
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<ActionResult<DepartmentResponse>> CreateDepartment([FromBody] CreateDepartmentDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var alreadyExists = await _context.Departments
+            var alreadyExists = await Db.Departments
                 .AnyAsync(d => d.Name.ToLower() == dto.Name.ToLower());
 
             if (alreadyExists)
@@ -58,8 +60,8 @@ namespace TalentHub.Controllers
                 IsActive = true
             };
 
-            _context.Departments.Add(department);
-            await _context.SaveChangesAsync();
+            Db.Departments.Add(department);
+            await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(department));
         }

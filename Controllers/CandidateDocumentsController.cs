@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
 using TalentHub.DTOs;
@@ -9,9 +10,9 @@ namespace TalentHub.Controllers
 {
     [ApiController]
     [Route("api/candidates/{candidateId}/documents")]
-    public class CandidateDocumentsController : ControllerBase
+    [Authorize]
+    public class CandidateDocumentsController : TalentHubControllerBase
     {
-        private readonly AppDbContext _db;
         private readonly IDocumentValidationService _validationService;
         private readonly IWebHostEnvironment _env;
 
@@ -22,27 +23,31 @@ namespace TalentHub.Controllers
         public CandidateDocumentsController(
             AppDbContext db,
             IDocumentValidationService validationService,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env) : base(db)
         {
-            _db = db;
             _validationService = validationService;
             _env = env;
         }
 
         // POST api/candidates/{candidateId}/documents
-        // multipart/form-data with fields: file (the actual file), documentType (string enum name)
+        // multipart/form-data with fields: file, documentType, and OPTIONAL qualificationId.
+        // Pass qualificationId when this document is proof/attachment for a specific qualification
+        // entry (e.g. a degree certificate) rather than a general standalone upload.
         [HttpPost]
         [RequestSizeLimit(MaxFileSizeBytes + 1024)] // small buffer above the limit so our own check returns the friendlier message
         public async Task<ActionResult<CandidateDocumentResponse>> Upload(
             int candidateId,
             [FromForm] string documentType,
+            [FromForm] int? qualificationId,
             IFormFile file)
         {
-            var candidate = await _db.Candidates.FindAsync(candidateId);
+            var candidate = await Db.Candidates.FindAsync(candidateId);
             if (candidate == null)
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
+
+            if (!await IsOwnerOrAdmin(candidateId)) return Forbid();
 
             if (file == null || file.Length == 0)
             {
@@ -69,6 +74,19 @@ namespace TalentHub.Controllers
                 return BadRequest(new { message = $"Invalid documentType '{documentType}'. Valid values: {validTypes}." });
             }
 
+            // If a qualificationId was supplied, confirm it exists AND belongs to this same candidate -
+            // stops one candidate from attaching a document to another candidate's qualification.
+            if (qualificationId.HasValue)
+            {
+                var belongsToCandidate = await Db.CandidateQualifications
+                    .AnyAsync(q => q.CandidateQualificationId == qualificationId.Value && q.CandidateId == candidateId);
+
+                if (!belongsToCandidate)
+                {
+                    return BadRequest(new { message = $"No qualification found with id {qualificationId.Value} for this candidate." });
+                }
+            }
+
             // Save the file to disk under Uploads/{candidateId}/
             var uploadsRoot = Path.Combine(_env.ContentRootPath, "Uploads");
             var candidateFolder = Path.Combine(uploadsRoot, candidateId.ToString());
@@ -91,11 +109,12 @@ namespace TalentHub.Controllers
                 DocumentType = parsedDocType,
                 FileUrl = relativeUrl,
                 OriginalFileName = file.FileName,
-                UploadedAt = DateTime.UtcNow
+                UploadedAt = DateTime.UtcNow,
+                QualificationId = qualificationId
             };
 
-            _db.CandidateDocuments.Add(document);
-            await _db.SaveChangesAsync();
+            Db.CandidateDocuments.Add(document);
+            await Db.SaveChangesAsync();
 
             return Ok(new CandidateDocumentResponse
             {
@@ -104,22 +123,32 @@ namespace TalentHub.Controllers
                 DocumentType = document.DocumentType.ToString(),
                 FileUrl = document.FileUrl,
                 OriginalFileName = document.OriginalFileName,
-                UploadedAt = document.UploadedAt
+                UploadedAt = document.UploadedAt,
+                QualificationId = document.QualificationId
             });
         }
 
         // GET api/candidates/{candidateId}/documents
+        // Optional ?qualificationId= filter - pass it to get only documents attached to that qualification.
         [HttpGet]
-        public async Task<ActionResult<List<CandidateDocumentResponse>>> GetAll(int candidateId)
+        public async Task<ActionResult<List<CandidateDocumentResponse>>> GetAll(int candidateId, [FromQuery] int? qualificationId)
         {
-            var candidateExists = await _db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
+            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
             if (!candidateExists)
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
 
-            var documents = await _db.CandidateDocuments
-                .Where(d => d.CandidateId == candidateId)
+            if (!await IsOwnerOrPrivileged(candidateId)) return Forbid();
+
+            var query = Db.CandidateDocuments.Where(d => d.CandidateId == candidateId);
+
+            if (qualificationId.HasValue)
+            {
+                query = query.Where(d => d.QualificationId == qualificationId.Value);
+            }
+
+            var documents = await query
                 .Select(d => new CandidateDocumentResponse
                 {
                     CandidateDocumentId = d.CandidateDocumentId,
@@ -127,7 +156,8 @@ namespace TalentHub.Controllers
                     DocumentType = d.DocumentType.ToString(),
                     FileUrl = d.FileUrl,
                     OriginalFileName = d.OriginalFileName,
-                    UploadedAt = d.UploadedAt
+                    UploadedAt = d.UploadedAt,
+                    QualificationId = d.QualificationId
                 })
                 .ToListAsync();
 
@@ -138,11 +168,13 @@ namespace TalentHub.Controllers
         [HttpGet("mandatory-status")]
         public async Task<ActionResult<MandatoryDocumentsStatusResponse>> GetMandatoryStatus(int candidateId)
         {
-            var candidateExists = await _db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
+            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
             if (!candidateExists)
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
+
+            if (!await IsOwnerOrPrivileged(candidateId)) return Forbid();
 
             var status = await _validationService.GetMandatoryStatusAsync(candidateId);
             return Ok(status);

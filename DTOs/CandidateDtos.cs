@@ -4,8 +4,7 @@ namespace TalentHub.DTOs
 {
     public class CreateCandidateRequest
     {
-        [Required]
-        public int UserId { get; set; }
+        
 
         [RegularExpression(@"^(\+?27|0)[6-8][0-9]{8}$",
         ErrorMessage = "Phone number must be a valid South African mobile number (e.g. 0821234567 or +27821234567).")]

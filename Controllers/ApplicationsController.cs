@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
 using TalentHub.DTOs;
@@ -9,29 +10,28 @@ namespace TalentHub.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class ApplicationsController : ControllerBase
+    [Authorize]
+    public class ApplicationsController : TalentHubControllerBase
     {
-        private readonly AppDbContext _db;
         private readonly IDocumentValidationService _docValidation;
         private readonly IApplicationStatusRules _statusRules;
 
         public ApplicationsController(
             AppDbContext db,
             IDocumentValidationService docValidation,
-            IApplicationStatusRules statusRules)
+            IApplicationStatusRules statusRules) : base(db)
         {
-            _db = db;
             _docValidation = docValidation;
             _statusRules = statusRules;
         }
 
         // POST api/applications
-        // Blocked if: candidate/vacancy don't exist, vacancy isn't published,
-        // mandatory documents are missing, or a duplicate application exists.
+        // Candidate applies for THEMSELVES only - CandidateId in the body must match the logged-in candidate.
+        [Authorize(Roles = "Candidate")]
         [HttpPost]
         public async Task<ActionResult<ApplicationResponse>> Apply(CreateApplicationRequest request)
         {
-            var candidate = await _db.Candidates
+            var candidate = await Db.Candidates
                 .Include(c => c.User)
                 .FirstOrDefaultAsync(c => c.CandidateId == request.CandidateId);
 
@@ -40,7 +40,12 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No candidate found with CandidateId {request.CandidateId}." });
             }
 
-            var vacancy = await _db.Vacancies.FindAsync(request.VacancyId);
+            if (candidate.UserId != CurrentUserId)
+            {
+                return Forbid(); // can't apply on someone else's behalf
+            }
+
+            var vacancy = await Db.Vacancies.FindAsync(request.VacancyId);
             if (vacancy == null)
             {
                 return NotFound(new { message = $"No vacancy found with VacancyId {request.VacancyId}." });
@@ -55,21 +60,21 @@ namespace TalentHub.Controllers
             {
                 return BadRequest(new { message = "This vacancy's closing date has passed." });
             }
-            var duplicateExists = await _db.Applications
+            var duplicateExists = await Db.Applications
                 .AnyAsync(a => a.CandidateId == request.CandidateId && a.VacancyId == request.VacancyId);
             if (duplicateExists)
             {
                 return Conflict(new { message = "This candidate has already applied to this vacancy." });
             }
 
-            var requiredDocTypes = await _db.Set<VacancyDocument>()
+            var requiredDocTypes = await Db.Set<VacancyDocument>()
      .Where(vd => vd.VacancyId == request.VacancyId && vd.IsMandatory)
      .Select(vd => vd.DocumentType)
      .ToListAsync();
 
             if (requiredDocTypes.Count > 0)
             {
-                var candidateUploadedTypes = await _db.CandidateDocuments
+                var candidateUploadedTypes = await Db.CandidateDocuments
                     .Where(cd => cd.CandidateId == request.CandidateId)
                     .Select(cd => cd.DocumentType)
                     .ToListAsync();
@@ -98,11 +103,11 @@ namespace TalentHub.Controllers
                 AppliedAt = DateTime.UtcNow
             };
 
-            _db.Applications.Add(application);
-            await _db.SaveChangesAsync();
+            Db.Applications.Add(application);
+            await Db.SaveChangesAsync();
 
             // Record the initial state in history too, so the full timeline is visible from the start.
-            _db.ApplicationStatusHistories.Add(new ApplicationStatusHistory
+            Db.ApplicationStatusHistories.Add(new ApplicationStatusHistory
             {
                 ApplicationId = application.ApplicationId,
                 OldStatus = ApplicationStatus.Applied,
@@ -110,16 +115,17 @@ namespace TalentHub.Controllers
                 ChangedByUserId = candidate.UserId,
                 ChangedAt = DateTime.UtcNow
             });
-            await _db.SaveChangesAsync();
+            await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(application, candidate, vacancy));
         }
 
         // GET api/applications/{id}
+        // Candidate can view their own application; Recruiter/Admin can view any.
         [HttpGet("{id}")]
         public async Task<ActionResult<ApplicationResponse>> GetById(int id)
         {
-            var application = await _db.Applications
+            var application = await Db.Applications
                 .Include(a => a.Candidate).ThenInclude(c => c!.User)
                 .Include(a => a.Vacancy)
                 .FirstOrDefaultAsync(a => a.ApplicationId == id);
@@ -129,14 +135,23 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No application found with ApplicationId {id}." });
             }
 
+            var isPrivileged = User.IsInRole("Admin") || User.IsInRole("Recruiter");
+            if (!isPrivileged && application.Candidate.UserId != CurrentUserId)
+            {
+                return Forbid();
+            }
+
             return Ok(MapToResponse(application, application.Candidate, application.Vacancy));
         }
 
         // GET api/applications/candidate/{candidateId}
+        // Candidate can view their own list; Recruiter/Admin can view any candidate's list.
         [HttpGet("candidate/{candidateId}")]
         public async Task<ActionResult<List<ApplicationResponse>>> GetByCandidate(int candidateId)
         {
-            var applications = await _db.Applications
+            if (!await IsOwnerOrPrivileged(candidateId)) return Forbid();
+
+            var applications = await Db.Applications
                 .Include(a => a.Candidate).ThenInclude(c => c!.User)
                 .Include(a => a.Vacancy)
                 .Where(a => a.CandidateId == candidateId)
@@ -152,10 +167,12 @@ namespace TalentHub.Controllers
         }
 
         // GET api/applications/vacancy/{vacancyId}
+        // Recruiter/Admin only - viewing everyone who applied to a vacancy.
+        [Authorize(Roles = "Recruiter,Admin")]
         [HttpGet("vacancy/{vacancyId}")]
         public async Task<ActionResult<List<ApplicationResponse>>> GetByVacancy(int vacancyId)
         {
-            var applications = await _db.Applications
+            var applications = await Db.Applications
                 .Include(a => a.Candidate).ThenInclude(c => c!.User)
                 .Include(a => a.Vacancy)
                 .Where(a => a.VacancyId == vacancyId)
@@ -171,10 +188,12 @@ namespace TalentHub.Controllers
         }
 
         // PUT api/applications/{id}/status
+        // Recruiter/Admin only. ChangedByUserId is always the logged-in user - never trusted from the body.
+        [Authorize(Roles = "Recruiter,Admin")]
         [HttpPut("{id}/status")]
         public async Task<ActionResult<ApplicationResponse>> UpdateStatus(int id, UpdateApplicationStatusRequest request)
         {
-            var application = await _db.Applications
+            var application = await Db.Applications
                 .Include(a => a.Candidate).ThenInclude(c => c!.User)
                 .Include(a => a.Vacancy)
                 .FirstOrDefaultAsync(a => a.ApplicationId == id);
@@ -190,12 +209,6 @@ namespace TalentHub.Controllers
                 return BadRequest(new { message = $"Invalid status '{request.NewStatus}'. Valid values: {validValues}." });
             }
 
-            var changedByUser = await _db.Users.FindAsync(request.ChangedByUserId);
-            if (changedByUser == null)
-            {
-                return BadRequest(new { message = $"No user found with ChangedByUserId {request.ChangedByUserId}." });
-            }
-
             var oldStatus = application.Status;
 
             if (!_statusRules.IsValidTransition(oldStatus, newStatus))
@@ -209,31 +222,41 @@ namespace TalentHub.Controllers
             application.Status = newStatus;
             application.UpdatedAt = DateTime.UtcNow;
 
-            _db.ApplicationStatusHistories.Add(new ApplicationStatusHistory
+            Db.ApplicationStatusHistories.Add(new ApplicationStatusHistory
             {
                 ApplicationId = application.ApplicationId,
                 OldStatus = oldStatus,
                 NewStatus = newStatus,
-                ChangedByUserId = request.ChangedByUserId,
+                ChangedByUserId = CurrentUserId,
                 ChangedAt = DateTime.UtcNow
             });
 
-            await _db.SaveChangesAsync();
+            await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(application, application.Candidate, application.Vacancy));
         }
 
         // GET api/applications/{id}/history
+        // Candidate can view their own application's history; Recruiter/Admin can view any.
         [HttpGet("{id}/history")]
         public async Task<ActionResult<List<ApplicationStatusHistoryResponse>>> GetHistory(int id)
         {
-            var applicationExists = await _db.Applications.AnyAsync(a => a.ApplicationId == id);
-            if (!applicationExists)
+            var application = await Db.Applications
+                .Include(a => a.Candidate)
+                .FirstOrDefaultAsync(a => a.ApplicationId == id);
+
+            if (application == null || application.Candidate == null)
             {
                 return NotFound(new { message = $"No application found with ApplicationId {id}." });
             }
 
-            var history = await _db.ApplicationStatusHistories
+            var isPrivileged = User.IsInRole("Admin") || User.IsInRole("Recruiter");
+            if (!isPrivileged && application.Candidate.UserId != CurrentUserId)
+            {
+                return Forbid();
+            }
+
+            var history = await Db.ApplicationStatusHistories
                 .Include(h => h.ChangedByUser)
                 .Where(h => h.ApplicationId == id)
                 .OrderBy(h => h.ChangedAt)
@@ -250,7 +273,7 @@ namespace TalentHub.Controllers
             return Ok(history);
         }
 
-      private static ApplicationResponse MapToResponse(Application a, Candidate c, Vacancy v)
+        private static ApplicationResponse MapToResponse(Application a, Candidate c, Vacancy v)
         {
             return new ApplicationResponse
             {

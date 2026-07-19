@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
 using TalentHub.DTOs;
@@ -8,13 +9,11 @@ namespace TalentHub.Controllers
 {
     [ApiController]
     [Route("api/candidates/{candidateId}/qualifications")]
-    public class CandidateQualificationsController : ControllerBase
+    [Authorize]
+    public class CandidateQualificationsController : TalentHubControllerBase
     {
-        private readonly AppDbContext _db;
-
-        public CandidateQualificationsController(AppDbContext db)
+        public CandidateQualificationsController(AppDbContext db) : base(db)
         {
-            _db = db;
         }
 
         // GET api/candidates/{candidateId}/qualifications
@@ -22,13 +21,15 @@ namespace TalentHub.Controllers
         [HttpGet]
         public async Task<ActionResult<List<QualificationResponse>>> GetAll(int candidateId, [FromQuery] string? type)
         {
-            var candidateExists = await _db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
+            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
             if (!candidateExists)
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
 
-            var query = _db.CandidateQualifications.Where(q => q.CandidateId == candidateId);
+            if (!await IsOwnerOrPrivileged(candidateId)) return Forbid();
+
+            var query = Db.CandidateQualifications.Where(q => q.CandidateId == candidateId);
 
             if (!string.IsNullOrWhiteSpace(type))
             {
@@ -51,11 +52,13 @@ namespace TalentHub.Controllers
         [HttpPost]
         public async Task<ActionResult<QualificationResponse>> Create(int candidateId, CreateQualificationRequest request)
         {
-            var candidateExists = await _db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
+            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
             if (!candidateExists)
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
+
+            if (!await IsOwnerOrAdmin(candidateId)) return Forbid();
 
             if (!Enum.TryParse<QualificationType>(request.QualificationType, true, out var parsedType))
             {
@@ -72,8 +75,8 @@ namespace TalentHub.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
-            _db.CandidateQualifications.Add(qualification);
-            await _db.SaveChangesAsync();
+            Db.CandidateQualifications.Add(qualification);
+            await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(qualification));
         }
@@ -82,7 +85,9 @@ namespace TalentHub.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int candidateId, int id)
         {
-            var qualification = await _db.CandidateQualifications
+            if (!await IsOwnerOrAdmin(candidateId)) return Forbid();
+
+            var qualification = await Db.CandidateQualifications
                 .FirstOrDefaultAsync(q => q.CandidateQualificationId == id && q.CandidateId == candidateId);
 
             if (qualification == null)
@@ -90,8 +95,15 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No qualification found with id {id} for this candidate." });
             }
 
-            _db.CandidateQualifications.Remove(qualification);
-            await _db.SaveChangesAsync();
+            // DB-level cascade isn't possible here (would conflict with Candidate -> CandidateDocuments'
+            // own cascade path), so any documents attached to this qualification are removed explicitly first.
+            var attachedDocs = await Db.CandidateDocuments
+                .Where(d => d.QualificationId == id)
+                .ToListAsync();
+            Db.CandidateDocuments.RemoveRange(attachedDocs);
+
+            Db.CandidateQualifications.Remove(qualification);
+            await Db.SaveChangesAsync();
 
             return NoContent();
         }

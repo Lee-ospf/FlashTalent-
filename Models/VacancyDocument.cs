@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TalentHub.Models
 {
+    
     public class VacancyDocument
     {
       

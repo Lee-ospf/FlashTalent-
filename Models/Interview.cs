@@ -10,6 +10,7 @@ namespace TalentHub.Models
     [Table("Interviews")]
     public class Interview
     {
+
         [Key]
         public int InterviewId { get; set; }
 

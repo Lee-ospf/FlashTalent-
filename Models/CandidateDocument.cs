@@ -34,5 +34,7 @@ namespace TalentHub.Models
         public string OriginalFileName { get; set; } = string.Empty;
 
         public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
+        public int? QualificationId { get; set; }
+        public CandidateQualification? Qualification { get; set; }
     }
 }

@@ -8,6 +8,7 @@
         public string FileUrl { get; set; } = string.Empty;
         public string OriginalFileName { get; set; } = string.Empty;
         public DateTime UploadedAt { get; set; }
+        public int? QualificationId { get; set; }
     }
 
     public class MandatoryDocumentsStatusResponse

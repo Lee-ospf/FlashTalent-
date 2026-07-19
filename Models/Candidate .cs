@@ -29,11 +29,10 @@ namespace TalentHub.Models
         public string? Nationality { get; set; }
 
 
-        [Required]
-        public DateTime DateOfBirth { get; set; }
+        public DateTime? DateOfBirth { get; set; }
 
-        
-        
+
+
 
         public DateTime RegisteredAt { get; set; } = DateTime.UtcNow;
 

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
 using TalentHub.DTOs;
@@ -8,21 +9,20 @@ namespace TalentHub.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class SkillsController : ControllerBase
+    [Authorize]
+    public class SkillsController : TalentHubControllerBase
     {
-        private readonly AppDbContext _db;
-
-        public SkillsController(AppDbContext db)
+        public SkillsController(AppDbContext db) : base(db)
         {
-            _db = db;
         }
 
         // GET api/skills
-        // Optional ?category=Technical query filter
+        // Any authenticated role can browse the master skill list (candidates selecting skills,
+        // recruiters building a vacancy).
         [HttpGet]
         public async Task<ActionResult<List<SkillResponse>>> GetAll([FromQuery] string? category)
         {
-            var query = _db.Skills.AsQueryable();
+            var query = Db.Skills.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(category))
             {
@@ -50,7 +50,7 @@ namespace TalentHub.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<SkillResponse>> GetById(int id)
         {
-            var skill = await _db.Skills.FindAsync(id);
+            var skill = await Db.Skills.FindAsync(id);
             if (skill == null)
             {
                 return NotFound(new { message = $"No skill found with SkillId {id}." });
@@ -60,10 +60,12 @@ namespace TalentHub.Controllers
         }
 
         // POST api/skills
+        // Admin only - master skill list management.
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<ActionResult<SkillResponse>> Create(CreateSkillRequest request)
         {
-            var nameExists = await _db.Skills.AnyAsync(s => s.Name == request.Name);
+            var nameExists = await Db.Skills.AnyAsync(s => s.Name == request.Name);
             if (nameExists)
             {
                 return Conflict(new { message = $"A skill named '{request.Name}' already exists." });
@@ -81,23 +83,25 @@ namespace TalentHub.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
-            _db.Skills.Add(skill);
-            await _db.SaveChangesAsync();
+            Db.Skills.Add(skill);
+            await Db.SaveChangesAsync();
 
             return Ok(new SkillResponse { SkillId = skill.SkillId, Name = skill.Name, Category = skill.Category.ToString() });
         }
 
         // PUT api/skills/{id}
+        // Admin only.
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<ActionResult<SkillResponse>> Update(int id, UpdateSkillRequest request)
         {
-            var skill = await _db.Skills.FindAsync(id);
+            var skill = await Db.Skills.FindAsync(id);
             if (skill == null)
             {
                 return NotFound(new { message = $"No skill found with SkillId {id}." });
             }
 
-            var nameTakenByAnother = await _db.Skills.AnyAsync(s => s.Name == request.Name && s.SkillId != id);
+            var nameTakenByAnother = await Db.Skills.AnyAsync(s => s.Name == request.Name && s.SkillId != id);
             if (nameTakenByAnother)
             {
                 return Conflict(new { message = $"A different skill named '{request.Name}' already exists." });
@@ -110,29 +114,31 @@ namespace TalentHub.Controllers
 
             skill.Name = request.Name;
             skill.Category = parsedCategory;
-            await _db.SaveChangesAsync();
+            await Db.SaveChangesAsync();
 
             return Ok(new SkillResponse { SkillId = skill.SkillId, Name = skill.Name, Category = skill.Category.ToString() });
         }
 
         // DELETE api/skills/{id}
+        // Admin only.
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var skill = await _db.Skills.FindAsync(id);
+            var skill = await Db.Skills.FindAsync(id);
             if (skill == null)
             {
                 return NotFound(new { message = $"No skill found with SkillId {id}." });
             }
 
-            var inUse = await _db.CandidateSkills.AnyAsync(cs => cs.SkillId == id);
+            var inUse = await Db.CandidateSkills.AnyAsync(cs => cs.SkillId == id);
             if (inUse)
             {
                 return Conflict(new { message = "This skill is assigned to one or more candidates and cannot be deleted. Remove it from those candidates first." });
             }
 
-            _db.Skills.Remove(skill);
-            await _db.SaveChangesAsync();
+            Db.Skills.Remove(skill);
+            await Db.SaveChangesAsync();
 
             return NoContent();
         }

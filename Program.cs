@@ -1,9 +1,13 @@
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using TalentHub.Data;
+using TalentHub.Models;
 using TalentHub.Services;
+using Microsoft.OpenApi.Models;
+
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -63,13 +67,40 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer",
+        new OpenApiSecurityScheme
+        {
+            Name = "Authorization",
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description = "Enter JWT Token"
+        });
+
+    options.AddSecurityRequirement(
+        new OpenApiSecurityRequirement        {
+            {
+                new OpenApiSecurityScheme                {
+                    Reference = new OpenApiReference                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"                    }
+                },
+                Array.Empty<string>()
+            }
+        });
+});
+
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IDocumentValidationService, DocumentValidationService>();
 builder.Services.AddScoped<IApplicationStatusRules, ApplicationStatusRules>();
 builder.Services.AddHttpClient();
+builder.Services.AddHostedService<VacancyClosingDateService>();
 
 var app = builder.Build();
+
 
 // ---------- Middleware pipeline ----------
 
@@ -90,5 +121,24 @@ app.UseAuthorization();
 app.UseStaticFiles();
 
 app.MapControllers();
+// in Program.cs, after app.Build(), before app.Run()
+//using (var scope = app.Services.CreateScope())
+//{
+//    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+//    if (!db.Users.Any(u => u.Role == UserRole.Admin))
+//    {
+//        db.Users.Add(new User
+//        {
+//            FirstName = "System",
+//            LastName = "Admin",
+//            Email = builder.Configuration["Bootstrap:AdminEmail"] ?? "admin@gmail.com",
+//            PasswordHash = BCrypt.Net.BCrypt.HashPassword(builder.Configuration["Bootstrap:AdminPassword"] ?? "ChangeMe123!"),
+//            Role = UserRole.Admin,
+//            MustChangePassword = true,
+//            CreatedAt = DateTime.UtcNow
+//        });
+//        db.SaveChanges();
+//    }
+//}
 
 app.Run();

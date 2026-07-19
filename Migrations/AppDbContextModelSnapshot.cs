@@ -160,7 +160,7 @@ namespace TalentHub.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CandidateId"));
 
-                    b.Property<DateTime>("DateOfBirth")
+                    b.Property<DateTime?>("DateOfBirth")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Gender")
@@ -219,12 +219,17 @@ namespace TalentHub.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<int?>("QualificationId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("UploadedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("CandidateDocumentId");
 
                     b.HasIndex("CandidateId");
+
+                    b.HasIndex("QualificationId");
 
                     b.ToTable("CandidateDocuments");
                 });
@@ -602,8 +607,8 @@ namespace TalentHub.Migrations
 
                     b.Property<string>("Category")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -679,6 +684,9 @@ namespace TalentHub.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("bit");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -780,6 +788,44 @@ namespace TalentHub.Migrations
                     b.ToTable("Vacancies");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.VacancyChangeHistory", b =>
+                {
+                    b.Property<int>("VacancyChangeHistoryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("VacancyChangeHistoryId"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ChangedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("VacancyId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("VacancyTitle")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("VacancyChangeHistoryId");
+
+                    b.HasIndex("ChangedByUserId");
+
+                    b.ToTable("VacancyChangeHistories");
+                });
+
             modelBuilder.Entity("TalentHub.Models.VacancyDocument", b =>
                 {
                     b.Property<int>("VacancyDocumentId")
@@ -790,7 +836,8 @@ namespace TalentHub.Migrations
 
                     b.Property<string>("DocumentType")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<bool>("IsMandatory")
                         .HasColumnType("bit");
@@ -907,7 +954,14 @@ namespace TalentHub.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("TalentHub.Models.CandidateQualification", "Qualification")
+                        .WithMany()
+                        .HasForeignKey("QualificationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Candidate");
+
+                    b.Navigation("Qualification");
                 });
 
             modelBuilder.Entity("TalentHub.Models.CandidateExperience", b =>
@@ -1051,6 +1105,17 @@ namespace TalentHub.Migrations
                     b.Navigation("Department");
 
                     b.Navigation("Recruiter");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.VacancyChangeHistory", b =>
+                {
+                    b.HasOne("TalentHub.Models.User", "ChangedByUser")
+                        .WithMany()
+                        .HasForeignKey("ChangedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ChangedByUser");
                 });
 
             modelBuilder.Entity("TalentHub.Models.VacancyDocument", b =>

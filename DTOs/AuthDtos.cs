@@ -39,5 +39,34 @@ namespace TalentHub.DTOs
         public string Role { get; set; } = string.Empty;
         public string Token { get; set; } = string.Empty;
         public DateTime ExpiresAt { get; set; }
+        public bool MustChangePassword { get; set; }
     }
+
+    public class CreateUserRequest
+    {
+        [Required]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required]
+        public string LastName { get; set; } = string.Empty;
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+
+        public string? JobTitle { get; set; }
+    }
+
+    public class ChangePasswordRequest
+    {
+        [Required]
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        [Required]
+        public string NewPassword { get; set; } = string.Empty;
+    }
+
 }

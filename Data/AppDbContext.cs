@@ -29,6 +29,7 @@ namespace TalentHub.Data
         public DbSet<Client> Clients => Set<Client>();
         public DbSet<Address> Addresses => Set<Address>();
         public DbSet<Department> Departments => Set<Department>();
+        public DbSet<VacancyChangeHistory> VacancyChangeHistories => Set<VacancyChangeHistory>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -40,6 +41,11 @@ namespace TalentHub.Data
                 .HasForeignKey(a => a.CandidateId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<VacancyChangeHistory>()
+                 .HasOne(h => h.ChangedByUser)
+                 .WithMany()
+                 .HasForeignKey(h => h.ChangedByUserId)
+                 .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<Address>()
                 .Property(a => a.AddressType)
                 .HasConversion<string>()
@@ -121,6 +127,11 @@ namespace TalentHub.Data
                 .HasForeignKey(d => d.CandidateId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<CandidateDocument>()
+                  .HasOne(d => d.Qualification)
+                  .WithMany()
+                  .HasForeignKey(d => d.QualificationId)
+                   .OnDelete(DeleteBehavior.Restrict); 
             modelBuilder.Entity<Application>()
                 .HasOne(a => a.Candidate)
                 .WithMany(c => c.Applications)
@@ -142,6 +153,11 @@ namespace TalentHub.Data
     .WithMany(r => r.VacanciesCreated)
     .HasForeignKey(v => v.CreatedByRecruiterId)
     .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<VacancyDocument>()
+    .Property(v => v.DocumentType)
+    .HasConversion<string>()
+    .HasMaxLength(30);
 
             modelBuilder.Entity<ApplicationStatusHistory>()
                 .HasOne(h => h.Application)

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
 using TalentHub.DTOs;
@@ -8,23 +9,49 @@ namespace TalentHub.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class VacancyController : Controller
-
+    [Authorize]
+    public class VacancyController : TalentHubControllerBase
     {
-        private readonly AppDbContext _context;
-        public VacancyController(AppDbContext context)
+        public VacancyController(AppDbContext db) : base(db)
         {
-            _context = context;
         }
 
+        // Resolves the logged-in recruiter's own RecruiterId from their token.
+        // Used only to attribute a vacancy to its creator - NOT used to restrict who can edit/manage it.
+        // Any Recruiter can manage any vacancy (shared team pool), per team decision.
+        private async Task<int?> GetCurrentRecruiterId()
+        {
+            return await Db.Recruiters
+                .Where(r => r.UserId == CurrentUserId)
+                .Select(r => (int?)r.RecruiterId)
+                .FirstOrDefaultAsync();
+        }
+
+        [Authorize(Roles = "Recruiter,Admin")]
         [HttpPost("create")]
         public async Task<IActionResult> CreateJob([FromBody] CreateVacancyDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
-            var recruiterExists = await _context.Recruiters.AnyAsync(r => r.RecruiterId == dto.RecruiterId);
+
+            // Recruiters always create vacancies as themselves - RecruiterId in the body is ignored for them.
+            // Admins may specify any RecruiterId (e.g. setting up a vacancy on a recruiter's behalf).
+            int recruiterId;
+            if (User.IsInRole("Admin"))
+            {
+                recruiterId = dto.RecruiterId;
+            }
+            else
+            {
+                var ownRecruiterId = await GetCurrentRecruiterId();
+                if (ownRecruiterId == null)
+                    return BadRequest("Your account has no recruiter profile.");
+                recruiterId = ownRecruiterId.Value;
+            }
+
+            var recruiterExists = await Db.Recruiters.AnyAsync(r => r.RecruiterId == recruiterId);
             if (!recruiterExists)
-                return BadRequest($"Recruiter with ID {dto.RecruiterId} does not exist.");
+                return BadRequest($"Recruiter with ID {recruiterId} does not exist.");
 
             if (dto.VacancyType == VacancyType.Internal.ToString() && dto.DepartmentId is null)
                 return BadRequest("DepartmentId is required for internal vacancies.");
@@ -36,14 +63,14 @@ namespace TalentHub.Controllers
                 return BadRequest("SalaryMin cannot be greater than SalaryMax.");
             if (dto.VacancyType == VacancyType.Internal.ToString())
             {
-                var departmentExists = await _context.Departments.AnyAsync(d => d.DepartmentId == dto.DepartmentId);
+                var departmentExists = await Db.Departments.AnyAsync(d => d.DepartmentId == dto.DepartmentId);
                 if (!departmentExists)
                     return BadRequest($"Department with ID {dto.DepartmentId} does not exist.");
             }
 
             if (dto.VacancyType == VacancyType.ClientPlacement.ToString())
             {
-                var clientExists = await _context.Clients.AnyAsync(c => c.ClientId == dto.ClientId);
+                var clientExists = await Db.Clients.AnyAsync(c => c.ClientId == dto.ClientId);
                 if (!clientExists)
                     return BadRequest($"Client with ID {dto.ClientId} does not exist.");
             }
@@ -77,14 +104,14 @@ namespace TalentHub.Controllers
                 MinYearsExperience = dto.MinYearsExperience,
                 RequiredQualifications = dto.RequiredQualifications,
                 Requirements = dto.Requirements,
-                CreatedByRecruiterId = dto.RecruiterId,
+                CreatedByRecruiterId = recruiterId,
                 Status = VacancyStatus.Draft
             };
 
             // Attach skills with proficiency level
             var skillIds = dto.Skills.Select(s => s.SkillId).ToList();
 
-            var validSkillIds = await _context.Skills
+            var validSkillIds = await Db.Skills
                 .Where(s => skillIds.Contains(s.SkillId))
                 .Select(s => s.SkillId)
                 .ToHashSetAsync();
@@ -107,22 +134,33 @@ namespace TalentHub.Controllers
                 })
                 .ToList();
 
-            _context.Vacancies.Add(vacancy);
-            await _context.SaveChangesAsync();
+            Db.Vacancies.Add(vacancy);
+            await Db.SaveChangesAsync();
+
+            Db.VacancyChangeHistories.Add(new VacancyChangeHistory
+            {
+                VacancyId = vacancy.VacancyId,
+                VacancyTitle = vacancy.Title,
+                Action = "Created",
+                ChangedByUserId = CurrentUserId,
+                ChangedAt = DateTime.UtcNow
+            });
+            await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(vacancy));
         }
 
-        // PUT: api/Vacancy/5
-        // Full replacement of an editable vacancy's content fields. Restricted to Draft vacancies
-
+        // PUT: api/Vacancy/5/edit
+        // Full replacement of an editable vacancy's content fields. Restricted to Draft vacancies.
+        // Any Recruiter or Admin can edit any vacancy (shared team pool).
+        [Authorize(Roles = "Recruiter,Admin")]
         [HttpPut("{id}/edit")]
         public async Task<IActionResult> UpdateVacancy(int id, [FromBody] UpdateVacancyDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var vacancy = await _context.Vacancies
+            var vacancy = await Db.Vacancies
                 .Include(v => v.VacancySkills)
                 .Include(v => v.RequiredDocuments)
                 .FirstOrDefaultAsync(v => v.VacancyId == id);
@@ -138,7 +176,7 @@ namespace TalentHub.Controllers
 
             if (dto.VacancyType == VacancyType.Internal.ToString())
             {
-                var departmentExists = await _context.Departments.AnyAsync(d => d.DepartmentId == dto.DepartmentId);
+                var departmentExists = await Db.Departments.AnyAsync(d => d.DepartmentId == dto.DepartmentId);
                 if (!departmentExists)
                     return BadRequest($"Department with ID {dto.DepartmentId} does not exist.");
             }
@@ -148,7 +186,7 @@ namespace TalentHub.Controllers
 
             if (dto.VacancyType == VacancyType.ClientPlacement.ToString())
             {
-                var clientExists = await _context.Clients.AnyAsync(c => c.ClientId == dto.ClientId);
+                var clientExists = await Db.Clients.AnyAsync(c => c.ClientId == dto.ClientId);
                 if (!clientExists)
                     return BadRequest($"Client with ID {dto.ClientId} does not exist.");
             }
@@ -172,6 +210,24 @@ namespace TalentHub.Controllers
 
             if (dto.Skills is null || !dto.Skills.Any())
                 return BadRequest("At least one required skill must be specified.");
+
+            // Snapshot the "before" values so we can build a human-readable diff after applying changes.
+            var before = new
+            {
+                vacancy.Title,
+                vacancy.Description,
+                vacancy.EmploymentType,
+                vacancy.SalaryMin,
+                vacancy.SalaryMax,
+                vacancy.Location,
+                vacancy.ClosingDate,
+                vacancy.MinYearsExperience,
+                vacancy.RequiredQualifications,
+                vacancy.Requirements,
+                SkillIds = vacancy.VacancySkills.Select(vs => vs.SkillId).OrderBy(id => id).ToList(),
+                DocTypes = vacancy.RequiredDocuments.Select(rd => rd.DocumentType.ToString()).OrderBy(t => t).ToList()
+            };
+
             vacancy.Title = dto.Title;
             vacancy.Description = dto.Description;
             vacancy.VacancyType = Enum.Parse<VacancyType>(dto.VacancyType, ignoreCase: true);
@@ -189,7 +245,7 @@ namespace TalentHub.Controllers
             // Replace skills entirely
             var skillIds = dto.Skills.Select(s => s.SkillId).ToList();
 
-            var validSkillIds = await _context.Skills
+            var validSkillIds = await Db.Skills
                 .Where(s => skillIds.Contains(s.SkillId))
                 .Select(s => s.SkillId)
                 .ToHashSetAsync();
@@ -217,16 +273,47 @@ namespace TalentHub.Controllers
                 })
                 .ToList();
 
-            await _context.SaveChangesAsync();
+            await Db.SaveChangesAsync();
+
+            var changes = new List<string>();
+            if (before.Title != vacancy.Title) changes.Add($"Title: '{before.Title}' → '{vacancy.Title}'");
+            if (before.Description != vacancy.Description) changes.Add("Description updated");
+            if (before.EmploymentType != vacancy.EmploymentType) changes.Add($"Employment type: {before.EmploymentType} → {vacancy.EmploymentType}");
+            if (before.SalaryMin != vacancy.SalaryMin) changes.Add($"Salary min: {before.SalaryMin?.ToString() ?? "—"} → {vacancy.SalaryMin?.ToString() ?? "—"}");
+            if (before.SalaryMax != vacancy.SalaryMax) changes.Add($"Salary max: {before.SalaryMax?.ToString() ?? "—"} → {vacancy.SalaryMax?.ToString() ?? "—"}");
+            if (before.Location != vacancy.Location) changes.Add($"Location: '{before.Location}' → '{vacancy.Location}'");
+            if (before.ClosingDate != vacancy.ClosingDate) changes.Add($"Closing date: {before.ClosingDate?.ToString("d") ?? "—"} → {vacancy.ClosingDate?.ToString("d") ?? "—"}");
+            if (before.MinYearsExperience != vacancy.MinYearsExperience) changes.Add($"Min experience: {before.MinYearsExperience?.ToString() ?? "—"} → {vacancy.MinYearsExperience?.ToString() ?? "—"} yrs");
+            if (before.RequiredQualifications != vacancy.RequiredQualifications) changes.Add("Required qualifications updated");
+            if (before.Requirements != vacancy.Requirements) changes.Add("Requirements updated");
+
+            var newSkillIds = dto.Skills.Select(s => s.SkillId).OrderBy(id => id).ToList();
+            if (!before.SkillIds.SequenceEqual(newSkillIds)) changes.Add("Required skills updated");
+
+            var newDocTypes = dto.RequiredDocuments.Select(rd => rd.DocumentType).OrderBy(t => t).ToList();
+            if (!before.DocTypes.SequenceEqual(newDocTypes)) changes.Add("Required documents updated");
+
+            Db.VacancyChangeHistories.Add(new VacancyChangeHistory
+            {
+                VacancyId = vacancy.VacancyId,
+                VacancyTitle = vacancy.Title,
+                Action = "Edited",
+                Details = changes.Count > 0 ? string.Join("; ", changes) : "No field changes detected",
+                ChangedByUserId = CurrentUserId,
+                ChangedAt = DateTime.UtcNow
+            });
+            await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(vacancy));
         }
+
         // PATCH: api/Vacancy/5/publish
-        // Using PATCH instead of PUT because this is a partial, action-style state change
+        // Any Recruiter or Admin (shared team pool).
+        [Authorize(Roles = "Recruiter,Admin")]
         [HttpPatch("{id}/publish")]
         public async Task<IActionResult> PublishVacancy(int id)
         {
-            var vacancy = await _context.Vacancies
+            var vacancy = await Db.Vacancies
                 .Include(v => v.VacancySkills)
                 .Include(v => v.RequiredDocuments)
                 .FirstOrDefaultAsync(v => v.VacancyId == id);
@@ -240,36 +327,48 @@ namespace TalentHub.Controllers
             if (vacancy.Status == VacancyStatus.Closed)
                 return BadRequest("A closed vacancy cannot be republished.");
 
+            Db.VacancyChangeHistories.Add(new VacancyChangeHistory
+            {
+                VacancyId = vacancy.VacancyId,
+                VacancyTitle = vacancy.Title,
+                Action = "Published",
+                Details = $"Status: {vacancy.Status} → Published",
+                ChangedByUserId = CurrentUserId,
+                ChangedAt = DateTime.UtcNow
+            });
+
             vacancy.Status = VacancyStatus.Published;
             vacancy.PublishedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
+            await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(vacancy));
         }
+
         // GET: api/Vacancy/published
-        // Candidate-facing endpoint. Returns only the published jobs this is to be accessed by candidates.
+        // Candidate-facing endpoint - any authenticated role can browse published vacancies.
         [HttpGet("published")]
         public async Task<ActionResult<List<VacancyResponse>>> GetPublishedVacancies()
         {
-            var vacancies = await _context.Vacancies
+            var now = DateTime.UtcNow;
+            var vacancies = await Db.Vacancies
                 .Include(v => v.VacancySkills)
                 .Include(v => v.RequiredDocuments)
-                .Where(v => v.Status == VacancyStatus.Published)
+                .Where(v => v.Status == VacancyStatus.Published &&
+                            (!v.ClosingDate.HasValue || v.ClosingDate.Value > now))
                 .ToListAsync();
 
             var result = vacancies.Select(v => MapToResponse(v)).ToList();
-
             return Ok(result);
         }
+
         // PATCH: api/Vacancy/5/close
-        // lifecycle transition
-        // A vacancy can be closed from either Draft (recruiter cancels before it ever goes live)
-        // or Published (position filled / no longer needed) — but not from Closed again.
+        // Any Recruiter or Admin (shared team pool).
+        [Authorize(Roles = "Recruiter,Admin")]
         [HttpPatch("{id}/close")]
         public async Task<IActionResult> CloseVacancy(int id)
         {
-            var vacancy = await _context.Vacancies
+            var vacancy = await Db.Vacancies
                 .Include(v => v.VacancySkills)
                 .Include(v => v.RequiredDocuments)
                 .FirstOrDefaultAsync(v => v.VacancyId == id);
@@ -280,19 +379,30 @@ namespace TalentHub.Controllers
             if (vacancy.Status == VacancyStatus.Closed)
                 return BadRequest("This vacancy is already closed.");
 
+            Db.VacancyChangeHistories.Add(new VacancyChangeHistory
+            {
+                VacancyId = vacancy.VacancyId,
+                VacancyTitle = vacancy.Title,
+                Action = "Closed",
+                Details = $"Status: {vacancy.Status} → Closed",
+                ChangedByUserId = CurrentUserId,
+                ChangedAt = DateTime.UtcNow
+            });
+
             vacancy.Status = VacancyStatus.Closed;
 
-            await _context.SaveChangesAsync();
+            await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(vacancy));
         }
-      
-        // GET: api/Vacancy
-        // Returns all the vacancies(draft, published or closed, this is to accessed by recruiter, admin or HR
+
+        // GET: api/Vacancy/GetVacancyByStatus.
+        // Internal view (draft/published/closed) - Recruiter/Admin only.
+        [Authorize(Roles = "Recruiter,Admin")]
         [HttpGet("GetVacancyByStatus.")]
         public async Task<ActionResult<List<VacancyResponse>>> GetAllVacancies([FromQuery] VacancyStatus? status = null)
         {
-            var query = _context.Vacancies
+            var query = Db.Vacancies
                 .Include(v => v.VacancySkills)
                 .Include(v => v.RequiredDocuments)
                 .AsQueryable();
@@ -305,11 +415,14 @@ namespace TalentHub.Controllers
 
             return Ok(result);
         }
+
         // GET: api/Vacancy/5
+        // Any authenticated role - but Candidates only get to see Published vacancies this way.
+        // Prevents a candidate from viewing a Draft/Closed vacancy's details by guessing an ID.
         [HttpGet("{id}")]
         public async Task<ActionResult<VacancyResponse>> GetVacancyById(int id)
         {
-            var vacancy = await _context.Vacancies
+            var vacancy = await Db.Vacancies
                 .Include(v => v.VacancySkills)
                 .Include(v => v.RequiredDocuments)
                 .FirstOrDefaultAsync(v => v.VacancyId == id);
@@ -317,16 +430,20 @@ namespace TalentHub.Controllers
             if (vacancy is null)
                 return NotFound($"Vacancy with ID {id} not found.");
 
+            var isPrivileged = User.IsInRole("Admin") || User.IsInRole("Recruiter");
+            if (!isPrivileged && vacancy.Status != VacancyStatus.Published)
+                return NotFound($"Vacancy with ID {id} not found.");
+
             return Ok(MapToResponse(vacancy));
         }
 
         // DELETE: api/Vacancy/5
-        // Only Draft vacancies can be deleted — Published/Closed vacancies are kept
-        // as historical record and may have candidate applications attached.
+        // Only Draft vacancies can be deleted. Any Recruiter or Admin can delete (shared team pool).
+        [Authorize(Roles = "Recruiter,Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteVacancy(int id)
         {
-            var vacancy = await _context.Vacancies
+            var vacancy = await Db.Vacancies
                 .Include(v => v.VacancySkills)
                 .Include(v => v.RequiredDocuments)
                 .FirstOrDefaultAsync(v => v.VacancyId == id);
@@ -337,11 +454,45 @@ namespace TalentHub.Controllers
             if (vacancy.Status != VacancyStatus.Draft)
                 return BadRequest("Only vacancies in Draft status can be deleted.");
 
-            _context.Vacancies.Remove(vacancy);
-            await _context.SaveChangesAsync();
+            Db.VacancyChangeHistories.Add(new VacancyChangeHistory
+            {
+                VacancyId = vacancy.VacancyId,
+                VacancyTitle = vacancy.Title,
+                Action = "Deleted",
+                ChangedByUserId = CurrentUserId,
+                ChangedAt = DateTime.UtcNow
+            });
+
+            Db.Vacancies.Remove(vacancy);
+            await Db.SaveChangesAsync();
 
             return NoContent();
         }
+        // GET: api/Vacancy/5/history
+        // Recruiter/Admin only - shows who created/edited/published/closed/deleted this vacancy and when.
+        [Authorize(Roles = "Recruiter,Admin")]
+        [HttpGet("{id}/history")]
+        public async Task<IActionResult> GetHistory(int id)
+        {
+            var history = await Db.VacancyChangeHistories
+                .Include(h => h.ChangedByUser)
+                .Where(h => h.VacancyId == id)
+                .OrderBy(h => h.ChangedAt)
+                .Select(h => new
+                {
+                    h.VacancyChangeHistoryId,
+                    h.VacancyId,
+                    h.VacancyTitle,
+                    h.Action,
+                    h.Details,
+                    ChangedByName = h.ChangedByUser != null ? $"{h.ChangedByUser.FirstName} {h.ChangedByUser.LastName}" : "Unknown",
+                    h.ChangedAt
+                })
+                .ToListAsync();
+
+            return Ok(history);
+        }
+
         private static VacancyResponse MapToResponse(Vacancy v)
         {
             return new VacancyResponse
@@ -377,6 +528,6 @@ namespace TalentHub.Controllers
                 }).ToList() ?? new()
             };
         }
-    
+
     }
 }

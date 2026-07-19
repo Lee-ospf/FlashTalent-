@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
 using TalentHub.DTOs;
@@ -8,26 +9,26 @@ namespace TalentHub.Controllers
 {
     [ApiController]
     [Route("api/candidates/{candidateId}/skills")]
-    public class CandidateSkillsController : ControllerBase
+    [Authorize]
+    public class CandidateSkillsController : TalentHubControllerBase
     {
-        private readonly AppDbContext _db;
-
-        public CandidateSkillsController(AppDbContext db)
+        public CandidateSkillsController(AppDbContext db) : base(db)
         {
-            _db = db;
         }
 
         // GET api/candidates/{candidateId}/skills
         [HttpGet]
         public async Task<ActionResult<List<CandidateSkillResponse>>> GetAll(int candidateId)
         {
-            var candidateExists = await _db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
+            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
             if (!candidateExists)
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
 
-            var skills = await _db.CandidateSkills
+            if (!await IsOwnerOrPrivileged(candidateId)) return Forbid();
+
+            var skills = await Db.CandidateSkills
                 .Include(cs => cs.Skill)
                 .Where(cs => cs.CandidateId == candidateId)
                 .Select(cs => new CandidateSkillResponse
@@ -45,22 +46,24 @@ namespace TalentHub.Controllers
 
             return Ok(skills);
         }
-       
+
         // POST api/candidates/{candidateId}/skills
         // Body: { "skills": [{ "skillId": 1, "proficiencyLevel": "Intermediate" }, ...] }
         // If a skill is already assigned, its proficiency level is updated rather than duplicated.
         [HttpPost]
         public async Task<ActionResult<List<CandidateSkillResponse>>> AssignSkills(int candidateId, AssignSkillsRequest request)
         {
-            var candidateExists = await _db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
+            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
             if (!candidateExists)
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
 
+            if (!await IsOwnerOrAdmin(candidateId)) return Forbid();
+
             var requestedIds = request.Skills.Select(s => s.SkillId).Distinct().ToList();
 
-            var validSkillIds = await _db.Skills
+            var validSkillIds = await Db.Skills
                 .Where(s => requestedIds.Contains(s.SkillId))
                 .Select(s => s.SkillId)
                 .ToListAsync();
@@ -71,7 +74,7 @@ namespace TalentHub.Controllers
                 return BadRequest(new { message = $"Unknown SkillId(s): {string.Join(", ", invalidIds)}." });
             }
 
-            var existingLinks = await _db.CandidateSkills
+            var existingLinks = await Db.CandidateSkills
                 .Where(cs => cs.CandidateId == candidateId && validSkillIds.Contains(cs.SkillId))
                 .ToListAsync();
 
@@ -90,7 +93,7 @@ namespace TalentHub.Controllers
                 }
                 else
                 {
-                    _db.CandidateSkills.Add(new CandidateSkill
+                    Db.CandidateSkills.Add(new CandidateSkill
                     {
                         CandidateId = candidateId,
                         SkillId = item.SkillId,
@@ -100,7 +103,7 @@ namespace TalentHub.Controllers
                 }
             }
 
-            await _db.SaveChangesAsync();
+            await Db.SaveChangesAsync();
 
             return await GetAll(candidateId);
         }
@@ -109,7 +112,9 @@ namespace TalentHub.Controllers
         [HttpDelete("{skillId}")]
         public async Task<IActionResult> RemoveSkill(int candidateId, int skillId)
         {
-            var link = await _db.CandidateSkills
+            if (!await IsOwnerOrAdmin(candidateId)) return Forbid();
+
+            var link = await Db.CandidateSkills
                 .FirstOrDefaultAsync(cs => cs.CandidateId == candidateId && cs.SkillId == skillId);
 
             if (link == null)
@@ -117,8 +122,8 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = "This candidate does not have that skill assigned." });
             }
 
-            _db.CandidateSkills.Remove(link);
-            await _db.SaveChangesAsync();
+            Db.CandidateSkills.Remove(link);
+            await Db.SaveChangesAsync();
 
             return NoContent();
         }
