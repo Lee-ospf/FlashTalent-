@@ -19,6 +19,20 @@ export interface AuthResponse {
   role: string;
   token: string;
   expiresAt: string;
+  mustChangePassword: boolean;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface CreateRecruiterRequest {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  jobTitle: string;
 }
 
 // ── Candidate ─────────────────────────────────────────────────────

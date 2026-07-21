@@ -114,6 +114,7 @@ export class SidebarComponent {
   // Visible to every logged-in role
   commonNavItems: NavItem[] = [
     { label: 'Dashboard', icon: 'ti-layout-dashboard', route: '/dashboard' },
+    { label: 'Settings',  icon: 'ti-settings',           route: '/settings' },
   ];
 
   // Candidate only - self-service pages tied to "my own" candidate record

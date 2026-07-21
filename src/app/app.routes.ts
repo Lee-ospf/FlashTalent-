@@ -4,31 +4,31 @@ import { roleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
 
-  // ---------- Recruiter + Admin (shared vacancy/application management pool) ----------
+  // ---------- Recruiter + Admin (shared pool, but Admin gets read-only views via gate components) ----------
   {
     path: 'admin/vacancies',
     canActivate: [roleGuard(['Recruiter', 'Admin'])],
-    loadComponent: () => import('./features/admin/vacancy-list/vacancy-list.component').then(m => m.VacancyListComponent)
+    loadComponent: () => import('./features/admin/vacancy-list/vacancy-list-gate.component').then(m => m.VacancyListGateComponent)
   },
   {
     path: 'admin/vacancies/new',
-    canActivate: [roleGuard(['Recruiter', 'Admin'])],
+    canActivate: [roleGuard(['Recruiter'])],
     loadComponent: () => import('./features/admin/create-vacancy/create-vacancy.component').then(m => m.CreateVacancyComponent)
   },
   {
     path: 'admin/vacancies/:id/edit',
-    canActivate: [roleGuard(['Recruiter', 'Admin'])],
+    canActivate: [roleGuard(['Recruiter'])],
     loadComponent: () => import('./features/admin/create-vacancy/create-vacancy.component').then(m => m.CreateVacancyComponent)
   },
   {
     path: 'admin/vacancies/:id',
     canActivate: [roleGuard(['Recruiter', 'Admin'])],
-    loadComponent: () => import('./features/admin/vacancy-detail/vacancy-admin-detail.component').then(m => m.VacancyAdminDetailComponent)
+    loadComponent: () => import('./features/admin/vacancy-detail/vacancy-detail-gate.component').then(m => m.VacancyDetailGateComponent)
   },
   {
     path: 'admin/applications',
     canActivate: [roleGuard(['Recruiter', 'Admin'])],
-    loadComponent: () => import('./features/admin/application-list/application-list.component').then(m => m.ApplicationListComponent)
+    loadComponent: () => import('./features/admin/application-list/application-list-gate.component').then(m => m.ApplicationListGateComponent)
   },
 
   // ---------- Read-only for Recruiter+Admin, write actions inside these pages should
@@ -103,6 +103,11 @@ export const routes: Routes = [
     path: 'dashboard',
     canActivate: [authGuard],
     loadComponent: () => import('./features/dashboard/dashboard-gate.component').then(m => m.DashboardGateComponent)
+  },
+  {
+    path: 'settings',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent)
   },
 
   // ---------- Public ----------

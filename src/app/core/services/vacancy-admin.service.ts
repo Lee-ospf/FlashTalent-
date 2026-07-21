@@ -54,6 +54,7 @@ export class VacancyAdminService {
       .pipe(catchError(this.handleError));
   }
 
+ 
   // NOTE: this route really does have a trailing period — confirmed from the controller:
   // [HttpGet("GetVacancyByStatus.")]
   getAllByStatus(status?: string): Observable<VacancyResponse[]> {
@@ -63,6 +64,11 @@ export class VacancyAdminService {
     return this.http.get<VacancyResponse[]>(url)
       .pipe(catchError(this.handleError));
   }
+
+   getRecentHistory(take = 20): Observable<VacancyChangeHistoryEntry[]> {
+  return this.http.get<VacancyChangeHistoryEntry[]>(`${this.base}/history/recent?take=${take}`)
+    .pipe(catchError(this.handleError));
+}
 
   private handleError(err: HttpErrorResponse) {
     const message = err.error?.message ?? err.error ?? 'Vacancy request failed.';

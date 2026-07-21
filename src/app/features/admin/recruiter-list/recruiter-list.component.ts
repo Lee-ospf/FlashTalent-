@@ -11,6 +11,18 @@ import { RecruiterService } from '../../../core/services/recruiter.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { RecruiterResponse } from '../../../core/models';
 
+function generateTempPassword(): string {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const symbols = '!@#$%';
+  const pick = (s: string) => s[Math.floor(Math.random() * s.length)];
+  const rest = Array.from({ length: 8 }, () => pick(upper + lower + digits)).join('');
+  // Guarantee at least one of each character class, then shuffle
+  const chars = [pick(upper), pick(lower), pick(digits), pick(symbols), ...rest].sort(() => Math.random() - 0.5);
+  return chars.join('');
+}
+
 @Component({
   selector: 'app-recruiter-list',
   standalone: true,
@@ -23,31 +35,41 @@ import { RecruiterResponse } from '../../../core/models';
       <div class="page-header">
         <div>
           <h2 class="page-title"><i class="ti ti-user-star"></i> Recruiters</h2>
-          <p class="page-sub">{{ isAdmin() ? 'Link an existing user account to a recruiter profile' : 'Recruiters on the team' }}</p>
+          <p class="page-sub">{{ isAdmin() ? 'Onboard a new recruiter' : 'Recruiters on the team' }}</p>
         </div>
       </div>
 
       @if (isAdmin()) {
-        <div class="info-banner warn" style="margin-bottom:16px">
-          <i class="ti ti-info-circle"></i>
-          Enter the User ID of the account you want to designate as a recruiter. This ID is assigned when the user registers.
-        </div>
-
         <mat-card class="mat-elevation-z1" style="border-radius:12px;margin-bottom:20px">
           <mat-card-content style="padding:18px 20px">
             <div class="form-section-label"><i class="ti ti-plus"></i> Add a recruiter</div>
-            <form [formGroup]="form" (ngSubmit)="add()" style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">
-              <mat-form-field appearance="outline" style="width:160px">
-                <mat-label>User ID</mat-label>
-                <input matInput type="number" formControlName="userId">
-                @if (invalid('userId')) { <mat-error>Required</mat-error> }
-              </mat-form-field>
-              <mat-form-field appearance="outline" style="flex:1;min-width:200px">
-                <mat-label>Job title</mat-label>
-                <input matInput formControlName="jobTitle" placeholder="e.g. Senior Recruiter">
-                @if (invalid('jobTitle')) { <mat-error>Required</mat-error> }
-              </mat-form-field>
-              <button mat-raised-button color="primary" type="submit" style="height:56px;border-radius:8px" [disabled]="form.invalid || saving()">
+            <form [formGroup]="form" (ngSubmit)="add()">
+              <div class="field-grid">
+                <mat-form-field appearance="outline" style="width:100%">
+                  <mat-label>First name</mat-label>
+                  <input matInput formControlName="firstName">
+                  @if (invalid('firstName')) { <mat-error>Required</mat-error> }
+                </mat-form-field>
+                <mat-form-field appearance="outline" style="width:100%">
+                  <mat-label>Last name</mat-label>
+                  <input matInput formControlName="lastName">
+                  @if (invalid('lastName')) { <mat-error>Required</mat-error> }
+                </mat-form-field>
+                <mat-form-field appearance="outline" style="width:100%">
+                  <mat-label>Email address</mat-label>
+                  <input matInput type="email" formControlName="email">
+                  @if (invalid('email')) { <mat-error>Enter a valid email</mat-error> }
+                </mat-form-field>
+                <mat-form-field appearance="outline" style="width:100%">
+                  <mat-label>Job title</mat-label>
+                  <input matInput formControlName="jobTitle" placeholder="e.g. Senior Recruiter">
+                  @if (invalid('jobTitle')) { <mat-error>Required</mat-error> }
+                </mat-form-field>
+              </div>
+              <p class="form-note" style="margin-top:4px">
+                <i class="ti ti-info-circle"></i> A temporary password will be generated automatically — you'll see it once after creating the account, to share with the new recruiter.
+              </p>
+              <button mat-raised-button color="primary" type="submit" style="border-radius:8px;margin-top:10px" [disabled]="form.invalid || saving()">
                 @if (saving()) { <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner> }
                 <i class="ti ti-plus"></i> Add recruiter
               </button>
@@ -57,6 +79,23 @@ import { RecruiterResponse } from '../../../core/models';
             }
           </mat-card-content>
         </mat-card>
+
+        @if (lastCreated(); as created) {
+          <div class="temp-password-banner">
+            <i class="ti ti-key" style="font-size:20px"></i>
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:13px">{{ created.name }}'s account is ready</div>
+              <div style="font-size:12px;margin-top:2px">
+                Temp password: <code class="temp-pw">{{ created.password }}</code>
+                <button class="btn-copy" (click)="copyPassword(created.password)"><i class="ti ti-copy"></i> Copy</button>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+                Share this with them directly — it won't be shown again. They'll be asked to set their own password on first login.
+              </div>
+            </div>
+            <button class="btn-dismiss" (click)="lastCreated.set(null)"><i class="ti ti-x"></i></button>
+          </div>
+        }
       }
 
       @if (!loading()) {
@@ -79,7 +118,8 @@ import { RecruiterResponse } from '../../../core/models';
                 <div class="directory-name">{{ r.fullName || r.email }}</div>
                 <div class="directory-meta">
                   @if (r.jobTitle) { <span><i class="ti ti-briefcase"></i> {{ r.jobTitle }}</span> }
-                  <span><i class="ti ti-hash"></i> Recruiter #{{ r.recruiterId }} · User #{{ r.userId }}</span>
+                  <span><i class="ti ti-mail"></i> {{ r.email }}</span>
+                  <span><i class="ti ti-hash"></i> Recruiter #{{ r.recruiterId }}</span>
                 </div>
               </div>
             </div>
@@ -103,6 +143,22 @@ import { RecruiterResponse } from '../../../core/models';
       .directory-name { font-size: 14px; font-weight: 600; color: var(--text); }
       .directory-meta { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; font-size: 12px; color: var(--text-muted); }
       .directory-meta span { display: flex; align-items: center; gap: 6px; }
+
+      .temp-password-banner {
+        display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; margin-bottom: 20px;
+        background: var(--green-bg); border: 1px solid var(--green-mid); border-radius: 12px; color: #1a5c35;
+      }
+      .temp-pw {
+        background: rgba(255,255,255,0.7); padding: 2px 8px; border-radius: 6px; font-weight: 700;
+        font-family: monospace; font-size: 13px; margin: 0 6px;
+      }
+      .btn-copy {
+        background: none; border: 1px solid #1a5c35; color: #1a5c35; border-radius: 6px;
+        font-size: 11px; padding: 2px 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+      }
+      .btn-copy:hover { background: rgba(255,255,255,0.5); }
+      .btn-dismiss { background: none; border: none; cursor: pointer; color: inherit; opacity: 0.6; }
+      .btn-dismiss:hover { opacity: 1; }
     </style>
   `
 })
@@ -118,8 +174,12 @@ export class RecruiterListComponent implements OnInit {
   apiError = '';
   searchQ = signal('');
 
+  lastCreated = signal<{ name: string; password: string } | null>(null);
+
   form = this.fb.group({
-    userId: [null as number | null, Validators.required],
+    firstName: ['', Validators.required],
+    lastName: ['', Validators.required],
+    email: ['', [Validators.required, Validators.email]],
     jobTitle: ['', Validators.required]
   });
 
@@ -148,6 +208,11 @@ export class RecruiterListComponent implements OnInit {
     return !!c && c.invalid && (c.dirty || c.touched);
   }
 
+  copyPassword(pw: string): void {
+    navigator.clipboard?.writeText(pw);
+    this.toast.show('Password copied to clipboard.', 'success');
+  }
+
   ngOnInit(): void { this.load(); }
 
   load(): void {
@@ -162,12 +227,24 @@ export class RecruiterListComponent implements OnInit {
     if (this.form.invalid) return;
     this.apiError = '';
     this.saving.set(true);
-    this.recruiterService.create(this.form.value as { userId: number; jobTitle: string }).subscribe({
-      next: created => {
-        this.recruiters.update(list => [...list, created]);
+    this.lastCreated.set(null);
+
+    const v = this.form.value;
+    const tempPassword = generateTempPassword();
+
+    this.auth.createRecruiter({
+      firstName: v.firstName!,
+      lastName: v.lastName!,
+      email: v.email!,
+      password: tempPassword,
+      jobTitle: v.jobTitle!
+    }).subscribe({
+      next: () => {
         this.saving.set(false);
+        this.lastCreated.set({ name: `${v.firstName} ${v.lastName}`, password: tempPassword });
         this.form.reset();
-        this.toast.show(`Recruiter profile created for User #${created.userId}.`, 'success');
+        this.toast.show('Recruiter account created.', 'success');
+        this.load(); // create-recruiter doesn't return the Recruiter object, so refresh the list
       },
       error: (err: Error) => { this.saving.set(false); this.apiError = err.message; }
     });
