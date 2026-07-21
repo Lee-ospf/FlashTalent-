@@ -120,6 +120,27 @@ namespace TalentHub.Controllers
             return Ok(MapToResponse(application, candidate, vacancy));
         }
 
+        // GET api/applications
+        // Recruiter/Admin only - full system-wide application list, used by dashboards
+        // and any "all applications" admin views.
+        [Authorize(Roles = "Recruiter,Admin")]
+        [HttpGet]
+        public async Task<ActionResult<List<ApplicationResponse>>> GetAll()
+        {
+            var applications = await Db.Applications
+                .Include(a => a.Candidate).ThenInclude(c => c!.User)
+                .Include(a => a.Vacancy)
+                .OrderByDescending(a => a.AppliedAt)
+                .ToListAsync();
+
+            var result = applications
+                .Where(a => a.Candidate != null && a.Vacancy != null)
+                .Select(a => MapToResponse(a, a.Candidate!, a.Vacancy!))
+                .ToList();
+
+            return Ok(result);
+        }
+
         // GET api/applications/{id}
         // Candidate can view their own application; Recruiter/Admin can view any.
         [HttpGet("{id}")]
@@ -272,6 +293,7 @@ namespace TalentHub.Controllers
 
             return Ok(history);
         }
+
 
         private static ApplicationResponse MapToResponse(Application a, Candidate c, Vacancy v)
         {

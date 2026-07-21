@@ -493,6 +493,31 @@ namespace TalentHub.Controllers
             return Ok(history);
         }
 
+        // GET: api/Vacancy/history/recent
+        // Admin only - system-wide activity feed across ALL vacancies (Created/Edited/Published/Closed/Deleted),
+        // so Admin can spot-check that the shared-editing model isn't being misused.
+        [Authorize(Roles = "Admin")]
+        [HttpGet("history/recent")]
+        public async Task<IActionResult> GetRecentHistory([FromQuery] int take = 20)
+        {
+            var history = await Db.VacancyChangeHistories
+                .Include(h => h.ChangedByUser)
+                .OrderByDescending(h => h.ChangedAt)
+                .Take(take)
+                .Select(h => new
+                {
+                    h.VacancyChangeHistoryId,
+                    h.VacancyId,
+                    h.VacancyTitle,
+                    h.Action,
+                    h.Details,
+                    ChangedByName = h.ChangedByUser != null ? $"{h.ChangedByUser.FirstName} {h.ChangedByUser.LastName}" : "Unknown",
+                    h.ChangedAt
+                })
+                .ToListAsync();
+
+            return Ok(history);
+        }
         private static VacancyResponse MapToResponse(Vacancy v)
         {
             return new VacancyResponse
