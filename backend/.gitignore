@@ -1,0 +1,18 @@
+## .NET / Visual Studio
+bin/
+obj/
+*.user
+.vs/
+
+## Uploads folder content (keep the folder, ignore actual uploaded files)
+Uploads/*
+!Uploads/.gitkeep
+
+## Rider/VS Code (in case teammates use these)
+.idea/
+.vscode/
+
+## Entity Framework Core migrations (ignore files but keep folder)
+**/Migrations/*
+!**/Migrations/.gitkeep
+!**/Migrations/*ModelSnapshot.cs
