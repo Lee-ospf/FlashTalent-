@@ -30,6 +30,7 @@ namespace TalentHub.Data
         public DbSet<Address> Addresses => Set<Address>();
         public DbSet<Department> Departments => Set<Department>();
         public DbSet<VacancyChangeHistory> VacancyChangeHistories => Set<VacancyChangeHistory>();
+        public DbSet<PrescreeningTemplate> PrescreeningTemplates => Set<PrescreeningTemplate>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -40,6 +41,13 @@ namespace TalentHub.Data
                 .WithMany(c => c.Addresses)
                 .HasForeignKey(a => a.CandidateId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PrescreeningTemplate>()
+                 .HasOne(t => t.UploadedByUser)
+                 .WithMany()
+                 .HasForeignKey(t => t.UploadedByUserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
 
             modelBuilder.Entity<VacancyChangeHistory>()
                  .HasOne(h => h.ChangedByUser)

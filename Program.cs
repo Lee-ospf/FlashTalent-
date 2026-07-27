@@ -47,6 +47,7 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
+builder.Services.AddScoped<IPrescreeningService, PrescreeningService>();
 
 // CORS - frontend (Person C/D) runs on a different origin/port, so the browser
 // needs explicit permission to call this API. Tighten this list to your actual
@@ -99,6 +100,10 @@ builder.Services.AddScoped<IApplicationStatusRules, ApplicationStatusRules>();
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<VacancyClosingDateService>();
 
+builder.Services.AddScoped<IDocumentValidationService, DocumentValidationService>();
+builder.Services.AddScoped<IApplicationStatusRules, ApplicationStatusRules>();
+builder.Services.AddScoped<ITalentPoolService, TalentPoolService>();   
+
 var app = builder.Build();
 
 
@@ -121,24 +126,6 @@ app.UseAuthorization();
 app.UseStaticFiles();
 
 app.MapControllers();
-// in Program.cs, after app.Build(), before app.Run()
-//using (var scope = app.Services.CreateScope())
-//{
-//    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-//    if (!db.Users.Any(u => u.Role == UserRole.Admin))
-//    {
-//        db.Users.Add(new User
-//        {
-//            FirstName = "System",
-//            LastName = "Admin",
-//            Email = builder.Configuration["Bootstrap:AdminEmail"] ?? "admin@gmail.com",
-//            PasswordHash = BCrypt.Net.BCrypt.HashPassword(builder.Configuration["Bootstrap:AdminPassword"] ?? "ChangeMe123!"),
-//            Role = UserRole.Admin,
-//            MustChangePassword = true,
-//            CreatedAt = DateTime.UtcNow
-//        });
-//        db.SaveChanges();
-//    }
-//}
+
 
 app.Run();

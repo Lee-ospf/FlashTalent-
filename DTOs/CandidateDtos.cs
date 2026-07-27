@@ -62,7 +62,7 @@ namespace TalentHub.DTOs
         public string? Race { get; set; }
         public string? Nationality { get; set; }
         //public string? Address { get; set; }
-        public DateTime DateOfBirth { get; set; }
+        public DateTime? DateOfBirth { get; set; }
        
         public DateTime RegisteredAt { get; set; }
         public List<string> UploadedDocumentTypes { get; set; } = new();

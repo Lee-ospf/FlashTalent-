@@ -15,14 +15,18 @@ namespace TalentHub.Controllers
     {
         private readonly IDocumentValidationService _docValidation;
         private readonly IApplicationStatusRules _statusRules;
+        private readonly ITalentPoolService _talentPoolService;
+
 
         public ApplicationsController(
             AppDbContext db,
             IDocumentValidationService docValidation,
-            IApplicationStatusRules statusRules) : base(db)
+            IApplicationStatusRules statusRules,
+            ITalentPoolService talentPoolService) : base(db)
         {
             _docValidation = docValidation;
             _statusRules = statusRules;
+            _talentPoolService = talentPoolService;
         }
 
         // POST api/applications
@@ -253,6 +257,13 @@ namespace TalentHub.Controllers
             });
 
             await Db.SaveChangesAsync();
+
+            // Auto-add/refresh in Talent Pool when a candidate is rejected at any stage
+            if (newStatus == ApplicationStatus.NotSelected)
+            {
+                await _talentPoolService.AddOrUpdateAsync(application.CandidateId, application.VacancyId);
+            }
+
 
             return Ok(MapToResponse(application, application.Candidate, application.Vacancy));
         }

@@ -8,6 +8,8 @@ namespace TalentHub.Models
         InterviewScheduled,
         StatusChanged,
         DocumentMissing,
+        PrescreeningSent,       
+        PrescreeningSubmitted,
         General
     }
 

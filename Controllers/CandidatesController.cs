@@ -185,7 +185,7 @@ namespace TalentHub.Controllers
                 Race = c.Race,
                 Nationality = c.Nationality,
 
-                DateOfBirth = (DateTime)c.DateOfBirth,
+                DateOfBirth = c.DateOfBirth,
 
                 RegisteredAt = c.RegisteredAt,
                 UploadedDocumentTypes = documentTypes
