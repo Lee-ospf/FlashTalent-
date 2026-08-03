@@ -11,13 +11,26 @@ import { CandidateStateService } from './core/services/candidate-state.service';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, CommonModule, SidebarComponent, TopbarComponent, ToastComponent, TempPasswordBannerComponent],
+  imports: [
+    RouterOutlet,
+    CommonModule,
+    SidebarComponent,
+    TopbarComponent,
+    ToastComponent,
+    TempPasswordBannerComponent,
+  ],
   template: `
     @if (auth.isLoggedIn()) {
       <div class="app-shell">
-        <app-sidebar [collapsed]="sidebarCollapsed()" (toggleSidebar)="toggleSidebar()" />
+        <app-sidebar
+          [collapsed]="sidebarCollapsed()"
+          (toggleSidebar)="toggleSidebar()"
+        />
         <div class="app-main" [class.sidebar-collapsed]="sidebarCollapsed()">
-          <app-topbar [sidebarCollapsed]="sidebarCollapsed()" (toggleSidebar)="toggleSidebar()" />
+          <app-topbar
+            [sidebarCollapsed]="sidebarCollapsed()"
+            (toggleSidebar)="toggleSidebar()"
+          />
           <app-temp-password-banner />
           <div class="app-content">
             <router-outlet />
@@ -28,7 +41,7 @@ import { CandidateStateService } from './core/services/candidate-state.service';
       <router-outlet />
     }
     <app-toast />
-  `
+  `,
 })
 export class AppComponent implements OnInit {
   auth = inject(AuthService);
@@ -42,6 +55,6 @@ export class AppComponent implements OnInit {
   }
 
   toggleSidebar(): void {
-    this.sidebarCollapsed.update(v => !v);
+    this.sidebarCollapsed.update((v) => !v);
   }
 }
