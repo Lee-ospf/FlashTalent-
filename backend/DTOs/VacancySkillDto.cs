@@ -6,6 +6,7 @@ namespace TalentHub.DTOs
     {
         public int SkillId { get; set; }
         public bool IsRequired { get; set; } = true;
+        public string SkillName { get; set; } = string.Empty;
 
         [MaxLength(50)]
         public string ProficiencyLevel { get; set; }
