@@ -285,7 +285,132 @@ namespace TalentHub.Controllers
             return Ok(history);
         }
 
+        // GET api/applications/{id}/review
+        // Returns the full enriched review payload for the recruiter split-screen view.
+        [Authorize(Roles = "Recruiter,Admin")]
+        [HttpGet("{id}/review")]
+        public async Task<ActionResult<ApplicationReviewResponse>> GetReview(int id)
+        {
+            var application = await Db.Applications
+                .Include(a => a.Candidate)
+                    .ThenInclude(c => c!.User)
+                .Include(a => a.Candidate)
+                    .ThenInclude(c => c!.CandidateSkills)
+                        .ThenInclude(cs => cs.Skill)
+                .Include(a => a.Candidate)
+                    .ThenInclude(c => c!.Qualifications)
+                .Include(a => a.Candidate)
+                    .ThenInclude(c => c!.Experiences)
+                .Include(a => a.Candidate)
+                    .ThenInclude(c => c!.Documents)
+                .Include(a => a.Vacancy)
+                    .ThenInclude(v => v.VacancySkills)
+                        .ThenInclude(vs => vs.Skill)
+                .Include(a => a.Vacancy)
+                    .ThenInclude(v => v.Department)
+                .Include(a => a.Vacancy)
+                    .ThenInclude(v => v.Client)
+                .FirstOrDefaultAsync(a => a.ApplicationId == id);
 
+            if (application == null || application.Candidate == null || application.Vacancy == null)
+                return NotFound(new { message = $"No application found with ApplicationId {id}." });
+
+            var c = application.Candidate;
+            var v = application.Vacancy;
+            var user = c.User;
+
+            if (user == null)
+                return NotFound(new { message = "Candidate user account not found." });
+
+            //get the most recent CV document URL for the candidate, if it exists
+            var cvUrl = c.Documents
+       .Where(d => d.DocumentType == DocumentType.CV)
+       .OrderByDescending(d => d.UploadedAt)
+       .FirstOrDefault()?.FileUrl;
+
+            // PostedFor — department name for internal, client name for placement
+            var postedFor = v.VacancyType == VacancyType.Internal
+                ? v.Department?.Name
+                : v.Client?.ClientName;
+
+            var response = new ApplicationReviewResponse
+            {
+                Application = new ApplicationSectionDto
+                {
+                    ApplicationId = application.ApplicationId,
+                    Status = application.Status.ToString(),
+                    AppliedAt = application.AppliedAt
+                },
+                Candidate = new CandidateSectionDto
+                {
+                    CandidateId = c.CandidateId,
+                    FirstName = user.FirstName,
+                    LastName = user.LastName,
+                    Email = user.Email,
+                    Phone = c.Phone,
+                    CvUrl = cvUrl,
+                    Skills = c.CandidateSkills
+                        .Where(cs => cs.Skill != null)
+                        .Select(cs => new CandidateSkillDto
+                        {
+                            SkillId = cs.SkillId,
+                            SkillName = cs.Skill!.Name,
+                            Category = cs.Skill.Category.ToString(),
+                            ProficiencyLevel = cs.ProficiencyLevel.ToString()
+                        }).ToList(),
+                    Qualifications = c.Qualifications
+                        .Where(q => q.QualificationType == QualificationType.Education)
+                        .Select(q => new CandidateQualificationDto
+                        {
+                            Name = q.Name,
+                            Institution = q.Institution,
+                            YearCompleted = q.YearCompleted
+                        }).ToList(),
+                    Certifications = c.Qualifications
+                        .Where(q => q.QualificationType == QualificationType.Certification)
+                        .Select(q => new CandidateQualificationDto
+                        {
+                            Name = q.Name,
+                            Institution = q.Institution,
+                            YearCompleted = q.YearCompleted
+                        }).ToList(),
+                    Experiences = c.Experiences
+                        .OrderByDescending(e => e.StartDate)
+                        .Select(e => new CandidateExperienceDto
+                        {
+                            Company = e.Company,
+                            Role = e.Role,
+                            StartDate = e.StartDate,
+                            EndDate = e.EndDate,
+                            ProjectsAndDuties = e.ProjectsAndDuties
+                        }).ToList()
+                },
+                Vacancy = new VacancySectionDto
+                {
+                    VacancyId = v.VacancyId,
+                    Title = v.Title,
+                    Description = v.Description,
+                    EmploymentType = v.EmploymentType.ToString(),
+                    Location = v.Location,
+                    MinYearsExperience = v.MinYearsExperience,
+                    RequiredQualifications = v.RequiredQualifications,
+                    Requirements = v.Requirements,
+                    VacancyType = v.VacancyType.ToString(),
+                    PostedFor = postedFor,
+                    RequiredSkills = v.VacancySkills
+                        .Where(vs => vs.Skill != null)
+                        .Select(vs => new VacancySkillDto
+                        {
+                            SkillId = vs.SkillId,
+                            SkillName = vs.Skill!.Name,
+                            IsRequired = vs.IsRequired,
+                            ProficiencyLevel = vs.ProficiencyLevel
+                        }).ToList()
+                }
+            };
+
+            return Ok(response);
+        }
         private static ApplicationResponse MapToResponse(Application a, Candidate c, Vacancy v)
         {
             return new ApplicationResponse
