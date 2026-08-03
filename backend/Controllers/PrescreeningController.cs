@@ -15,18 +15,21 @@ namespace TalentHub.Controllers
     {
         private readonly IPrescreeningService _prescreeningService;
         private readonly IWebHostEnvironment _env;
+        private readonly IApplicationStatusRules _statusRules;
 
         // Same conventions as CandidateDocumentsController - keep in sync if those change.
         private static readonly string[] AllowedExtensions = { ".pdf", ".doc", ".docx" };
         private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
 
         public PrescreeningController(
-            AppDbContext db,
-            IPrescreeningService prescreeningService,
-            IWebHostEnvironment env) : base(db)
+     AppDbContext db,
+     IPrescreeningService prescreeningService,
+     IWebHostEnvironment env,
+     IApplicationStatusRules statusRules) : base(db)
         {
             _prescreeningService = prescreeningService;
             _env = env;
+            _statusRules = statusRules;
         }
 
         // POST api/prescreening/template
@@ -155,6 +158,7 @@ namespace TalentHub.Controllers
             var notification = await _prescreeningService.BuildSentNotification(application);
             Db.Notifications.Add(notification);
 
+            await _statusRules.TransitionAsync(application, ApplicationStatus.PrescreeningStage, CurrentUserId);
             await Db.SaveChangesAsync();
 
             return Ok(_prescreeningService.MapToResponse(prescreening, application));
@@ -303,6 +307,11 @@ namespace TalentHub.Controllers
             application.Prescreening.RecruiterNotes = request.RecruiterNotes;
             application.Prescreening.ReviewedAt = DateTime.UtcNow;
             application.Prescreening.Status = PrescreeningStatus.Reviewed;
+
+            if (outcome == PrescreeningOutcome.Failed)   
+            {
+                await _statusRules.TransitionAsync(application, ApplicationStatus.NotSelected, CurrentUserId);
+            }
 
             await Db.SaveChangesAsync();
 

@@ -6,6 +6,8 @@ namespace TalentHub.Models
     public enum NotificationType
     {
         InterviewScheduled,
+        InterviewRescheduled,  
+        InterviewCancelled,
         StatusChanged,
         DocumentMissing,
         PrescreeningSent,       

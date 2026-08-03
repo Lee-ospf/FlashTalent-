@@ -480,6 +480,16 @@ namespace TalentHub.Migrations
                     b.Property<int>("ApplicationId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("InterviewType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Location")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
@@ -488,12 +498,32 @@ namespace TalentHub.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RecruiterNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("RoundNumber")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("ScheduledAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("ScheduledByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.HasKey("InterviewId");
 
-                    b.HasIndex("ApplicationId");
+                    b.HasIndex("ScheduledByUserId");
+
+                    b.HasIndex("ApplicationId", "RoundNumber")
+                        .IsUnique();
 
                     b.ToTable("Interviews");
                 });
@@ -547,6 +577,12 @@ namespace TalentHub.Migrations
                     b.Property<int>("ApplicationId")
                         .HasColumnType("int");
 
+                    b.Property<string>("CompletedFileUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CompletedOriginalFileName")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Outcome")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -555,14 +591,17 @@ namespace TalentHub.Migrations
                     b.Property<string>("RecruiterNotes")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ResponsesJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime?>("ReviewedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime>("SubmittedAt")
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("SubmittedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("PrescreeningId");
@@ -571,6 +610,35 @@ namespace TalentHub.Migrations
                         .IsUnique();
 
                     b.ToTable("Prescreenings");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.PrescreeningTemplate", b =>
+                {
+                    b.Property<int>("PrescreeningTemplateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PrescreeningTemplateId"));
+
+                    b.Property<string>("FileUrl")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UploadedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("PrescreeningTemplateId");
+
+                    b.HasIndex("UploadedByUserId");
+
+                    b.ToTable("PrescreeningTemplates");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Recruiter", b =>
@@ -1031,7 +1099,15 @@ namespace TalentHub.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("TalentHub.Models.User", "ScheduledByUser")
+                        .WithMany()
+                        .HasForeignKey("ScheduledByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Application");
+
+                    b.Navigation("ScheduledByUser");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Notification", b =>
@@ -1054,6 +1130,17 @@ namespace TalentHub.Migrations
                         .IsRequired();
 
                     b.Navigation("Application");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.PrescreeningTemplate", b =>
+                {
+                    b.HasOne("TalentHub.Models.User", "UploadedByUser")
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("UploadedByUser");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Recruiter", b =>

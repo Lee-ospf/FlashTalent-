@@ -15,18 +15,18 @@ namespace TalentHub.Controllers
     {
         private readonly IDocumentValidationService _docValidation;
         private readonly IApplicationStatusRules _statusRules;
-        private readonly ITalentPoolService _talentPoolService;
+       
 
 
         public ApplicationsController(
             AppDbContext db,
             IDocumentValidationService docValidation,
-            IApplicationStatusRules statusRules,
-            ITalentPoolService talentPoolService) : base(db)
+            IApplicationStatusRules statusRules) : base(db)
+
         {
             _docValidation = docValidation;
             _statusRules = statusRules;
-            _talentPoolService = talentPoolService;
+           
         }
 
         // POST api/applications
@@ -234,36 +234,16 @@ namespace TalentHub.Controllers
                 return BadRequest(new { message = $"Invalid status '{request.NewStatus}'. Valid values: {validValues}." });
             }
 
-            var oldStatus = application.Status;
-
-            if (!_statusRules.IsValidTransition(oldStatus, newStatus))
+            if (!_statusRules.IsValidTransition(application.Status, newStatus))
             {
                 return BadRequest(new
                 {
-                    message = $"Cannot move application from '{oldStatus}' to '{newStatus}'. This is not a valid pipeline transition."
+                    message = $"Cannot move application from '{application.Status}' to '{newStatus}'. This is not a valid pipeline transition."
                 });
             }
 
-            application.Status = newStatus;
-            application.UpdatedAt = DateTime.UtcNow;
-
-            Db.ApplicationStatusHistories.Add(new ApplicationStatusHistory
-            {
-                ApplicationId = application.ApplicationId,
-                OldStatus = oldStatus,
-                NewStatus = newStatus,
-                ChangedByUserId = CurrentUserId,
-                ChangedAt = DateTime.UtcNow
-            });
-
+            await _statusRules.TransitionAsync(application, newStatus, CurrentUserId);
             await Db.SaveChangesAsync();
-
-            // Auto-add/refresh in Talent Pool when a candidate is rejected at any stage
-            if (newStatus == ApplicationStatus.NotSelected)
-            {
-                await _talentPoolService.AddOrUpdateAsync(application.CandidateId, application.VacancyId);
-            }
-
 
             return Ok(MapToResponse(application, application.Candidate, application.Vacancy));
         }
