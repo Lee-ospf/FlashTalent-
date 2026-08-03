@@ -227,6 +227,23 @@ namespace TalentHub.Data
                 .HasForeignKey(t => t.LastVacancyId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
 
+            modelBuilder.Entity<Interview>()
+    .HasOne(i => i.Application)
+    .WithMany(a => a.Interviews)
+    .HasForeignKey(i => i.ApplicationId)
+    .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Interview>()
+                .HasOne(i => i.ScheduledByUser)
+                .WithMany()
+                .HasForeignKey(i => i.ScheduledByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // One application can't have two rounds with the same number
+            modelBuilder.Entity<Interview>()
+                .HasIndex(i => new { i.ApplicationId, i.RoundNumber })
+                .IsUnique();
+
             // convert all enums to strings in the database for readability
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {

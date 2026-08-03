@@ -8,6 +8,8 @@
             Applied,
             UnderReview,
             Shortlisted,
+            PrescreeningStage,  
+            InterviewStage,
             OfferExtended,
             Hired,
             NotSelected

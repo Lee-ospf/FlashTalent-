@@ -3,22 +3,44 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TalentHub.Models
 {
-    // NOTE: MINIMAL STUB owned by Person A only, so Application.cs compiles.
-    // Person B (Recruiter backend, D7) owns the full Interview table
-    // (ScheduledByUserId, Location, MeetingLink, InterviewType, Status, etc).
-    // Keep InterviewId and class name "Interview" identical when merging.
+    public enum InterviewType
+    {
+        InPerson,
+        Virtual,
+        Phone
+    }
+
+    public enum InterviewStatus
+    {
+        Scheduled,
+        Completed,
+        Cancelled
+    }
+
+    public enum InterviewOutcome
+    {
+        Pending,
+        Passed,
+        Failed
+    }
+
     [Table("Interviews")]
     public class Interview
     {
-
         [Key]
         public int InterviewId { get; set; }
 
         [Required, ForeignKey(nameof(Application))]
         public int ApplicationId { get; set; }
-
         public Application? Application { get; set; }
 
+        [Required]
+        public int RoundNumber { get; set; }
+
+        [Required]
+        public InterviewType InterviewType { get; set; }
+
+        [Required]
         public DateTime ScheduledAt { get; set; }
 
         [MaxLength(300)]
@@ -26,5 +48,19 @@ namespace TalentHub.Models
 
         [MaxLength(500)]
         public string? MeetingLink { get; set; }
+
+        [Required]
+        public InterviewStatus Status { get; set; } = InterviewStatus.Scheduled;
+
+        public InterviewOutcome Outcome { get; set; } = InterviewOutcome.Pending;
+
+        public string? RecruiterNotes { get; set; }
+
+        [Required, ForeignKey(nameof(ScheduledByUser))]
+        public int ScheduledByUserId { get; set; }
+        public User? ScheduledByUser { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? CompletedAt { get; set; }
     }
 }

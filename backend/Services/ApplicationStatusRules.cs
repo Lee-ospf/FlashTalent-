@@ -1,19 +1,25 @@
-﻿using TalentHub.Models;
+﻿using Microsoft.EntityFrameworkCore;
+using TalentHub.Data;
+using TalentHub.Models;
 
 namespace TalentHub.Services
 {
     public interface IApplicationStatusRules
     {
         bool IsValidTransition(ApplicationStatus from, ApplicationStatus to);
+
+        // The single place status changes, history writes, and Talent Pool hooks
+        // happen - reused by Applications, Prescreening, and Interviews controllers
+        // so none of them duplicate this logic. Caller is still responsible for
+        
+        Task TransitionAsync(Application application, ApplicationStatus newStatus, int changedByUserId);
     }
 
     public class ApplicationStatusRules : IApplicationStatusRules
     {
-        // Defines which statuses can move to which. NotSelected is reachable from
-        // any active stage (a candidate can be rejected at any point in the
-        // pipeline, per the scope doc: "recruiter to mark candidate as Not Selected
-        // at any pipeline stage"). Hired and NotSelected are terminal - no transitions
-        // out of them, since the scope doc treats them as end states.
+        private readonly AppDbContext _db;
+        private readonly ITalentPoolService _talentPoolService;
+
         private static readonly Dictionary<ApplicationStatus, ApplicationStatus[]> AllowedTransitions = new()
         {
             [ApplicationStatus.Applied] = new[]
@@ -28,6 +34,16 @@ namespace TalentHub.Services
             },
             [ApplicationStatus.Shortlisted] = new[]
             {
+                ApplicationStatus.PrescreeningStage,
+                ApplicationStatus.NotSelected
+            },
+            [ApplicationStatus.PrescreeningStage] = new[]
+            {
+                ApplicationStatus.InterviewStage,
+                ApplicationStatus.NotSelected
+            },
+            [ApplicationStatus.InterviewStage] = new[]
+            {
                 ApplicationStatus.OfferExtended,
                 ApplicationStatus.NotSelected
             },
@@ -40,10 +56,46 @@ namespace TalentHub.Services
             [ApplicationStatus.NotSelected] = Array.Empty<ApplicationStatus>()
         };
 
+        public ApplicationStatusRules(AppDbContext db, ITalentPoolService talentPoolService)
+        {
+            _db = db;
+            _talentPoolService = talentPoolService;
+        }
+
         public bool IsValidTransition(ApplicationStatus from, ApplicationStatus to)
         {
-            if (from == to) return false; // no-op changes aren't a "transition"
+            if (from == to) return false;
             return AllowedTransitions.TryGetValue(from, out var allowed) && allowed.Contains(to);
+        }
+
+        public async Task TransitionAsync(Application application, ApplicationStatus newStatus, int changedByUserId)
+        {
+            var oldStatus = application.Status;
+
+            if (!IsValidTransition(oldStatus, newStatus))
+            {
+                // Defensive - callers should already be gating this, so hitting this
+                // means a bug in the calling controller's own guard logic.
+                throw new InvalidOperationException(
+                    $"Cannot transition application {application.ApplicationId} from '{oldStatus}' to '{newStatus}'.");
+            }
+
+            application.Status = newStatus;
+            application.UpdatedAt = DateTime.UtcNow;
+
+            _db.ApplicationStatusHistories.Add(new ApplicationStatusHistory
+            {
+                ApplicationId = application.ApplicationId,
+                OldStatus = oldStatus,
+                NewStatus = newStatus,
+                ChangedByUserId = changedByUserId,
+                ChangedAt = DateTime.UtcNow
+            });
+
+            if (newStatus == ApplicationStatus.NotSelected)
+            {
+                await _talentPoolService.AddOrUpdateAsync(application.CandidateId, application.VacancyId);
+            }
         }
     }
 }

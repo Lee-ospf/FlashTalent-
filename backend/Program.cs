@@ -102,7 +102,8 @@ builder.Services.AddHostedService<VacancyClosingDateService>();
 
 builder.Services.AddScoped<IDocumentValidationService, DocumentValidationService>();
 builder.Services.AddScoped<IApplicationStatusRules, ApplicationStatusRules>();
-builder.Services.AddScoped<ITalentPoolService, TalentPoolService>();   
+builder.Services.AddScoped<ITalentPoolService, TalentPoolService>();
+builder.Services.AddScoped<IInterviewService, InterviewService>();
 
 var app = builder.Build();
 
