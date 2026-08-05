@@ -6,6 +6,8 @@ using TalentHub.Data;
 using TalentHub.Models;
 using TalentHub.Services;
 using Microsoft.OpenApi.Models;
+using Microsoft.Extensions.FileProviders;
+
 
 
 
@@ -125,6 +127,18 @@ app.UseAuthorization();
 
 // Serve uploaded documents back as static files (e.g. so a recruiter can open a CV link)
 app.UseStaticFiles();
+// Serve uploaded candidate documents from the Uploads folder
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(builder.Environment.ContentRootPath, "Uploads")),
+    RequestPath = "/Uploads"
+});
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+
 
 app.MapControllers();
 
