@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TalentHub.Data;
 
@@ -11,9 +12,11 @@ using TalentHub.Data;
 namespace TalentHub.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260728084946_AddPrescreeningTemplateAndInterviewFields")]
+    partial class AddPrescreeningTemplateAndInterviewFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -564,96 +567,6 @@ namespace TalentHub.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Notifications");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.OfferLetter", b =>
-                {
-                    b.Property<int>("OfferLetterId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("OfferLetterId"));
-
-                    b.Property<int>("ApplicationId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ClosingDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("EmploymentType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("GeneratedHtml")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("JobTitle")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Location")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime?>("RespondedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("Salary")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("SentAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("SentByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("VersionNumber")
-                        .HasColumnType("int");
-
-                    b.HasKey("OfferLetterId");
-
-                    b.HasIndex("SentByUserId");
-
-                    b.HasIndex("ApplicationId", "VersionNumber")
-                        .IsUnique();
-
-                    b.ToTable("OfferLetters");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.OfferLetterTemplate", b =>
-                {
-                    b.Property<int>("OfferLetterTemplateId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("OfferLetterTemplateId"));
-
-                    b.Property<string>("HtmlContent")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("UploadedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UploadedByUserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("OfferLetterTemplateId");
-
-                    b.HasIndex("UploadedByUserId");
-
-                    b.ToTable("OfferLetterTemplates");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Prescreening", b =>
@@ -1209,36 +1122,6 @@ namespace TalentHub.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.OfferLetter", b =>
-                {
-                    b.HasOne("TalentHub.Models.Application", "Application")
-                        .WithMany()
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TalentHub.Models.User", "SentByUser")
-                        .WithMany()
-                        .HasForeignKey("SentByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Application");
-
-                    b.Navigation("SentByUser");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.OfferLetterTemplate", b =>
-                {
-                    b.HasOne("TalentHub.Models.User", "UploadedByUser")
-                        .WithMany()
-                        .HasForeignKey("UploadedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("UploadedByUser");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Prescreening", b =>

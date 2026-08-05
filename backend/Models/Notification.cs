@@ -10,8 +10,10 @@ namespace TalentHub.Models
         InterviewCancelled,
         StatusChanged,
         DocumentMissing,
-        PrescreeningSent,       
+        PrescreeningSent,
         PrescreeningSubmitted,
+        OfferSent,       
+        OfferResponded,
         General
     }
 

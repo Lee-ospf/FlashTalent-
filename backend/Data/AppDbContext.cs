@@ -31,6 +31,8 @@ namespace TalentHub.Data
         public DbSet<Department> Departments => Set<Department>();
         public DbSet<VacancyChangeHistory> VacancyChangeHistories => Set<VacancyChangeHistory>();
         public DbSet<PrescreeningTemplate> PrescreeningTemplates => Set<PrescreeningTemplate>();
+        public DbSet<OfferLetterTemplate> OfferLetterTemplates => Set<OfferLetterTemplate>();
+        public DbSet<OfferLetter> OfferLetters => Set<OfferLetter>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -157,15 +159,15 @@ namespace TalentHub.Data
                 .IsUnique();
 
             modelBuilder.Entity<Vacancy>()
-    .HasOne(v => v.Recruiter)
-    .WithMany(r => r.VacanciesCreated)
-    .HasForeignKey(v => v.CreatedByRecruiterId)
-    .OnDelete(DeleteBehavior.Restrict);
+                .HasOne(v => v.Recruiter)
+                .WithMany(r => r.VacanciesCreated)
+                .HasForeignKey(v => v.CreatedByRecruiterId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<VacancyDocument>()
-    .Property(v => v.DocumentType)
-    .HasConversion<string>()
-    .HasMaxLength(30);
+                 .Property(v => v.DocumentType)
+                 .HasConversion<string>()
+                 .HasMaxLength(30);
 
             modelBuilder.Entity<ApplicationStatusHistory>()
                 .HasOne(h => h.Application)
@@ -228,10 +230,10 @@ namespace TalentHub.Data
                 .OnDelete(DeleteBehavior.ClientSetNull);
 
             modelBuilder.Entity<Interview>()
-    .HasOne(i => i.Application)
-    .WithMany(a => a.Interviews)
-    .HasForeignKey(i => i.ApplicationId)
-    .OnDelete(DeleteBehavior.Cascade);
+                .HasOne(i => i.Application)
+                .WithMany(a => a.Interviews)
+                .HasForeignKey(i => i.ApplicationId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Interview>()
                 .HasOne(i => i.ScheduledByUser)
@@ -244,6 +246,27 @@ namespace TalentHub.Data
                 .HasIndex(i => new { i.ApplicationId, i.RoundNumber })
                 .IsUnique();
 
+            modelBuilder.Entity<OfferLetterTemplate>()
+              .HasOne(t => t.UploadedByUser)
+              .WithMany()
+              .HasForeignKey(t => t.UploadedByUserId)
+              .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<OfferLetter>()
+                .HasOne(o => o.Application)
+                .WithMany()
+                .HasForeignKey(o => o.ApplicationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<OfferLetter>()
+                .HasOne(o => o.SentByUser)
+                .WithMany()
+                .HasForeignKey(o => o.SentByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<OfferLetter>()
+                .HasIndex(o => new { o.ApplicationId, o.VersionNumber })
+                .IsUnique();
             // convert all enums to strings in the database for readability
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {

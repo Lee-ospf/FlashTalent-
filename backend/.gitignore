@@ -12,7 +12,3 @@ Uploads/*
 .idea/
 .vscode/
 
-## Entity Framework Core migrations (ignore files but keep folder)
-**/Migrations/*
-!**/Migrations/.gitkeep
-!**/Migrations/*ModelSnapshot.cs

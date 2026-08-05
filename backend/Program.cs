@@ -104,7 +104,7 @@ builder.Services.AddScoped<IDocumentValidationService, DocumentValidationService
 builder.Services.AddScoped<IApplicationStatusRules, ApplicationStatusRules>();
 builder.Services.AddScoped<ITalentPoolService, TalentPoolService>();
 builder.Services.AddScoped<IInterviewService, InterviewService>();
-
+builder.Services.AddScoped<IOfferLetterService, OfferLetterService>();
 var app = builder.Build();
 
 
