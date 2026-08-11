@@ -11,7 +11,8 @@ import { VacancyResponse, ApplicationResponse, SkillResponse } from '../../../co
 import { STATUS_LABELS } from '../../../core/utils/application-status';
 
 const STATUS_CLASS: Record<string, string> = {
-  Applied: 'applied', UnderReview: 'shortlisted', Shortlisted: 'interview',
+  Applied: 'applied', UnderReview: 'shortlisted', Shortlisted: 'prescreen',
+  PrescreeningStage: 'interview', InterviewStage: 'interview',
   OfferExtended: 'offer', Hired: 'offer', NotSelected: 'rejected'
 };
 

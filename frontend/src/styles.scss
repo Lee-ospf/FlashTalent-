@@ -42,6 +42,8 @@ $ft-theme: mat.define-light-theme(
   --purple: #4527a0;
   --blue-bg: #e3f2fd;
   --blue: #0d47a1;
+  --teal-bg: #e0f2f1;
+  --teal: #00695c;
   --border: rgba(0, 0, 0, 0.1);
   --radius-sm: 6px;
   --radius: 8px;
@@ -1461,6 +1463,10 @@ textarea {
   flex-shrink: 0;
   background: var(--blue-bg);
   color: var(--blue);
+}
+.app-icon-prescreen {
+  background: var(--teal-bg);
+  color: var(--teal);
 }
 .app-icon-shortlisted {
   background: var(--purple-bg);

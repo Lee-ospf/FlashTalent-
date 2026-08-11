@@ -1,22 +1,21 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { RouterLink, ActivatedRoute, Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { VacancyAdminService, VacancyChangeHistoryEntry } from '../../../core/services/vacancy-admin.service';
 import { ApplicationService } from '../../../core/services/application.service';
 import { SkillService } from '../../../core/services/skill.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { PrescreeningService, PrescreeningResponse } from '../../../core/services/prescreening.service';
 import { VacancyResponse, ApplicationResponse, SkillResponse } from '../../../core/models';
-import { getValidNextStatuses, STATUS_LABELS, ApplicationStatusKey } from '../../../core/utils/application-status';
+import { STATUS_LABELS } from '../../../core/utils/application-status';
 
 const STATUS_CLASS: Record<string, string> = {
-  Applied: 'applied', UnderReview: 'shortlisted', Shortlisted: 'interview',
+  Applied: 'applied', UnderReview: 'shortlisted', Shortlisted: 'prescreen',
+  PrescreeningStage: 'interview', InterviewStage: 'interview',
   OfferExtended: 'offer', Hired: 'offer', NotSelected: 'rejected'
 };
 
@@ -24,8 +23,8 @@ const STATUS_CLASS: Record<string, string> = {
   selector: 'app-vacancy-admin-detail',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterLink,
-    MatCardModule, MatButtonModule, MatFormFieldModule, MatSelectModule,
+    CommonModule, RouterLink,
+    MatCardModule, MatButtonModule,
     MatProgressSpinnerModule, MatDividerModule
   ],
   template: `
@@ -166,38 +165,48 @@ const STATUS_CLASS: Record<string, string> = {
                 @for (a of applications(); track a.applicationId; let i = $index) {
                   <div class="app-row">
                     <div class="app-rank">#{{ i + 1 }}</div>
-                    <div class="app-icon-wrap" [class]="'app-icon-' + statusClass(a.status)">
+                    <div class="app-icon-wrap" [class]="'app-icon-' + statusClass(effectiveStatus(a))">
                       <i class="ti ti-user"></i>
                     </div>
                     <div class="app-main">
                       <div class="app-title">{{ a.candidateName }}</div>
                       <div class="app-sub">Applied {{ formatDate(a.appliedAt) }}{{ i === 0 ? ' · First to apply' : '' }}</div>
                     </div>
-                    <span class="status-pill s-{{ statusClass(a.status) }}">{{ label(a.status) }}</span>
+                    <a class="status-pill s-{{ statusClass(effectiveStatus(a)) }} status-pill-link"
+                       [routerLink]="['/admin/applications', a.applicationId]"
+                       title="View application & pre-screening">
+                      {{ label(effectiveStatus(a)) }}
+                    </a>
 
-                    <div style="display:flex;align-items:center;gap:8px;margin-left:12px">
-                      @if (nextOptions(a.status).length) {
-                        <mat-form-field appearance="outline" style="width:180px" class="compact-select">
-                          <mat-label>Move to</mat-label>
-                          <mat-select [(ngModel)]="pendingStatus[a.applicationId]">
-                            @for (s of nextOptions(a.status); track s) {
-                              <mat-option [value]="s">{{ label(s) }}</mat-option>
-                            }
-                          </mat-select>
-                        </mat-form-field>
-                        <button mat-raised-button color="primary" style="border-radius:8px;height:56px;white-space:nowrap"
-                                [disabled]="!pendingStatus[a.applicationId] || updatingId() === a.applicationId"
-                                (click)="updateStatus(a)">
-                          @if (updatingId() === a.applicationId) {
-                            <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
-                          }
-                          Update
-                        </button>
-                      } @else {
-                        <span class="form-note" style="white-space:nowrap"><i class="ti ti-lock"></i> Final stage</span>
-                      }
-                    </div>
+                    <a class="btn-secondary app-row-open" style="margin-left:12px;white-space:nowrap"
+                       [routerLink]="['/admin/applications', a.applicationId]">
+                      <i class="ti ti-clipboard-text"></i> View details
+                    </a>
                   </div>
+
+                  @if (prescreeningDoc(a.applicationId); as doc) {
+                    <div class="prescreen-panel">
+                      <div class="prescreen-summary">
+                        <i class="ti ti-clipboard-text"></i>
+                        <span>
+                          Pre-screening document —
+                          @if (doc.status === 'Reviewed') {
+                            <strong>reviewed — {{ doc.outcome }}</strong>
+                          } @else if (doc.status === 'Submitted') {
+                            <strong>submitted {{ formatDate(doc.submittedAt) }}</strong>
+                          } @else {
+                            <strong>awaiting candidate upload</strong> (sent {{ formatDate(doc.sentAt) }})
+                          }
+                        </span>
+                        @if (doc.status !== 'Sent') {
+                          <a class="btn-secondary" style="margin-left:auto;padding:4px 10px;font-size:12px"
+                             [href]="fileHref(doc.completedFileUrl!)" [download]="doc.completedOriginalFileName">
+                            <i class="ti ti-download"></i> Download {{ doc.completedOriginalFileName }}
+                          </a>
+                        }
+                      </div>
+                    </div>
+                  }
                 }
               </div>
             }
@@ -233,11 +242,33 @@ const STATUS_CLASS: Record<string, string> = {
         border-bottom: 1px solid var(--border);
       }
       .app-row:last-child { border-bottom: none; }
+      .status-pill-link {
+        text-decoration: none; cursor: pointer; border: 1px solid transparent;
+        transition: box-shadow 0.15s, transform 0.1s;
+      }
+      .status-pill-link:hover { box-shadow: 0 0 0 1px currentColor inset; }
+      .status-pill-link:active { transform: scale(0.97); }
+      .app-row-open {
+        display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;
+        font-size: 12px; text-decoration: none; flex-shrink: 0;
+      }
       .app-rank {
         width: 26px; height: 26px; border-radius: 50%; background: var(--navy); color: #fff;
         font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
         flex-shrink: 0;
       }
+      .prescreen-panel { margin: 0 0 4px 38px; padding: 8px 0 12px; }
+      .prescreen-summary {
+        display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted);
+        cursor: pointer; user-select: none;
+      }
+      .prescreen-summary strong { color: var(--text); font-weight: 600; }
+      .prescreen-answers {
+        margin-top: 8px; padding: 12px 14px; background: var(--surface-2); border-radius: 10px;
+        border: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px;
+      }
+      .pa-q { font-size: 12px; font-weight: 700; color: var(--navy); }
+      .pa-a { font-size: 13px; color: var(--text); margin-top: 2px; white-space: pre-line; }
     </style>
   `
 })
@@ -248,6 +279,7 @@ export class VacancyAdminDetailComponent implements OnInit {
   private appService = inject(ApplicationService);
   private skillService = inject(SkillService);
   private toast = inject(ToastService);
+  private prescreening = inject(PrescreeningService);
 
   vacancy   = signal<VacancyResponse | null>(null);
   loading   = signal(true);
@@ -256,8 +288,6 @@ export class VacancyAdminDetailComponent implements OnInit {
 
   applications = signal<ApplicationResponse[]>([]);
   appsLoading  = signal(false);
-  updatingId   = signal<number | null>(null);
-  pendingStatus: Record<number, ApplicationStatusKey | ''> = {};
 
   history     = signal<VacancyChangeHistoryEntry[]>([]);
   historyOpen = signal(false);
@@ -283,10 +313,12 @@ export class VacancyAdminDetailComponent implements OnInit {
     this.appsLoading.set(true);
     this.appService.getByVacancy(this.vacancyId).subscribe({
       next: apps => {
-        this.applications.set(
-          [...apps].sort((a, b) => new Date(a.appliedAt).getTime() - new Date(b.appliedAt).getTime())
-        );
+        const sorted = [...apps].sort((a, b) => new Date(a.appliedAt).getTime() - new Date(b.appliedAt).getTime());
+        this.applications.set(sorted);
         this.appsLoading.set(false);
+        // Preload pre-screening records for every application so the assessment
+        // panel and status pill can read them synchronously in the template.
+        this.prescreening.preload(sorted.map(a => a.applicationId)).subscribe();
       },
       error: () => this.appsLoading.set(false)
     });
@@ -296,7 +328,6 @@ export class VacancyAdminDetailComponent implements OnInit {
     return this.allSkills().find(s => s.skillId === skillId)?.name ?? `Skill #${skillId}`;
   }
 
-  nextOptions(status: string) { return getValidNextStatuses(status); }
   label(s: string): string { return (STATUS_LABELS as Record<string, string>)[s] ?? s; }
   statusClass(s: string): string { return STATUS_CLASS[s] ?? 'applied'; }
 
@@ -308,20 +339,16 @@ export class VacancyAdminDetailComponent implements OnInit {
     return new Date(d).toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
-  updateStatus(a: ApplicationResponse): void {
-    const newStatus = this.pendingStatus[a.applicationId];
-    if (!newStatus) return;
+  effectiveStatus(a: ApplicationResponse): string {
+    return this.prescreening.effectiveStatus(a.applicationId, a.status);
+  }
 
-    this.updatingId.set(a.applicationId);
-    this.appService.updateStatus(a.applicationId, { newStatus }).subscribe({
-      next: updated => {
-        this.applications.update(list => list.map(x => x.applicationId === updated.applicationId ? updated : x));
-        this.updatingId.set(null);
-        delete this.pendingStatus[a.applicationId];
-        this.toast.show(`${a.candidateName} moved to ${this.label(newStatus)}.`, 'success');
-      },
-      error: (err: Error) => { this.updatingId.set(null); this.toast.show(err.message, 'error'); }
-    });
+  prescreeningDoc(applicationId: number): PrescreeningResponse | undefined {
+    return this.prescreening.peek(applicationId);
+  }
+
+  fileHref(relativeUrl: string): string {
+    return this.prescreening.fileHref(relativeUrl);
   }
 
   publish(v: VacancyResponse): void {

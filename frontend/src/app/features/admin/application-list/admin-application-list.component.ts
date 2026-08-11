@@ -1,10 +1,12 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { forkJoin } from 'rxjs';
 import { ApplicationService } from '../../../core/services/application.service';
 import { VacancyAdminService } from '../../../core/services/vacancy-admin.service';
@@ -18,7 +20,9 @@ import {
 const STATUS_CLASS: Record<string, string> = {
   Applied: 'applied',
   UnderReview: 'shortlisted',
-  Shortlisted: 'interview',
+  Shortlisted: 'prescreen',
+  PrescreeningStage: 'interview',
+  InterviewStage: 'interview',
   OfferExtended: 'offer',
   Hired: 'offer',
   NotSelected: 'rejected',
@@ -36,10 +40,12 @@ interface VacancyGroup {
   imports: [
     CommonModule,
     FormsModule,
+    RouterLink,
     MatCardModule,
     MatSelectModule,
     MatFormFieldModule,
     MatProgressSpinnerModule,
+    MatTooltipModule,
   ],
   template: `
     <div class="page-container">
