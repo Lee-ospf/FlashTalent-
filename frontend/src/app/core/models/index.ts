@@ -79,8 +79,8 @@ export interface CreateAddressRequest {
   line2?: string;
   city: string;
   province: string;
-  postalCode: string; // 4-digit SA format, e.g. "2196"
-  country?: string; // defaults to "South Africa" server-side
+  postalCode: string;   // 4-digit SA format, e.g. "2196"
+  country?: string;     // defaults to "South Africa" server-side
 }
 
 export interface UpdateAddressRequest {
@@ -95,7 +95,7 @@ export interface UpdateAddressRequest {
 export interface AddressResponse {
   addressId: number;
   candidateId: number;
-  addressType: string; // 'Residential' | 'Postal'
+  addressType: string;  // 'Residential' | 'Postal'
   line1: string;
   line2?: string;
   city: string;
@@ -110,7 +110,7 @@ export interface AddressResponse {
 export interface CandidateDocumentResponse {
   candidateDocumentId: number;
   candidateId: number;
-  documentType: string; // 'CV' | 'MatricCertificate' | 'Qualification' | 'Certification' | 'Other'
+  documentType: string;        // 'CV' | 'MatricCertificate' | 'Qualification' | 'Certification' | 'Other'
   fileUrl: string;
   originalFileName: string;
   uploadedAt: string;
@@ -127,7 +127,7 @@ export interface MandatoryDocumentsStatusResponse {
 
 // ── Vacancies ─────────────────────────────────────────────────────
 export interface RequiredDocumentDto {
-  documentType: string; // matches DocumentType enum: CV, MatricCertificate, Qualification, Certification, Other
+  documentType: string;   // matches DocumentType enum: CV, MatricCertificate, Qualification, Certification, Other
   isMandatory: boolean;
 }
 
@@ -135,10 +135,10 @@ export interface VacancyResponse {
   vacancyId: number;
   title: string;
   description: string;
-  vacancyType: string; // 'Internal' | 'ClientPlacement'
+  vacancyType: string;          // 'Internal' | 'ClientPlacement'
   departmentId?: number;
   clientId?: number;
-  employmentType: string; // 'Permanent' | 'Contract' | 'Internship' | 'PartTime'
+  employmentType: string;       // 'Permanent' | 'Contract' | 'Internship' | 'PartTime'
   salaryMin?: number;
   salaryMax?: number;
   location: string;
@@ -146,11 +146,11 @@ export interface VacancyResponse {
   minYearsExperience?: number;
   requiredQualifications: string;
   requirements: string;
-  status: string; // 'Draft' | 'Published' | 'Closed'
+  status: string;               // 'Draft' | 'Published' | 'Closed'
   createdByRecruiterId: number;
   createdAt: string;
   skills: VacancySkillDto[];
-  requiredDocuments: RequiredDocumentDto[]; // ← NEW: recruiter-defined docs for this specific vacancy
+  requiredDocuments: RequiredDocumentDto[];   // ← NEW: recruiter-defined docs for this specific vacancy
 }
 
 // ── Applications ──────────────────────────────────────────────────
@@ -169,7 +169,7 @@ export interface ApplicationResponse {
   candidateName: string;
   vacancyId: number;
   vacancyTitle: string;
-  status: string; // 'Applied' | 'UnderReview' | 'Shortlisted' | 'OfferExtended' | 'Hired' | 'NotSelected'
+  status: string;               // 'Applied' | 'UnderReview' | 'Shortlisted' | 'OfferExtended' | 'Hired' | 'NotSelected'
   appliedAt: string;
   updatedAt?: string;
 }
@@ -188,62 +188,6 @@ export interface ApplicationStatusHistoryResponse {
   newStatus: string;
   changedByName: string;
   changedAt: string;
-}
-export interface ApplicationReviewResponse {
-  application: {
-    applicationId: number;
-    status: string;
-    appliedAt: string;
-  };
-  candidate: {
-    candidateId: number;
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone?: string;
-    cvUrl?: string;
-    skills: {
-      skillId: number;
-      skillName: string;
-      category: string;
-      proficiencyLevel: string;
-    }[];
-    qualifications: {
-      name: string;
-      institution: string;
-      yearCompleted: string;
-    }[];
-    certifications: {
-      name: string;
-      institution: string;
-      yearCompleted: string;
-    }[];
-    experiences: {
-      company: string;
-      role: string;
-      startDate: string;
-      endDate?: string;
-      projectsAndDuties?: string;
-    }[];
-  };
-  vacancy: {
-    vacancyId: number;
-    title: string;
-    description: string;
-    employmentType: string;
-    location?: string;
-    minYearsExperience?: number;
-    requiredQualifications: string;
-    requirements: string;
-    vacancyType: string;
-    postedFor?: string;
-    requiredSkills: {
-      skillId: number;
-      skillName: string;
-      isRequired: boolean;
-      proficiencyLevel?: string;
-    }[];
-  };
 }
 
 // ── API Error shape ───────────────────────────────────────────────
@@ -281,10 +225,7 @@ export interface CreateVacancyRequest {
   requiredDocuments: RequiredDocumentInput[];
 }
 
-export interface UpdateVacancyRequest extends Omit<
-  CreateVacancyRequest,
-  'recruiterId'
-> {}
+export interface UpdateVacancyRequest extends Omit<CreateVacancyRequest, 'recruiterId'> {}
 export interface SkillResponse {
   skillId: number;
   name: string;

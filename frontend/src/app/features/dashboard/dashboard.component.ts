@@ -16,7 +16,8 @@ import { VacancyService } from '../../core/services/vacancy.service';
 import { ApplicationResponse, VacancyResponse, MandatoryDocumentsStatusResponse } from '../../core/models';
 
 const STATUS_CLASS: Record<string, string> = {
-  Applied:'applied', UnderReview:'shortlisted', Shortlisted:'interview',
+  Applied:'applied', UnderReview:'shortlisted', Shortlisted:'prescreen',
+  PrescreeningStage:'interview', InterviewStage:'interview',
   OfferExtended:'offer', Hired:'offer', NotSelected:'rejected'
 };
 const STATUS_LABEL: Record<string, string> = {

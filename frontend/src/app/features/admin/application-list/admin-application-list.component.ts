@@ -1,10 +1,12 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { forkJoin } from 'rxjs';
 import { ApplicationService } from '../../../core/services/application.service';
 import { VacancyAdminService } from '../../../core/services/vacancy-admin.service';
@@ -13,7 +15,8 @@ import { ApplicationResponse } from '../../../core/models';
 import { STATUS_LABELS, ApplicationStatusKey } from '../../../core/utils/application-status';
 
 const STATUS_CLASS: Record<string, string> = {
-  Applied: 'applied', UnderReview: 'shortlisted', Shortlisted: 'interview',
+  Applied: 'applied', UnderReview: 'shortlisted', Shortlisted: 'prescreen',
+  PrescreeningStage: 'interview', InterviewStage: 'interview',
   OfferExtended: 'offer', Hired: 'offer', NotSelected: 'rejected'
 };
 
@@ -26,7 +29,7 @@ interface VacancyGroup {
 @Component({
   selector: 'app-admin-application-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatCardModule, MatSelectModule, MatFormFieldModule, MatProgressSpinnerModule],
+  imports: [CommonModule, FormsModule, RouterLink, MatCardModule, MatSelectModule, MatFormFieldModule, MatProgressSpinnerModule, MatTooltipModule],
   template: `
     <div class="page-container">
       <div class="page-header">
@@ -104,7 +107,11 @@ interface VacancyGroup {
                       <div class="app-title">{{ a.candidateName }}</div>
                       <div class="app-sub">Applied {{ formatDate(a.appliedAt) }}{{ i === 0 ? ' · First to apply' : '' }}</div>
                     </div>
-                    <span class="status-pill s-{{ statusClass(a.status) }}">{{ label(a.status) }}</span>
+                    <a class="status-pill s-{{ statusClass(a.status) }} status-pill-link"
+                       [routerLink]="['/admin/applications', a.applicationId]"
+                       matTooltip="View application, pre-screening & offer letter">
+                      {{ label(a.status) }}
+                    </a>
                   </div>
                 }
               </div>
@@ -116,6 +123,12 @@ interface VacancyGroup {
 
     <style>
       .filters-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 18px; }
+      .status-pill-link {
+        text-decoration: none; cursor: pointer; border: 1px solid transparent;
+        transition: box-shadow 0.15s, transform 0.1s;
+      }
+      .status-pill-link:hover { box-shadow: 0 0 0 1px currentColor inset; }
+      .status-pill-link:active { transform: scale(0.97); }
       .vgroup-header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
       .vgroup-title { font-size: 14px; font-weight: 700; color: var(--text); }
       .vgroup-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
@@ -137,7 +150,7 @@ export class AdminApplicationListComponent implements OnInit {
   vacancyFilter: number | '' = '';
   statusFilter: ApplicationStatusKey | '' = '';
 
-  allStatuses: ApplicationStatusKey[] = ['Applied', 'UnderReview', 'Shortlisted', 'OfferExtended', 'Hired', 'NotSelected'];
+  allStatuses: ApplicationStatusKey[] = ['Applied', 'UnderReview', 'Shortlisted', 'PrescreeningStage', 'InterviewStage', 'OfferExtended', 'Hired', 'NotSelected'];
 
   totalApplications = computed(() => this.rawGroups().reduce((sum, g) => sum + g.applications.length, 0));
   pendingReviewCount = computed(() => this.rawGroups().reduce(
