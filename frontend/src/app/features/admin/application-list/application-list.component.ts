@@ -8,27 +8,25 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { ApplicationService } from '../../../core/services/application.service';
 import { VacancyAdminService } from '../../../core/services/vacancy-admin.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { PrescreeningService } from '../../../core/services/prescreening.service';
+import { InterviewService } from '../../../core/services/interview.service';
 import { ApplicationResponse } from '../../../core/models';
 import {
   getValidNextStatuses,
-  STATUS_LABELS,
+  statusLabel as sharedStatusLabel,
+  statusClass as sharedStatusClass,
   ApplicationStatusKey,
 } from '../../../core/utils/application-status';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 
-const STATUS_CLASS: Record<string, string> = {
-  Applied: 'applied',
-  UnderReview: 'shortlisted',
-  Shortlisted: 'interview',
-  OfferExtended: 'offer',
-  Hired: 'offer',
-  NotSelected: 'rejected',
-};
+// Must stay in sync with backend InterviewService.MaxRounds
+const MAX_INTERVIEW_ROUNDS = 5;
 
 interface VacancyGroup {
   vacancyId: number;
@@ -263,26 +261,47 @@ interface VacancyGroup {
                             </button>
                           }
 
-                          @case ('PreScreening') {
-                            <button
-                              mat-stroked-button
-                              style="border-radius:8px"
-                              (click)="
-                                openPreScreeningReview(a, group.vacancyId)
-                              "
-                            >
-                              <i class="ti ti-eye"></i> Review Answers
-                            </button>
+                          @case ('PrescreeningStage') {
+                            @if (prescreeningPassed().has(a.applicationId)) {
+                              <button
+                                mat-stroked-button
+                                style="border-radius:8px"
+                                (click)="scheduleInterview(a, group.vacancyId)"
+                              >
+                                <i class="ti ti-calendar-event"></i> Schedule
+                                Interview
+                              </button>
+                            } @else {
+                              <span class="form-note">
+                                <i class="ti ti-clock"></i> Awaiting
+                                pre-screening outcome
+                              </span>
+                            }
                           }
 
-                          @case ('Interview') {
-                            <button
-                              mat-stroked-button
-                              style="border-radius:8px"
-                              (click)="openInterviewReview(a, group.vacancyId)"
-                            >
-                              <i class="ti ti-eye"></i> View Interview
-                            </button>
+                          @case ('InterviewStage') {
+                            @if (maxRoundsReached().has(a.applicationId)) {
+                              <span
+                                class="form-note"
+                                [matTooltip]="
+                                  'All ' +
+                                  maxRounds +
+                                  ' interview rounds passed — move this application forward manually'
+                                "
+                              >
+                                <i class="ti ti-flag-check"></i> Final round
+                                completed
+                              </span>
+                            } @else {
+                              <button
+                                mat-stroked-button
+                                style="border-radius:8px"
+                                (click)="scheduleInterview(a, group.vacancyId)"
+                              >
+                                <i class="ti ti-calendar-event"></i> view
+                                Interview
+                              </button>
+                            }
                           }
 
                           @case ('OfferExtended') {
@@ -308,74 +327,6 @@ interface VacancyGroup {
         </div>
       }
     </div>
-
-    <style>
-      .filters-row {
-        display: flex;
-        gap: 10px;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        margin-bottom: 18px;
-      }
-
-      .vgroup-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 16px 20px;
-        cursor: pointer;
-        user-select: none;
-        background: var(--surface-2);
-        border-bottom: 1px solid var(--border);
-        transition: background 0.15s;
-      }
-      .vgroup-header:hover {
-        background: #eef1f6;
-      }
-      .vgroup-chevron {
-        font-size: 16px;
-        color: var(--text-muted);
-        transition: transform 0.2s;
-        flex-shrink: 0;
-      }
-      .vgroup-chevron.open {
-        transform: rotate(180deg);
-      }
-      .vgroup-title {
-        font-size: 14px;
-        font-weight: 700;
-        color: var(--text);
-      }
-      .vgroup-sub {
-        font-size: 11px;
-        color: var(--text-muted);
-        margin-top: 1px;
-      }
-
-      .app-row {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px 0;
-        border-bottom: 1px solid var(--border);
-      }
-      .app-row:last-child {
-        border-bottom: none;
-      }
-      .app-rank {
-        width: 26px;
-        height: 26px;
-        border-radius: 50%;
-        background: var(--navy);
-        color: #fff;
-        font-size: 11px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-    </style>
   `,
 })
 export class ApplicationListComponent implements OnInit {
@@ -383,6 +334,12 @@ export class ApplicationListComponent implements OnInit {
   private vacancyService = inject(VacancyAdminService);
   private toast = inject(ToastService);
   private router = inject(Router);
+  private prescreeningService = inject(PrescreeningService);
+  private interviewService = inject(InterviewService);
+
+  prescreeningPassed = signal<Set<number>>(new Set());
+  maxRoundsReached = signal<Set<number>>(new Set());
+  maxRounds = MAX_INTERVIEW_ROUNDS;
 
   rawGroups = signal<VacancyGroup[]>([]);
   loading = signal(false);
@@ -399,6 +356,8 @@ export class ApplicationListComponent implements OnInit {
     'Applied',
     'UnderReview',
     'Shortlisted',
+    'PrescreeningStage',
+    'InterviewStage',
     'OfferExtended',
     'Hired',
     'NotSelected',
@@ -455,6 +414,27 @@ export class ApplicationListComponent implements OnInit {
     );
   });
 
+  statusBreakdown(group: VacancyGroup) {
+    const counts: Record<string, number> = {};
+    for (const a of group.applications)
+      counts[a.status] = (counts[a.status] ?? 0) + 1;
+    return Object.entries(counts).map(([status, count]) => ({ status, count }));
+  }
+
+  isExpanded(vacancyId: number): boolean {
+    return this.expandedIds().has(vacancyId);
+  }
+
+  toggleGroup(vacancyId: number): void {
+    const s = new Set(this.expandedIds());
+    if (s.has(vacancyId)) {
+      s.delete(vacancyId);
+    } else {
+      s.add(vacancyId);
+    }
+    this.expandedIds.set(s);
+  }
+
   ngOnInit(): void {
     this.load();
   }
@@ -477,7 +457,6 @@ export class ApplicationListComponent implements OnInit {
             const groups: VacancyGroup[] = vacancies.map((v, i) => ({
               vacancyId: v.vacancyId,
               vacancyTitle: v.title,
-              // Oldest first = submission order, so #1 is always the first person who applied
               applications: [...results[i]].sort(
                 (a, b) =>
                   new Date(a.appliedAt).getTime() -
@@ -485,7 +464,6 @@ export class ApplicationListComponent implements OnInit {
               ),
             }));
             this.rawGroups.set(groups);
-            // Default: expand every group that actually has applicants
             this.expandedIds.set(
               new Set(
                 groups
@@ -494,6 +472,64 @@ export class ApplicationListComponent implements OnInit {
               ),
             );
             this.loading.set(false);
+
+            // Check prescreening outcomes for applications currently in that stage
+            const toCheck = groups
+              .flatMap((g) => g.applications)
+              .filter((a) => a.status === 'PrescreeningStage');
+
+            if (toCheck.length) {
+              forkJoin(
+                toCheck.map(
+                  (a) =>
+                    this.prescreeningService
+                      .getByApplication(a.applicationId)
+                      .pipe(catchError(() => of(null))), // 404 = no prescreening yet, treat as "not passed"
+                ),
+              ).subscribe((prescreenResults) => {
+                const passedIds = toCheck
+                  .filter((_, i) => prescreenResults[i]?.outcome === 'Passed')
+                  .map((a) => a.applicationId);
+                this.prescreeningPassed.set(new Set(passedIds));
+              });
+            }
+
+            // Check whether applications currently in InterviewStage have
+            // exhausted all rounds (last round Completed + Passed at MaxRounds),
+            // so we don't send the recruiter into a form that only fails server-side.
+            const interviewStageApps = groups
+              .flatMap((g) => g.applications)
+              .filter((a) => a.status === 'InterviewStage');
+
+            if (interviewStageApps.length) {
+              forkJoin(
+                interviewStageApps.map((a) =>
+                  this.interviewService
+                    .getByApplication(a.applicationId)
+                    .pipe(catchError(() => of([]))),
+                ),
+              ).subscribe((interviewResults) => {
+                const exhaustedIds = interviewStageApps
+                  .filter((_, i) => {
+                    const interviews = interviewResults[i];
+                    if (!interviews.length) return false;
+                    const hasScheduled = interviews.some(
+                      (iv) => iv.status === 'Scheduled',
+                    );
+                    if (hasScheduled) return false;
+                    const latest = [...interviews].sort(
+                      (x, y) => y.roundNumber - x.roundNumber,
+                    )[0];
+                    return (
+                      latest.status === 'Completed' &&
+                      latest.outcome === 'Passed' &&
+                      latest.roundNumber >= MAX_INTERVIEW_ROUNDS
+                    );
+                  })
+                  .map((a) => a.applicationId);
+                this.maxRoundsReached.set(new Set(exhaustedIds));
+              });
+            }
           },
           error: (err: Error) => {
             this.toast.show(err.message, 'error');
@@ -506,27 +542,6 @@ export class ApplicationListComponent implements OnInit {
         this.loading.set(false);
       },
     });
-  }
-
-  statusBreakdown(group: VacancyGroup) {
-    const counts: Record<string, number> = {};
-    for (const a of group.applications)
-      counts[a.status] = (counts[a.status] ?? 0) + 1;
-    return Object.entries(counts).map(([status, count]) => ({ status, count }));
-  }
-
-  isExpanded(vacancyId: number): boolean {
-    return this.expandedIds().has(vacancyId);
-  }
-
-  toggleGroup(vacancyId: number): void {
-    const s = new Set(this.expandedIds());
-    if (s.has(vacancyId)) {
-      s.delete(vacancyId);
-    } else {
-      s.add(vacancyId);
-    }
-    this.expandedIds.set(s);
   }
 
   toggleExpandAll(): void {
@@ -543,10 +558,10 @@ export class ApplicationListComponent implements OnInit {
     return getValidNextStatuses(status);
   }
   label(s: string): string {
-    return (STATUS_LABELS as Record<string, string>)[s] ?? s;
+    return sharedStatusLabel(s);
   }
   statusClass(s: string): string {
-    return STATUS_CLASS[s] ?? 'applied';
+    return sharedStatusClass(s);
   }
   formatDate(d: string): string {
     return new Date(d).toLocaleDateString('en-ZA', {
@@ -595,9 +610,12 @@ export class ApplicationListComponent implements OnInit {
     this.toast.show('Pre-screening review coming soon.', 'warn');
   }
 
-  openInterviewReview(a: ApplicationResponse, vacancyId: number): void {
-    // Navigate to interview review screen
-    // This will be built in a later sprint
-    this.toast.show('Interview review coming soon.', 'warn');
+  scheduleInterview(a: ApplicationResponse, vacancyId: number): void {
+    this.router.navigate(
+      ['/applications', a.applicationId, 'schedule-interview'],
+      {
+        queryParams: { vacancyId },
+      },
+    );
   }
 }

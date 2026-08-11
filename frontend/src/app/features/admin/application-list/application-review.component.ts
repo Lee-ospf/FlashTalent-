@@ -216,21 +216,23 @@ import { environment } from '../../../../environments/environment';
 
               <!-- TAB 2 — CV -->
               <mat-tab label="CV Document">
-                <div class="cv-wrap">
-                  @if (safeCvUrl()) {
-                    <iframe
-                      [src]="safeCvUrl()"
-                      class="cv-iframe"
-                      title="Candidate CV"
-                    >
-                    </iframe>
-                  } @else {
-                    <div class="empty-state">
-                      <i class="ti ti-file-off"></i>
-                      <p>No CV uploaded</p>
-                    </div>
-                  }
-                </div>
+                <ng-template matTabContent>
+                  <div class="cv-wrap">
+                    @if (safeCvUrl()) {
+                      <iframe
+                        [src]="safeCvUrl()"
+                        class="cv-iframe"
+                        title="Candidate CV"
+                      >
+                      </iframe>
+                    } @else {
+                      <div class="empty-state">
+                        <i class="ti ti-file-off"></i>
+                        <p>No CV uploaded</p>
+                      </div>
+                    }
+                  </div>
+                </ng-template>
               </mat-tab>
             </mat-tab-group>
           </div>
@@ -441,24 +443,25 @@ import { environment } from '../../../../environments/environment';
         min-height: 0;
         overflow: hidden;
       }
-      .fill-tabs .mat-mdc-tab-body-wrapper {
+      ::ng-deep .fill-tabs .mat-mdc-tab-body-wrapper {
         flex: 1;
         min-height: 0;
         display: flex;
         flex-direction: column;
       }
-      .fill-tabs .mat-mdc-tab-body {
+      ::ng-deep .fill-tabs .mat-mdc-tab-body {
         flex: 1;
         min-height: 0;
         display: flex;
         flex-direction: column;
       }
-      .fill-tabs .mat-mdc-tab-body-content {
+      ::ng-deep .fill-tabs .mat-mdc-tab-body-content {
         flex: 1;
         min-height: 0;
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        width: 100%;
       }
       .panel-scroll {
         flex: 1;
@@ -469,6 +472,7 @@ import { environment } from '../../../../environments/environment';
       .cv-wrap {
         flex: 1;
         min-height: 0;
+        width: 100%;
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -477,6 +481,7 @@ import { environment } from '../../../../environments/environment';
         flex: 1;
         min-height: 0;
         width: 100%;
+        height: 100%;
         border: none;
         display: block;
       }
@@ -719,7 +724,7 @@ export class ApplicationReviewComponent implements OnInit {
   safeCvUrl(): SafeResourceUrl | null {
     const url = this.data()?.candidate.cvUrl;
     if (!url) return null;
-    const full = `${environment.apiUrl.replace('/api', '')}${url}`;
+    const full = `${environment.apiUrl.replace('/api', '')}${url}#toolbar=0&navpanes=0&zoom=page-width`;
     return this.sanitizer.bypassSecurityTrustResourceUrl(full);
   }
 

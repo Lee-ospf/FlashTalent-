@@ -132,6 +132,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'applications/:id/schedule-interview',
+    canActivate: [roleGuard(['Recruiter', 'Admin'])],
+    loadComponent: () =>
+      import('./features/admin/interviews/schedule-interview.component').then(
+        (m) => m.ScheduleInterviewComponent,
+      ),
+  },
+  {
     path: 'applications',
     canActivate: [roleGuard(['Candidate'])],
     loadComponent: () =>
@@ -171,6 +179,14 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/settings/settings.component').then(
         (m) => m.SettingsComponent,
+      ),
+  },
+  {
+    path: 'notifications',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/notifications/notifications.component').then(
+        (m) => m.NotificationsComponent,
       ),
   },
 

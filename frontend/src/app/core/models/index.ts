@@ -371,3 +371,74 @@ export interface QualificationResponse {
   institution: string;
   yearCompleted: string;
 }
+// ── Interviews ────────────────────────────────────────────────────
+export type InterviewType = 'InPerson' | 'Virtual' | 'Phone';
+
+export interface ScheduleInterviewRequest {
+  interviewType: InterviewType;
+  scheduledAt: string; // ISO string
+  location?: string;
+  meetingLink?: string;
+}
+
+export interface RescheduleInterviewRequest {
+  scheduledAt: string;
+  location?: string;
+  meetingLink?: string;
+}
+
+export interface SetInterviewOutcomeRequest {
+  outcome: 'Passed' | 'Failed';
+  recruiterNotes?: string;
+}
+
+export interface InterviewResponse {
+  interviewId: number;
+  applicationId: number;
+  candidateId: number;
+  candidateName: string;
+  vacancyId: number;
+  vacancyTitle: string;
+  roundNumber: number;
+  interviewType: string;
+  scheduledAt: string;
+  location?: string;
+  meetingLink?: string;
+  status: string; // 'Scheduled' | 'Completed' | 'Cancelled'
+  outcome: string; // 'Pending' | 'Passed' | 'Failed'
+  recruiterNotes?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+//_______Precreening_________________
+export interface PrescreeningResponse {
+  prescreeningId: number;
+  applicationId: number;
+  candidateId: number;
+  candidateName: string;
+  vacancyId: number;
+  vacancyTitle: string;
+  status: string;
+  sentAt: string;
+  completedFileUrl: string | null;
+  completedOriginalFileName: string | null;
+  submittedAt: string | null;
+  outcome: string;
+  recruiterNotes: string | null;
+  reviewedAt: string | null;
+}
+
+// ── Notifications ─────────────────────────────────────────────────
+export interface NotificationResponse {
+  notificationId: number;
+  notificationType: string;
+  subject: string;
+  body: string;
+  isRead: boolean;
+  sentAt: string;
+}
+
+export interface UnreadCountResponse {
+  unreadCount: number;
+}
