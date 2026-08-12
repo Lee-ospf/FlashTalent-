@@ -33,7 +33,7 @@ const ALLOWED_TRANSITIONS: Record<
 > = {
   Applied: ['UnderReview', 'NotSelected'],
   UnderReview: ['Shortlisted', 'NotSelected'],
-  Shortlisted: ['NotSelected'], // → PrescreeningStage happens via the Send pre-screening form button
+  Shortlisted: ['PrescreeningStage', 'NotSelected'],
   PrescreeningStage: ['InterviewStage', 'NotSelected'],
   InterviewStage: ['OfferExtended', 'NotSelected'],
   OfferExtended: ['Hired', 'NotSelected'],
@@ -54,8 +54,6 @@ export const STATUS_LABELS: Record<ApplicationStatusKey, string> = {
   Shortlisted: 'Shortlisted',
   PrescreeningStage: 'Pre-Screening',
   InterviewStage: 'Interview',
-  PrescreeningStage: 'Pre-Screening',
-  InterviewStage: 'Interview',
   OfferExtended: 'Offer Extended',
   OfferSent: 'Offer Sent',
   OfferAccepted: 'Offer Accepted',
@@ -71,6 +69,9 @@ export const STATUS_CLASS: Record<ApplicationStatusKey, string> = {
   PrescreeningStage: 'prescreening',
   InterviewStage: 'interview',
   OfferExtended: 'offer',
+  OfferSent: 'Offer Sent',
+  OfferAccepted: 'Offer Accepted',
+  OfferDeclined: 'Offer Declined',
   Hired: 'hired',
   NotSelected: 'rejected',
 };

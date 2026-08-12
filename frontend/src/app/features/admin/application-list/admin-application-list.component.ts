@@ -1,7 +1,6 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -19,9 +18,9 @@ import {
 
 const STATUS_CLASS: Record<string, string> = {
   Applied: 'applied',
-  UnderReview: 'shortlisted',
-  Shortlisted: 'prescreen',
-  PrescreeningStage: 'interview',
+  UnderReview: 'underreview',
+  Shortlisted: 'shortlisted',
+  PrescreeningStage: 'prescreening',
   InterviewStage: 'interview',
   OfferExtended: 'offer',
   Hired: 'offer',
@@ -40,7 +39,6 @@ interface VacancyGroup {
   imports: [
     CommonModule,
     FormsModule,
-    RouterLink,
     MatCardModule,
     MatSelectModule,
     MatFormFieldModule,

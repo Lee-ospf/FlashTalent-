@@ -173,7 +173,62 @@ export interface ApplicationResponse {
   appliedAt: string;
   updatedAt?: string;
 }
-
+export interface ApplicationReviewResponse {
+  application: {
+    applicationId: number;
+    status: string;
+    appliedAt: string;
+  };
+  candidate: {
+    candidateId: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    cvUrl?: string;
+    skills: {
+      skillId: number;
+      skillName: string;
+      category: string;
+      proficiencyLevel: string;
+    }[];
+    qualifications: {
+      name: string;
+      institution: string;
+      yearCompleted: string;
+    }[];
+    certifications: {
+      name: string;
+      institution: string;
+      yearCompleted: string;
+    }[];
+    experiences: {
+      company: string;
+      role: string;
+      startDate: string;
+      endDate?: string;
+      projectsAndDuties?: string;
+    }[];
+  };
+  vacancy: {
+    vacancyId: number;
+    title: string;
+    description: string;
+    employmentType: string;
+    location?: string;
+    minYearsExperience?: number;
+    requiredQualifications: string;
+    requirements: string;
+    vacancyType: string;
+    postedFor?: string;
+    requiredSkills: {
+      skillId: number;
+      skillName: string;
+      isRequired: boolean;
+      proficiencyLevel?: string;
+    }[];
+  };
+}
 export interface UpdateApplicationStatusRequest {
   newStatus: string;
   // Optional - the backend now derives who made the change from the logged-in user's

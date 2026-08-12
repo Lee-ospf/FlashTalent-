@@ -183,7 +183,8 @@ export class PrescreeningService {
   }
 
   /** Resolves a backend-relative file URL (e.g. CompletedFileUrl) to an absolute one. */
-  fileHref(relativeUrl: string): string {
+  fileHref(relativeUrl: string | null | undefined): string {
+    if (!relativeUrl) return '';
     if (/^https?:\/\//i.test(relativeUrl)) return relativeUrl;
     const origin = environment.apiUrl.replace(/\/api\/?$/, '');
     return relativeUrl.startsWith('/')
