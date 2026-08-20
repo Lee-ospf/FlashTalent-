@@ -7,8 +7,18 @@ namespace TalentHub.Models
     {
         InPerson,
         Virtual,
-        Phone
     }
+
+    public enum InterviewCategory
+    {
+       
+        Technical,
+        Behavioral,
+        Panel,
+        Managerial,
+       
+    }
+
 
     public enum InterviewStatus
     {
@@ -39,6 +49,9 @@ namespace TalentHub.Models
 
         [Required]
         public InterviewType InterviewType { get; set; }
+
+        [Required]
+        public InterviewCategory InterviewCategory { get; set; }
 
         [Required]
         public DateTime ScheduledAt { get; set; }

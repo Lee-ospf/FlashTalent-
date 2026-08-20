@@ -31,6 +31,7 @@ namespace TalentHub.Services
                 VacancyTitle = a.Vacancy?.Title ?? "Unknown",
                 RoundNumber = i.RoundNumber,
                 InterviewType = i.InterviewType.ToString(),
+                InterviewCategory = i.InterviewCategory.ToString(),
                 ScheduledAt = i.ScheduledAt,
                 Location = i.Location,
                 MeetingLink = i.MeetingLink,

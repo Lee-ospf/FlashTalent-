@@ -9,8 +9,6 @@ namespace TalentHub.Models
         Postal
     }
 
-    // A candidate can have more than one address (e.g. Residential vs Postal,
-    // common in SA where a PO Box differs from where someone actually lives).
     [Table("Addresses")]
     public class Address
     {
@@ -27,9 +25,6 @@ namespace TalentHub.Models
 
         [Required, MaxLength(200)]
         public string Line1 { get; set; } = string.Empty; // street address / PO Box number
-
-        [MaxLength(200)]
-        public string? Line2 { get; set; } // unit, complex, suburb detail - optional
 
         [Required, MaxLength(100)]
         public string City { get; set; } = string.Empty;

@@ -48,6 +48,12 @@ namespace TalentHub.Controllers
                 return BadRequest(new { message = $"Invalid interviewType '{request.InterviewType}'. Valid values: {validTypes}." });
             }
 
+            if (!Enum.TryParse<InterviewCategory>(request.InterviewCategory, true, out var category))
+            {
+                var validCategories = string.Join(", ", Enum.GetNames(typeof(InterviewCategory)));
+                return BadRequest(new { message = $"Invalid interviewCategory '{request.InterviewCategory}'. Valid values: {validCategories}." });
+            }
+
             if (type == InterviewType.InPerson && string.IsNullOrWhiteSpace(request.Location))
             {
                 return BadRequest(new { message = "Location is required for an InPerson interview." });
@@ -91,6 +97,7 @@ namespace TalentHub.Controllers
                 ApplicationId = applicationId,
                 RoundNumber = nextRound,
                 InterviewType = type,
+                InterviewCategory = category,
                 ScheduledAt = request.ScheduledAt,
                 Location = type == InterviewType.InPerson ? request.Location : null,
                 MeetingLink = type == InterviewType.Virtual ? request.MeetingLink : null,
@@ -104,7 +111,7 @@ namespace TalentHub.Controllers
             var notification = _interviewService.BuildScheduledNotification(application, interview);
             Db.Notifications.Add(notification);
 
-            if (nextRound == 1)   
+            if (nextRound == 1)
             {
                 await _statusRules.TransitionAsync(application, ApplicationStatus.InterviewStage, CurrentUserId);
             }
@@ -134,18 +141,36 @@ namespace TalentHub.Controllers
                 return BadRequest(new { message = $"Cannot reschedule - current status is '{interview.Status}'." });
             }
 
-            if (interview.InterviewType == InterviewType.InPerson && string.IsNullOrWhiteSpace(request.Location))
+            // InterviewType is optional on reschedule - if the recruiter doesn't
+            // send one, keep the interview's current type. If they do, switch to it.
+            var effectiveType = interview.InterviewType;
+            if (!string.IsNullOrWhiteSpace(request.InterviewType))
+            {
+                if (!Enum.TryParse<InterviewType>(request.InterviewType, true, out var parsedType))
+                {
+                    var validTypes = string.Join(", ", Enum.GetNames(typeof(InterviewType)));
+                    return BadRequest(new { message = $"Invalid interviewType '{request.InterviewType}'. Valid values: {validTypes}." });
+                }
+                effectiveType = parsedType;
+            }
+
+            if (effectiveType == InterviewType.InPerson && string.IsNullOrWhiteSpace(request.Location))
             {
                 return BadRequest(new { message = "Location is required for an InPerson interview." });
             }
-            if (interview.InterviewType == InterviewType.Virtual && string.IsNullOrWhiteSpace(request.MeetingLink))
+            if (effectiveType == InterviewType.Virtual && string.IsNullOrWhiteSpace(request.MeetingLink))
             {
                 return BadRequest(new { message = "MeetingLink is required for a Virtual interview." });
             }
 
             interview.ScheduledAt = request.ScheduledAt;
-            if (interview.InterviewType == InterviewType.InPerson) interview.Location = request.Location;
-            if (interview.InterviewType == InterviewType.Virtual) interview.MeetingLink = request.MeetingLink;
+            interview.InterviewType = effectiveType;
+
+            // Clear whichever field no longer applies when the type changes, so a
+            // stale address doesn't linger on an interview that's now virtual (or
+            // vice versa).
+            interview.Location = effectiveType == InterviewType.InPerson ? request.Location : null;
+            interview.MeetingLink = effectiveType == InterviewType.Virtual ? request.MeetingLink : null;
 
             var notification = _interviewService.BuildRescheduledNotification(interview.Application, interview);
             Db.Notifications.Add(notification);

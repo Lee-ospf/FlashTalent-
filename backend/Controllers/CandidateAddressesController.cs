@@ -74,7 +74,6 @@ namespace TalentHub.Controllers
                 CandidateId = candidateId,
                 AddressType = parsedType,
                 Line1 = request.Line1,
-                Line2 = request.Line2,
                 City = request.City,
                 Province = request.Province,
                 PostalCode = request.PostalCode,
@@ -101,7 +100,6 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No address found with AddressId {id} for this candidate." });
 
             address.Line1 = request.Line1;
-            address.Line2 = request.Line2;
             address.City = request.City;
             address.Province = request.Province;
             address.PostalCode = request.PostalCode;
@@ -145,7 +143,6 @@ namespace TalentHub.Controllers
             CandidateId = a.CandidateId,
             AddressType = a.AddressType.ToString(),
             Line1 = a.Line1,
-            Line2 = a.Line2,
             City = a.City,
             Province = a.Province,
             PostalCode = a.PostalCode,
