@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -16,13 +16,15 @@ import { ExperienceResponse } from '../../core/models';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatCardModule, MatProgressSpinnerModule],
   template: `
-    <div class="page-container">
-      <div class="page-header">
-        <div>
-          <h2 class="page-title"><i class="ti ti-briefcase"></i> Work experience</h2>
-          <p class="page-sub">Your employment history, visible to recruiters</p>
+    <div [class.page-container]="!embedded" [class.step-body-padded]="embedded">
+      @if (!embedded) {
+        <div class="page-header">
+          <div>
+            <h2 class="page-title"><i class="ti ti-briefcase"></i> Work experience</h2>
+            <p class="page-sub">Your employment history, visible to recruiters</p>
+          </div>
         </div>
-      </div>
+      }
 
       <mat-card class="mat-elevation-z1" style="border-radius:12px;margin-bottom:16px">
         <mat-card-content style="padding:18px 20px">
@@ -88,9 +90,20 @@ import { ExperienceResponse } from '../../core/models';
         </div>
       }
     </div>
-  `
+    <style>.step-body-padded { padding: 1.5rem; }</style>
+  `,
 })
 export class CandidateExperienceComponent implements OnInit {
+  @Input() embedded = false;
+  /** Whether adding the very first experience entry from the inline button
+   *  should itself emit `saved`. True by default (used by the edit-in-place
+   *  summary view, where saving should close the section). The setup wizard
+   *  sets this to false so only its footer's "Save and continue" button —
+   *  which calls add(true) — advances the step; the inline "Add experience"
+   *  button there just saves and stays put. */
+  @Input() autoAdvanceOnSave = true;
+  @Output() saved = new EventEmitter<void>();
+
   private fb = inject(FormBuilder);
   private state = inject(CandidateStateService);
   private experienceService = inject(CandidateExperienceService);
@@ -106,7 +119,7 @@ export class CandidateExperienceComponent implements OnInit {
     role: ['', Validators.required],
     startDate: ['', Validators.required],
     endDate: [''],
-    projectsAndDuties: ['']
+    projectsAndDuties: [''],
   }, { validators: this.endAfterStart });
 
   private endAfterStart(group: any) {
@@ -128,7 +141,7 @@ export class CandidateExperienceComponent implements OnInit {
     this.loading.set(true);
     this.experienceService.getAll(p.candidateId).subscribe({
       next: e => { this.experiences.set(e); this.loading.set(false); },
-      error: () => this.loading.set(false)
+      error: () => this.loading.set(false),
     });
   }
 
@@ -136,25 +149,32 @@ export class CandidateExperienceComponent implements OnInit {
     return new Date(d).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' });
   }
 
-  add(): void {
+  /** @param forceAdvance When true (used by the wizard's footer button),
+   *  emits `saved` on success regardless of `autoAdvanceOnSave` or whether
+   *  this is the first entry. */
+  add(forceAdvance: boolean = false): void {
     const p = this.state.profile();
-    if (!p || this.form.invalid) return;
+    if (!p) return;
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+
     this.apiError = '';
     this.saving.set(true);
+    const wasEmpty = this.experiences().length === 0;
     const v = this.form.value;
     this.experienceService.create(p.candidateId, {
       company: v.company!, role: v.role!,
       startDate: new Date(v.startDate!).toISOString(),
       endDate: v.endDate ? new Date(v.endDate).toISOString() : undefined,
-      projectsAndDuties: v.projectsAndDuties || undefined
+      projectsAndDuties: v.projectsAndDuties || undefined,
     }).subscribe({
       next: created => {
         this.experiences.update(list => [created, ...list]);
         this.saving.set(false);
         this.form.reset();
         this.toast.show('Experience added.', 'success');
+        if ((wasEmpty && this.autoAdvanceOnSave) || forceAdvance) this.saved.emit();
       },
-      error: (err: Error) => { this.saving.set(false); this.apiError = err.message; }
+      error: (err: Error) => { this.saving.set(false); this.apiError = err.message; },
     });
   }
 
@@ -167,7 +187,7 @@ export class CandidateExperienceComponent implements OnInit {
         this.experiences.update(list => list.filter(x => x.candidateExperienceId !== e.candidateExperienceId));
         this.toast.show('Experience removed.', 'success');
       },
-      error: (err: Error) => this.toast.show(err.message, 'error')
+      error: (err: Error) => this.toast.show(err.message, 'error'),
     });
   }
 }

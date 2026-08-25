@@ -88,7 +88,22 @@ export class AuthService {
   }
 
   private handleError(err: HttpErrorResponse) {
-    const message = err.error?.message ?? 'An unexpected error occurred.';
-    return throwError(() => new Error(message));
+    // Two response shapes to account for here:
+    // 1. Our own controller actions return `{ message: "..." }` directly
+    //    (e.g. "An account with this email already exists.").
+    // 2. ASP.NET's automatic [ApiController] model validation (e.g. the
+    //    RegularExpression on RegisterRequest.Password) short-circuits before
+    //    the controller runs and returns a ValidationProblemDetails body
+    //    instead: { title, status, errors: { Password: ["msg", ...], ... } }.
+    //    Without handling this shape, every validation failure surfaced as a
+    //    generic "An unexpected error occurred."
+    let message = err.error?.message as string | undefined;
+
+    if (!message && err.error?.errors) {
+      const fieldErrors = Object.values(err.error.errors as Record<string, string[]>).flat();
+      if (fieldErrors.length) message = fieldErrors.join(' ');
+    }
+
+    return throwError(() => new Error(message ?? 'An unexpected error occurred.'));
   }
 }

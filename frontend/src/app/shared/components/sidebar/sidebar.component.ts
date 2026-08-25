@@ -139,15 +139,15 @@ export class SidebarComponent {
     { label: 'Settings',  icon: 'ti-settings',           route: '/settings' },
   ];
 
-  // Candidate only - self-service pages tied to "my own" candidate record
+  // Candidate only - self-service pages tied to "my own" candidate record.
+  // Documents, My Skills, Experience, and Qualifications are no longer separate
+  // nav destinations - they now live as steps inside the My Profile wizard/summary.
+  // Their routes still exist in app.routes.ts (Documents in particular is still
+  // deep-linked from the vacancy-apply flow via ?vacancyId=) - only removed here.
   candidateNavItems: NavItem[] = [
     { label: 'Vacancies',       icon: 'ti-briefcase',     route: '/vacancies' },
     { label: 'My Profile',      icon: 'ti-user-circle', route: '/profile' },
-    { label: 'Documents',       icon: 'ti-files',        route: '/documents' },
     { label: 'My Applications', icon: 'ti-file-check',   route: '/applications' },
-    { label: 'My Skills',       icon: 'ti-bulb',          route: '/skills' },
-    { label: 'Experience',      icon: 'ti-briefcase',     route: '/experience' },
-    { label: 'Qualifications',  icon: 'ti-school',        route: '/qualifications' },
   ];
 
   // Recruiter + Admin - shared team management pages

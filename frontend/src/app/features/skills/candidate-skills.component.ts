@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { Component, inject, signal, OnInit, computed, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -17,29 +17,24 @@ import { CandidateSkillResponse, SkillResponse } from '../../core/models';
   selector: 'app-candidate-skills',
   standalone: true,
   imports: [
-    CommonModule,
-    ReactiveFormsModule,
-    MatCardModule,
-    MatButtonModule,
-    MatProgressSpinnerModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule
+    CommonModule, ReactiveFormsModule, MatCardModule, MatButtonModule,
+    MatProgressSpinnerModule, MatFormFieldModule, MatInputModule, MatSelectModule,
   ],
   template: `
-    <div class="page-container">
-      <div class="page-header">
-        <div>
-          <h2 class="page-title"><i class="ti ti-bulb"></i> My Skills</h2>
-          <p class="page-sub">Skills recruiters will see on your profile</p>
+    <div [class.page-container]="!embedded" [class.step-body-padded]="embedded">
+      @if (!embedded) {
+        <div class="page-header">
+          <div>
+            <h2 class="page-title"><i class="ti ti-bulb"></i> My Skills</h2>
+            <p class="page-sub">Skills recruiters will see on your profile</p>
+          </div>
         </div>
-      </div>
+      }
 
       @if (loading()) {
         <div class="empty-state"><mat-spinner diameter="32"></mat-spinner></div>
       } @else {
 
-        <!-- ── TECHNICAL SKILLS ───────────────────── -->
         <mat-card class="mat-elevation-z1" style="border-radius:12px;margin-bottom:20px">
           <mat-card-content style="padding:20px">
             <div class="form-section-label" style="margin-bottom:12px">
@@ -104,7 +99,6 @@ import { CandidateSkillResponse, SkillResponse } from '../../core/models';
           </mat-card-content>
         </mat-card>
 
-        <!-- ── SOFT SKILLS ─────────────────────────── -->
         <mat-card class="mat-elevation-z1" style="border-radius:12px">
           <mat-card-content style="padding:20px">
             <div class="form-section-label" style="margin-bottom:12px">
@@ -172,15 +166,8 @@ import { CandidateSkillResponse, SkillResponse } from '../../core/models';
     </div>
 
     <style>
-      .skill-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 10px;
-        border-radius: 20px;
-        font-size: 13px;
-        font-weight: 500;
-      }
+      .step-body-padded { padding: 1.5rem; }
+      .skill-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 20px; font-size: 13px; font-weight: 500; }
       .skill-chip--technical { background:#e8f4fd; color:#1565c0; border:1px solid #90caf9; }
       .skill-chip--soft { background:#f3e5f5; color:#6a1b9a; border:1px solid #ce93d8; }
       .chip-level { font-size:11px; opacity:0.75; font-weight:400; }
@@ -190,9 +177,12 @@ import { CandidateSkillResponse, SkillResponse } from '../../core/models';
       .skill-pill:hover:not(:disabled) { background:#e3f2fd; border-color:#90caf9; }
       .skill-pill--disabled { opacity:0.45; cursor:not-allowed; }
     </style>
-  `
+  `,
 })
 export class CandidateSkillsComponent implements OnInit {
+  @Input() embedded = false;
+  @Output() saved = new EventEmitter<void>();
+
   private state = inject(CandidateStateService);
   private skillService = inject(SkillService);
   private candidateSkillService = inject(CandidateSkillService);
@@ -205,35 +195,23 @@ export class CandidateSkillsComponent implements OnInit {
   loading = signal(false);
   saving = signal(false);
 
-  // Search terms as signals so computed() tracks them reactively
   technicalSearchTerm = signal('');
   softSearchTerm = signal('');
 
-  // Proficiency levels as signals
   technicalLevel = signal('Intermediate');
   softLevel = signal('Intermediate');
 
-  // Split assigned skills by category
-  myTechnicalSkills = computed(() =>
-    this.mySkills().filter(s => s.category === 'Technical')
-  );
-  mySoftSkills = computed(() =>
-    this.mySkills().filter(s => s.category === 'SoftSkill')
-  );
+  myTechnicalSkills = computed(() => this.mySkills().filter(s => s.category === 'Technical'));
+  mySoftSkills = computed(() => this.mySkills().filter(s => s.category === 'SoftSkill'));
 
-  // Filter available skills by search term
   filteredTechnical = computed(() => {
     const term = this.technicalSearchTerm().toLowerCase();
-    return term
-      ? this.technicalSkills().filter(s => s.name.toLowerCase().includes(term))
-      : this.technicalSkills();
+    return term ? this.technicalSkills().filter(s => s.name.toLowerCase().includes(term)) : this.technicalSkills();
   });
 
   filteredSoft = computed(() => {
     const term = this.softSearchTerm().toLowerCase();
-    return term
-      ? this.softSkills().filter(s => s.name.toLowerCase().includes(term))
-      : this.softSkills();
+    return term ? this.softSkills().filter(s => s.name.toLowerCase().includes(term)) : this.softSkills();
   });
 
   isAlreadyAdded(skill: SkillResponse): boolean {
@@ -241,12 +219,8 @@ export class CandidateSkillsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.skillService.getByCategory('Technical').subscribe({
-      next: skills => this.technicalSkills.set(skills)
-    });
-    this.skillService.getByCategory('SoftSkill').subscribe({
-      next: skills => this.softSkills.set(skills)
-    });
+    this.skillService.getByCategory('Technical').subscribe({ next: skills => this.technicalSkills.set(skills) });
+    this.skillService.getByCategory('SoftSkill').subscribe({ next: skills => this.softSkills.set(skills) });
     this.load();
   }
 
@@ -256,7 +230,7 @@ export class CandidateSkillsComponent implements OnInit {
     this.loading.set(true);
     this.candidateSkillService.getAll(p.candidateId).subscribe({
       next: s => { this.mySkills.set(s); this.loading.set(false); },
-      error: () => this.loading.set(false)
+      error: () => this.loading.set(false),
     });
   }
 
@@ -264,18 +238,20 @@ export class CandidateSkillsComponent implements OnInit {
     const p = this.state.profile();
     if (!p || this.saving()) return;
     this.saving.set(true);
+    const wasEmpty = this.mySkills().length === 0;
     this.candidateSkillService.assign(p.candidateId, {
-      skills: [{ skillId: skill.skillId, proficiencyLevel }]
+      skills: [{ skillId: skill.skillId, proficiencyLevel }],
     }).subscribe({
       next: updated => {
         this.mySkills.set(updated);
         this.saving.set(false);
         this.toast.show(`${skill.name} added.`, 'success');
+        if (wasEmpty) this.saved.emit();
       },
       error: (err: Error) => {
         this.saving.set(false);
         this.toast.show(err.message, 'error');
-      }
+      },
     });
   }
 
@@ -284,12 +260,10 @@ export class CandidateSkillsComponent implements OnInit {
     if (!p) return;
     this.candidateSkillService.remove(p.candidateId, s.skillId).subscribe({
       next: () => {
-        this.mySkills.update(list =>
-          list.filter(x => x.candidateSkillId !== s.candidateSkillId)
-        );
+        this.mySkills.update(list => list.filter(x => x.candidateSkillId !== s.candidateSkillId));
         this.toast.show(`${s.skillName} removed.`, 'success');
       },
-      error: (err: Error) => this.toast.show(err.message, 'error')
+      error: (err: Error) => this.toast.show(err.message, 'error'),
     });
   }
 }
