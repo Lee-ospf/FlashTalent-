@@ -9,7 +9,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import * as mammoth from 'mammoth';
+import {mammoth} from 'mammoth';
 
 import { ApplicationService } from '../../../core/services/application.service';
 import { CandidateService } from '../../../core/services/candidate.service';
