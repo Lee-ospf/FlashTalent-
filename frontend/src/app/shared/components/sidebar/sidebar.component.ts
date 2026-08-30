@@ -169,6 +169,7 @@ export class SidebarComponent {
       route: '/admin/departments',
     },
     { label: 'Skills', icon: 'ti-tools', route: '/admin/skills' },
+    { label: 'Templates', icon: 'ti-file-stack', route: '/admin/templates' },
   ];
  adminNavItems: NavItem[] = [
     {
@@ -197,6 +198,7 @@ export class SidebarComponent {
       icon: 'ti-user-star',
       route: '/admin/recruiters',
     },
+    { label: 'Templates', icon: 'ti-file-stack', route: '/admin/templates' },
   ];
   isCandidate(): boolean {
     return this.auth.currentUser()?.role === 'Candidate';

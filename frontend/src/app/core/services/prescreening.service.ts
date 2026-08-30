@@ -1,7 +1,23 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Observable, catchError, forkJoin, of, tap, throwError } from 'rxjs';
+import { Observable, catchError, forkJoin, from, map, of, switchMap, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
+
+// Recognised inline-previewable types. 'docx' is rendered client-side via
+// mammoth (converts the .docx XML to HTML - no server/public-URL needed).
+// Legacy .doc (binary format) isn't supported by mammoth, so it - and
+// anything else - falls back to download-only.
+export type FilePreviewKind = 'pdf' | 'docx' | 'image' | 'unsupported';
+
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
+
+export function previewKindFor(fileName: string | null | undefined): FilePreviewKind {
+  const name = (fileName || '').toLowerCase();
+  if (name.endsWith('.pdf')) return 'pdf';
+  if (name.endsWith('.docx')) return 'docx';
+  if (IMAGE_EXT.test(name)) return 'image';
+  return 'unsupported';
+}
 
 // ── Backed by the real /api/prescreening endpoints ─────────────────
 // Mirrors TalentHub.Controllers.PrescreeningController on the backend.
@@ -190,6 +206,80 @@ export class PrescreeningService {
     return relativeUrl.startsWith('/')
       ? origin + relativeUrl
       : `${origin}/${relativeUrl}`;
+  }
+
+  /**
+   * Fetches a pre-screening file (template or completed submission) as a Blob,
+   * through HttpClient so the auth interceptor attaches the bearer token.
+   * A plain `<a href>` navigation skips that interceptor entirely, so if the
+   * file endpoint requires auth the browser gets a 401 with nothing visible -
+   * it just looks like the button "does nothing". Fetching via HttpClient and
+   * handing back an object URL avoids that, and surfaces a real error if the
+   * request does fail.
+   */
+  getFileBlob(relativeUrl: string | null | undefined): Observable<Blob> {
+    const href = this.fileHref(relativeUrl);
+    if (!href) return throwError(() => new Error('No file is available.'));
+    return this.http
+      .get(href, { responseType: 'blob' })
+      .pipe(catchError((err: HttpErrorResponse) => this.handleBlobError(err)));
+  }
+
+  /**
+   * catchError for blob requests specifically. When responseType is 'blob',
+   * a *failed* request's body also comes back as a Blob rather than parsed
+   * JSON - so the normal handleError()'s `err.error?.message` is always
+   * undefined here, and every failure (401, 404, CORS, 500, ...) collapses
+   * into the same unhelpful "An error occurred." This decodes the blob body
+   * when possible and falls back to a status-specific message otherwise, so
+   * the real cause of a failed view/download is actually visible.
+   */
+  private handleBlobError(err: HttpErrorResponse): Observable<never> {
+    if (err.status === 0) {
+      return throwError(
+        () => new Error('Could not reach the server. Check your connection and try again.'),
+      );
+    }
+    if (err.status === 401 || err.status === 403) {
+      return throwError(
+        () => new Error('You are not authorized to view this file. Try logging in again.'),
+      );
+    }
+    if (err.status === 404) {
+      return throwError(() => new Error('This file could not be found on the server.'));
+    }
+    if (err.error instanceof Blob && err.error.type?.toLowerCase().includes('json')) {
+      return from(err.error.text()).pipe(
+        switchMap((text) => {
+          let msg = '';
+          try {
+            msg = JSON.parse(text)?.message ?? '';
+          } catch {
+            /* not JSON after all - fall through to generic message below */
+          }
+          return throwError(
+            () => new Error(msg || `Could not load the file (error ${err.status}).`),
+          );
+        }),
+      );
+    }
+    return throwError(() => new Error(`Could not load the file (error ${err.status}).`));
+  }
+
+  /** Fetches the file and triggers a real browser download of it. */
+  downloadFile(relativeUrl: string | null | undefined, fileName: string): Observable<void> {
+    return this.getFileBlob(relativeUrl).pipe(
+      map((blob) => {
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = fileName || 'document';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      }),
+    );
   }
 
   private updateCache(res: PrescreeningResponse): void {

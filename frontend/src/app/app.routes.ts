@@ -53,6 +53,22 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'admin/templates',
+    canActivate: [roleGuard(['Recruiter', 'Admin'])],
+    loadComponent: () =>
+      import('./features/admin/templates/templates.component').then(
+        (m) => m.TemplatesComponent,
+      ),
+  },
+  {
+    path: 'admin/applications/:id/candidate',
+    canActivate: [roleGuard(['Recruiter', 'Admin'])],
+    loadComponent: () =>
+      import('./features/admin/candidate-profile/candidate-profile.component').then(
+        (m) => m.CandidateProfileComponent,
+      ),
+  },
+  {
     path: 'admin/applications/:id/offer',
     canActivate: [roleGuard(['Recruiter', 'Admin'])],
     loadComponent: () =>
