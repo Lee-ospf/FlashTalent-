@@ -13,11 +13,12 @@ import { DocumentService, DocumentTypeKey, validateFileClient } from '../../core
 import { ToastService } from '../../core/services/toast.service';
 import { QualificationResponse, CandidateDocumentResponse } from '../../core/models';
 import { environment } from '../../../environments/environment';
+import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-trigger.directive';
 
 @Component({
   selector: 'app-candidate-qualifications',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatCardModule, MatProgressSpinnerModule],
+  imports: [CommonModule,DatePickerTriggerDirective , ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatCardModule, MatProgressSpinnerModule],
   template: `
     <div class="page-container">
       <div class="page-header">

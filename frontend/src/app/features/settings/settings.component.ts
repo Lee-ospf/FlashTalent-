@@ -1,6 +1,11 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroupDirective,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -18,8 +23,14 @@ function minLength8(c: { value: string }) {
   selector: 'app-settings',
   standalone: true,
   imports: [
-    CommonModule, ReactiveFormsModule,
-    MatCardModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule
+    CommonModule,
+    ReactiveFormsModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
   ],
   template: `
     <div class="page-container">
@@ -30,14 +41,24 @@ function minLength8(c: { value: string }) {
         </div>
       </div>
 
-      <mat-card class="mat-elevation-z1" style="border-radius:12px;max-width:520px">
+      <mat-card
+        class="mat-elevation-z1"
+        style="border-radius:12px;max-width:520px"
+      >
         <mat-card-content style="padding:20px">
-          <div class="card-header"><i class="ti ti-user-circle"></i> Account</div>
-          <div style="font-size:13px;color:var(--text-muted);margin-top:6px;margin-bottom:16px">
-            {{ user()?.firstName }} {{ user()?.lastName }} · {{ user()?.email }} · {{ user()?.role }}
+          <div class="card-header">
+            <i class="ti ti-user-circle"></i> Account
+          </div>
+          <div
+            style="font-size:13px;color:var(--text-muted);margin-top:6px;margin-bottom:16px"
+          >
+            {{ user()?.firstName }} {{ user()?.lastName }} ·
+            {{ user()?.email }} · {{ user()?.role }}
           </div>
 
-          <div class="form-section-label"><i class="ti ti-lock"></i> Change password</div>
+          <div class="form-section-label">
+            <i class="ti ti-lock"></i> Change password
+          </div>
           @if (user()?.mustChangePassword) {
             <div class="info-banner warn" style="margin-top:10px">
               <i class="ti ti-alert-triangle"></i>
@@ -45,24 +66,57 @@ function minLength8(c: { value: string }) {
             </div>
           }
 
-          <form [formGroup]="form" (ngSubmit)="submit()" style="margin-top:12px">
+          <form
+            [formGroup]="form"
+            (ngSubmit)="submit()"
+            style="margin-top:12px"
+          >
             <mat-form-field appearance="outline" style="width:100%">
               <mat-label>Current password</mat-label>
-              <input matInput formControlName="currentPassword" [type]="showCurrent ? 'text' : 'password'" autocomplete="current-password">
-              <button mat-icon-button matSuffix type="button" (click)="showCurrent=!showCurrent">
-                <mat-icon>{{ showCurrent ? 'visibility_off' : 'visibility' }}</mat-icon>
+              <input
+                matInput
+                formControlName="currentPassword"
+                [type]="showCurrent ? 'text' : 'password'"
+                autocomplete="current-password"
+              />
+              <button
+                mat-icon-button
+                matSuffix
+                type="button"
+                (click)="showCurrent = !showCurrent"
+              >
+                <mat-icon>{{
+                  showCurrent ? 'visibility_off' : 'visibility'
+                }}</mat-icon>
               </button>
-              @if (invalid('currentPassword')) { <mat-error>Required</mat-error> }
+              @if (invalid('currentPassword')) {
+                <mat-error>Required</mat-error>
+              }
             </mat-form-field>
 
             <mat-form-field appearance="outline" style="width:100%">
               <mat-label>New password</mat-label>
-              <input matInput formControlName="newPassword" [type]="showNew ? 'text' : 'password'" autocomplete="new-password">
-              <button mat-icon-button matSuffix type="button" (click)="showNew=!showNew">
-                <mat-icon>{{ showNew ? 'visibility_off' : 'visibility' }}</mat-icon>
+              <input
+                matInput
+                formControlName="newPassword"
+                [type]="showNew ? 'text' : 'password'"
+                autocomplete="new-password"
+              />
+              <button
+                mat-icon-button
+                matSuffix
+                type="button"
+                (click)="showNew = !showNew"
+              >
+                <mat-icon>{{
+                  showNew ? 'visibility_off' : 'visibility'
+                }}</mat-icon>
               </button>
               <mat-hint>Minimum 8 characters</mat-hint>
-              @if (form.get('newPassword')?.errors?.['required'] && form.get('newPassword')?.touched) {
+              @if (
+                form.get('newPassword')?.errors?.['required'] &&
+                form.get('newPassword')?.touched
+              ) {
                 <mat-error>Required</mat-error>
               }
               @if (form.get('newPassword')?.errors?.['minLength']) {
@@ -72,30 +126,52 @@ function minLength8(c: { value: string }) {
 
             <mat-form-field appearance="outline" style="width:100%">
               <mat-label>Confirm new password</mat-label>
-              <input matInput formControlName="confirmPassword" [type]="showNew ? 'text' : 'password'" autocomplete="new-password">
-              @if (form.errors?.['mismatch'] && form.get('confirmPassword')?.touched) {
+              <input
+                matInput
+                formControlName="confirmPassword"
+                [type]="showNew ? 'text' : 'password'"
+                autocomplete="new-password"
+              />
+              @if (
+                form.errors?.['mismatch'] &&
+                form.get('confirmPassword')?.touched
+              ) {
                 <mat-error>Passwords don't match</mat-error>
               }
             </mat-form-field>
 
             @if (apiError) {
-              <div class="api-error" style="margin-bottom:12px"><i class="ti ti-alert-circle"></i> {{ apiError }}</div>
+              <div class="api-error" style="margin-bottom:12px">
+                <i class="ti ti-alert-circle"></i> {{ apiError }}
+              </div>
             }
 
-            <button mat-raised-button color="primary" type="submit" style="border-radius:8px" [disabled]="form.invalid || saving()">
-              @if (saving()) { <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner> }
+            <button
+              mat-raised-button
+              color="primary"
+              type="submit"
+              style="border-radius:8px"
+              [disabled]="form.invalid || saving()"
+            >
+              @if (saving()) {
+                <mat-spinner
+                  diameter="16"
+                  style="display:inline-block;margin-right:6px"
+                ></mat-spinner>
+              }
               <i class="ti ti-check"></i> Update password
             </button>
           </form>
         </mat-card-content>
       </mat-card>
     </div>
-  `
+  `,
 })
 export class SettingsComponent {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
   private toast = inject(ToastService);
+  @ViewChild(FormGroupDirective) formDirective!: FormGroupDirective;
 
   user = this.auth.currentUser;
   showCurrent = false;
@@ -103,11 +179,14 @@ export class SettingsComponent {
   saving = signal(false);
   apiError = '';
 
-  form = this.fb.group({
-    currentPassword: ['', Validators.required],
-    newPassword: ['', [Validators.required, minLength8]],
-    confirmPassword: ['', Validators.required]
-  }, { validators: this.passwordsMatch });
+  form = this.fb.group(
+    {
+      currentPassword: ['', Validators.required],
+      newPassword: ['', [Validators.required, minLength8]],
+      confirmPassword: ['', Validators.required],
+    },
+    { validators: this.passwordsMatch },
+  );
 
   private passwordsMatch(group: any) {
     const a = group.get('newPassword')?.value;
@@ -121,18 +200,30 @@ export class SettingsComponent {
   }
 
   submit(): void {
-    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
     this.apiError = '';
     this.saving.set(true);
     const v = this.form.value;
 
-    this.auth.changePassword({ currentPassword: v.currentPassword!, newPassword: v.newPassword! }).subscribe({
-      next: () => {
-        this.saving.set(false);
-        this.form.reset();
-        this.toast.show('Password updated.', 'success');
-      },
-      error: (err: Error) => { this.saving.set(false); this.apiError = err.message; }
-    });
+    this.auth
+      .changePassword({
+        currentPassword: v.currentPassword!,
+        newPassword: v.newPassword!,
+      })
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
+          this.form.reset();
+          this.formDirective.resetForm();
+          this.toast.show('Password updated.', 'success');
+        },
+        error: (err: Error) => {
+          this.saving.set(false);
+          this.apiError = err.message;
+        },
+      });
   }
 }

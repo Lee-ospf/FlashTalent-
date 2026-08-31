@@ -3,21 +3,24 @@ import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import { MatTabsModule } from '@angular/material/tabs';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { FormsModule } from '@angular/forms';
 import { ApplicationService } from '../../../core/services/application.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { ApplicationReviewResponse } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
-
+import {
+  DocumentService,
+  DOCUMENT_TYPE_LABELS,
+  DocumentTypeKey,
+} from '../../../core/services/document.service';
+import { CandidateDocumentResponse } from '../../../core/models';
 @Component({
   selector: 'app-application-review',
   standalone: true,
   imports: [
     CommonModule,
     MatButtonModule,
-    MatTabsModule,
     MatProgressSpinnerModule,
     FormsModule,
   ],
@@ -31,19 +34,25 @@ import { environment } from '../../../../environments/environment';
 
         <div class="topbar-center">
           @if (data()) {
-            <div class="topbar-name">
-              {{ data()!.candidate.firstName }} {{ data()!.candidate.lastName }}
-            </div>
-            <div class="topbar-meta">
-              Applied {{ formatDate(data()!.application.appliedAt) }}
-              &nbsp;·&nbsp;
-              <span
-                class="status-pill s-{{
-                  statusClass(data()!.application.status)
-                }}"
-              >
-                {{ data()!.application.status }}
-              </span>
+            <div class="topbar-identity">
+              <div class="topbar-avatar">{{ candidateInitials() }}</div>
+              <div>
+                <div class="topbar-name">
+                  {{ data()!.candidate.firstName }}
+                  {{ data()!.candidate.lastName }}
+                </div>
+                <div class="topbar-meta">
+                  Applied {{ formatDate(data()!.application.appliedAt) }}
+                  &nbsp;·&nbsp;
+                  <span
+                    class="status-pill s-{{
+                      statusClass(data()!.application.status)
+                    }}"
+                  >
+                    {{ data()!.application.status }}
+                  </span>
+                </div>
+              </div>
             </div>
           }
         </div>
@@ -83,158 +92,182 @@ import { environment } from '../../../../environments/environment';
             <div class="panel-label">
               <i class="ti ti-user"></i> Candidate Profile
             </div>
-
-            <mat-tab-group class="fill-tabs" animationDuration="150ms">
-              <!-- TAB 1 — Profile Info -->
-              <mat-tab label="Profile Info">
-                <div class="panel-scroll">
-                  <!-- Contact -->
-                  <div class="info-section">
-                    <div class="section-heading">Contact</div>
-                    <div class="info-row">
-                      <span class="info-label">Name</span>
-                      <span class="info-val">
-                        {{ data()!.candidate.firstName }}
-                        {{ data()!.candidate.lastName }}
-                      </span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">Email</span>
-                      <span class="info-val">{{
-                        data()!.candidate.email
-                      }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">Phone</span>
-                      <span class="info-val">{{
-                        data()!.candidate.phone ?? '—'
-                      }}</span>
-                    </div>
+            <div class="panel-scroll">
+              <!-- Skill Match Summary -->
+              @if (skillMatchSummary().total > 0) {
+                <div class="match-summary" [class]="matchLevelClass()">
+                  <div class="match-summary-header">
+                    <i class="ti ti-target"></i>
+                    <span>Skill Match</span>
+                    <span class="match-percentage"
+                      >{{ skillMatchSummary().percentage }}%</span
+                    >
                   </div>
-
-                  <!-- Skills -->
-                  <div class="info-section">
-                    <div class="section-heading">Skills</div>
-                    @if (data()!.candidate.skills.length) {
-                      <div class="tag-wrap">
-                        @for (s of data()!.candidate.skills; track s.skillId) {
-                          <span
-                            class="tag"
-                            [class.tag-match]="isSkillMatch(s.skillId)"
-                          >
-                            {{ s.skillName }}
-                            <span class="tag-sub">{{
-                              s.proficiencyLevel
-                            }}</span>
-                            @if (isSkillMatch(s.skillId)) {
-                              <i class="ti ti-check tag-check"></i>
-                            }
-                          </span>
-                        }
-                      </div>
-                      <div class="match-hint">
-                        <i class="ti ti-info-circle"></i>
-                        Green skills match vacancy requirements
-                      </div>
-                    } @else {
-                      <span class="info-empty">No skills listed</span>
-                    }
+                  <div class="match-bar-wrap">
+                    <div
+                      class="match-bar-fill"
+                      [style.width.%]="skillMatchSummary().percentage"
+                    ></div>
                   </div>
-
-                  <!-- Qualifications -->
-                  <div class="info-section">
-                    <div class="section-heading">Qualifications</div>
-                    @if (data()!.candidate.qualifications.length) {
-                      @for (
-                        q of data()!.candidate.qualifications;
-                        track q.name
-                      ) {
-                        <div class="qual-card">
-                          <div class="qual-name">{{ q.name }}</div>
-                          <div class="qual-sub">
-                            {{ q.institution }} ·
-                            {{ q.yearCompleted | date: 'yyyy' }}
-                          </div>
-                        </div>
-                      }
-                    } @else {
-                      <span class="info-empty">None listed</span>
-                    }
-                  </div>
-
-                  <!-- Certifications -->
-                  <div class="info-section">
-                    <div class="section-heading">Certifications</div>
-                    @if (data()!.candidate.certifications.length) {
-                      @for (
-                        c of data()!.candidate.certifications;
-                        track c.name
-                      ) {
-                        <div class="qual-card">
-                          <div class="qual-name">{{ c.name }}</div>
-                          <div class="qual-sub">
-                            {{ c.institution }} ·
-                            {{ c.yearCompleted | date: 'yyyy' }}
-                          </div>
-                        </div>
-                      }
-                    } @else {
-                      <span class="info-empty">None listed</span>
-                    }
-                  </div>
-
-                  <!-- Experience -->
-                  <div class="info-section">
-                    <div class="section-heading">Experience</div>
-                    @if (data()!.candidate.experiences.length) {
-                      @for (
-                        e of data()!.candidate.experiences;
-                        track e.company
-                      ) {
-                        <div class="exp-card">
-                          <div class="exp-role">{{ e.role }}</div>
-                          <div class="exp-company">{{ e.company }}</div>
-                          <div class="exp-dates">
-                            {{ e.startDate | date: 'MMM yyyy' }} —
-                            {{
-                              e.endDate
-                                ? (e.endDate | date: 'MMM yyyy')
-                                : 'Present'
-                            }}
-                          </div>
-                          @if (e.projectsAndDuties) {
-                            <p class="exp-duties">{{ e.projectsAndDuties }}</p>
-                          }
-                        </div>
-                      }
-                    } @else {
-                      <span class="info-empty">No experience listed</span>
-                    }
+                  <div class="match-summary-text">
+                    {{ skillMatchSummary().matched }} of
+                    {{ skillMatchSummary().total }} required skills matched
                   </div>
                 </div>
-              </mat-tab>
-
-              <!-- TAB 2 — CV -->
-              <mat-tab label="CV Document">
-                <ng-template matTabContent>
-                  <div class="cv-wrap">
-                    @if (safeCvUrl()) {
-                      <iframe
-                        [src]="safeCvUrl()"
-                        class="cv-iframe"
-                        title="Candidate CV"
+              }
+              <!-- Contact -->
+              <div class="info-section">
+                <div class="section-heading">Contact</div>
+                <div class="info-row">
+                  <span class="info-label">Name</span>
+                  <span class="info-val">
+                    {{ data()!.candidate.firstName }}
+                    {{ data()!.candidate.lastName }}
+                  </span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Email</span>
+                  <span class="info-val">{{ data()!.candidate.email }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Phone</span>
+                  <span class="info-val">{{
+                    data()!.candidate.phone ?? '—'
+                  }}</span>
+                </div>
+              </div>
+              <!--Documents-->
+              <div class="info-section">
+                <div class="section-heading">Submitted Documents</div>
+                @if (documentsLoading()) {
+                  <span class="info-empty">Loading documents…</span>
+                } @else if (documents().length) {
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    @for (doc of documents(); track doc.candidateDocumentId) {
+                      <div
+                        class="doc-slot uploaded"
+                        style="cursor:pointer"
+                        (click)="toggleDocPreview(doc)"
                       >
-                      </iframe>
-                    } @else {
-                      <div class="empty-state">
-                        <i class="ti ti-file-off"></i>
-                        <p>No CV uploaded</p>
+                        <i class="ti ti-file-text doc-icon icon-ok"></i>
+                        <div class="doc-info">
+                          <div class="doc-name">
+                            {{ docLabel(doc.documentType) }}
+                          </div>
+                          <div class="doc-meta">
+                            {{ doc.originalFileName }}
+                          </div>
+                        </div>
+                        <i
+                          class="ti"
+                          [class.ti-chevron-down]="
+                            expandedDocId() !== doc.candidateDocumentId
+                          "
+                          [class.ti-chevron-up]="
+                            expandedDocId() === doc.candidateDocumentId
+                          "
+                        ></i>
                       </div>
+                      @if (expandedDocId() === doc.candidateDocumentId) {
+                        <iframe
+                          [src]="safeDocUrl(doc)"
+                          class="doc-preview-iframe"
+                          [title]="doc.originalFileName"
+                        ></iframe>
+                      }
                     }
                   </div>
-                </ng-template>
-              </mat-tab>
-            </mat-tab-group>
+                } @else {
+                  <span class="info-empty">No documents submitted</span>
+                }
+              </div>
+              <!-- Skills -->
+              <div class="info-section">
+                <div class="section-heading">Skills</div>
+                @if (data()!.candidate.skills.length) {
+                  <div class="tag-wrap">
+                    @for (s of data()!.candidate.skills; track s.skillId) {
+                      <span
+                        class="tag"
+                        [class.tag-match]="isSkillMatch(s.skillId)"
+                      >
+                        {{ s.skillName }}
+                        <span class="tag-sub">{{ s.proficiencyLevel }}</span>
+                        @if (isSkillMatch(s.skillId)) {
+                          <i class="ti ti-check tag-check"></i>
+                        }
+                      </span>
+                    }
+                  </div>
+                  <div class="match-hint">
+                    <i class="ti ti-info-circle"></i>
+                    Green skills match vacancy requirements
+                  </div>
+                } @else {
+                  <span class="info-empty">No skills listed</span>
+                }
+              </div>
+
+              <!-- Qualifications -->
+              <div class="info-section">
+                <div class="section-heading">Qualifications</div>
+                @if (data()!.candidate.qualifications.length) {
+                  @for (q of data()!.candidate.qualifications; track q.name) {
+                    <div class="qual-card">
+                      <div class="qual-name">{{ q.name }}</div>
+                      <div class="qual-sub">
+                        {{ q.institution }} ·
+                        {{ q.yearCompleted | date: 'yyyy' }}
+                      </div>
+                    </div>
+                  }
+                } @else {
+                  <span class="info-empty">None listed</span>
+                }
+              </div>
+
+              <!-- Certifications -->
+              <div class="info-section">
+                <div class="section-heading">Certifications</div>
+                @if (data()!.candidate.certifications.length) {
+                  @for (c of data()!.candidate.certifications; track c.name) {
+                    <div class="qual-card">
+                      <div class="qual-name">{{ c.name }}</div>
+                      <div class="qual-sub">
+                        {{ c.institution }} ·
+                        {{ c.yearCompleted | date: 'yyyy' }}
+                      </div>
+                    </div>
+                  }
+                } @else {
+                  <span class="info-empty">None listed</span>
+                }
+              </div>
+
+              <!-- Experience -->
+              <div class="info-section">
+                <div class="section-heading">Experience</div>
+                @if (data()!.candidate.experiences.length) {
+                  @for (e of data()!.candidate.experiences; track e.company) {
+                    <div class="exp-card">
+                      <div class="exp-role">{{ e.role }}</div>
+                      <div class="exp-company">{{ e.company }}</div>
+                      <div class="exp-dates">
+                        {{ e.startDate | date: 'MMM yyyy' }} —
+                        {{
+                          e.endDate ? (e.endDate | date: 'MMM yyyy') : 'Present'
+                        }}
+                      </div>
+                      @if (e.projectsAndDuties) {
+                        <p class="exp-duties">{{ e.projectsAndDuties }}</p>
+                      }
+                    </div>
+                  }
+                } @else {
+                  <span class="info-empty">No experience listed</span>
+                }
+              </div>
+            </div>
           </div>
 
           <!-- DIVIDER -->
@@ -372,6 +405,34 @@ import { environment } from '../../../../environments/environment';
           </div>
         </div>
       }
+
+      <!-- DOCUMENT PREVIEW MODAL -->
+      @if (previewModalDoc()) {
+        <div class="confirm-backdrop" (click)="closeDocModal()">
+          <div class="confirm-card" (click)="$event.stopPropagation()">
+            <div class="confirm-title">
+              {{ docLabel(previewModalDoc()!.documentType) }}
+            </div>
+            <p class="confirm-body">
+              {{ previewModalDoc()!.originalFileName }} can't be previewed in
+              the browser for this file type. Download it to view the contents.
+            </p>
+            <div class="confirm-actions">
+              <button mat-stroked-button (click)="closeDocModal()">
+                Close
+              </button>
+              <a
+                mat-raised-button
+                color="primary"
+                [href]="docDownloadUrl(previewModalDoc()!)"
+                download
+              >
+                <i class="ti ti-download"></i> Download
+              </a>
+            </div>
+          </div>
+        </div>
+      }
     </div>
 
     <style>
@@ -393,6 +454,30 @@ import { environment } from '../../../../environments/environment';
         border-bottom: 1px solid var(--border);
         flex-shrink: 0;
       }
+      .topbar-identity {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        justify-content: center;
+      }
+      .topbar-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(
+          135deg,
+          var(--navy) 0%,
+          var(--navy-light) 100%
+        );
+        color: #fff;
+        font-size: 14px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 3px 10px rgba(26, 39, 68, 0.3);
+      }
       .topbar-center {
         flex: 1;
         text-align: center;
@@ -401,14 +486,16 @@ import { environment } from '../../../../environments/environment';
         font-size: 15px;
         font-weight: 700;
         color: var(--text);
+        text-align: left;
       }
+      
       .topbar-meta {
         font-size: 12px;
         color: var(--text-muted);
         margin-top: 2px;
         display: flex;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
         gap: 4px;
       }
       .split-container {
@@ -436,54 +523,11 @@ import { environment } from '../../../../environments/environment';
         border-bottom: 1px solid var(--border);
         flex-shrink: 0;
       }
-      .fill-tabs {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        overflow: hidden;
-      }
-      ::ng-deep .fill-tabs .mat-mdc-tab-body-wrapper {
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-      }
-      ::ng-deep .fill-tabs .mat-mdc-tab-body {
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-      }
-      ::ng-deep .fill-tabs .mat-mdc-tab-body-content {
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        width: 100%;
-      }
       .panel-scroll {
         flex: 1;
         overflow-y: auto;
         padding: 20px 24px;
         min-height: 0;
-      }
-      .cv-wrap {
-        flex: 1;
-        min-height: 0;
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
-      .cv-iframe {
-        flex: 1;
-        min-height: 0;
-        width: 100%;
-        height: 100%;
-        border: none;
-        display: block;
       }
       .split-divider {
         width: 1px;
@@ -671,6 +715,86 @@ import { environment } from '../../../../environments/environment';
         justify-content: flex-end;
         gap: 8px;
       }
+      .doc-preview-iframe {
+        width: 100%;
+        height: 500px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin: 4px 0 4px 44px; /* aligns with .doc-info's left offset, roughly matching icon width + gap */
+      }
+      .match-summary {
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin-bottom: 20px;
+        border: 1.5px solid var(--border);
+      }
+      .match-summary-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 10px;
+      }
+      .match-percentage {
+        margin-left: auto;
+        font-size: 16px;
+        font-weight: 800;
+      }
+      .match-bar-wrap {
+        height: 6px;
+        background: var(--surface-3);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-bottom: 8px;
+      }
+      .match-bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.4s ease;
+      }
+      .match-summary-text {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .match-high {
+        background: var(--green-bg);
+        border-color: var(--green-mid);
+      }
+      .match-high .match-summary-header,
+      .match-high .match-percentage {
+        color: #1a5c35;
+      }
+      .match-high .match-bar-fill {
+        background: var(--green);
+      }
+
+      .match-medium {
+        background: var(--amber-bg);
+        border-color: #ffe0b2;
+      }
+      .match-medium .match-summary-header,
+      .match-medium .match-percentage {
+        color: var(--amber);
+      }
+      .match-medium .match-bar-fill {
+        background: var(--amber);
+      }
+
+      .match-low {
+        background: var(--red-bg);
+        border-color: #ffcdd2;
+      }
+      .match-low .match-summary-header,
+      .match-low .match-percentage {
+        color: var(--red);
+      }
+      .match-low .match-bar-fill {
+        background: var(--red);
+      }
     </style>
   `,
 })
@@ -680,12 +804,30 @@ export class ApplicationReviewComponent implements OnInit {
   private appService = inject(ApplicationService);
   private sanitizer = inject(DomSanitizer);
   private toast = inject(ToastService);
-
+  private documentService = inject(DocumentService);
+  private rawDocuments = signal<CandidateDocumentResponse[]>([]);
   data = signal<ApplicationReviewResponse | null>(null);
   loading = signal(true);
   actioning = signal(false);
   showDropConfirm = signal(false);
   dropNotes = '';
+  documentsLoading = signal(false);
+  expandedDocId = signal<number | null>(null);
+  previewModalDoc = signal<CandidateDocumentResponse | null>(null);
+  documents = computed(() => {
+    const latestByKey = new Map<string, CandidateDocumentResponse>();
+    for (const doc of this.rawDocuments()) {
+      const key = `${doc.documentType}:${doc.qualificationId ?? 'none'}`;
+      const existing = latestByKey.get(key);
+      if (
+        !existing ||
+        new Date(doc.uploadedAt) > new Date(existing.uploadedAt)
+      ) {
+        latestByKey.set(key, doc);
+      }
+    }
+    return Array.from(latestByKey.values());
+  });
 
   // Set of vacancy skill IDs for O(1) lookup when highlighting candidate skills
   private vacancySkillIds = computed(
@@ -708,7 +850,7 @@ export class ApplicationReviewComponent implements OnInit {
       next: (d) => {
         this.data.set(d);
         this.loading.set(false);
-        console.log('cvUrl from API:', d.candidate.cvUrl);
+        this.loadDocuments(d.candidate.candidateId);
       },
       error: (err: Error) => {
         this.toast.show(err.message, 'error');
@@ -717,17 +859,43 @@ export class ApplicationReviewComponent implements OnInit {
     });
   }
 
+  private loadDocuments(candidateId: number): void {
+    this.documentsLoading.set(true);
+    this.documentService.getAll(candidateId).subscribe({
+      next: (docs) => {
+        this.rawDocuments.set(docs);
+        this.documentsLoading.set(false);
+      },
+      error: () => this.documentsLoading.set(false),
+    });
+  }
+  candidateInitials(): string {
+    const c = this.data()?.candidate;
+    if (!c) return '';
+    return (c.firstName[0] + c.lastName[0]).toUpperCase();
+  }
   isSkillMatch(skillId: number): boolean {
     return this.vacancySkillIds().has(skillId);
   }
+  skillMatchSummary = computed(() => {
+    const required = this.data()?.vacancy.requiredSkills ?? [];
+    const candidateSkillIds = new Set(
+      this.data()?.candidate.skills.map((s) => s.skillId) ?? [],
+    );
+    const matched = required.filter((r) =>
+      candidateSkillIds.has(r.skillId),
+    ).length;
+    const total = required.length;
+    const percentage = total > 0 ? Math.round((matched / total) * 100) : 0;
+    return { matched, total, percentage };
+  });
 
-  safeCvUrl(): SafeResourceUrl | null {
-    const url = this.data()?.candidate.cvUrl;
-    if (!url) return null;
-    const full = `${environment.apiUrl.replace('/api', '')}${url}#toolbar=0&navpanes=0&zoom=page-width`;
-    return this.sanitizer.bypassSecurityTrustResourceUrl(full);
-  }
-
+  matchLevelClass = computed(() => {
+    const pct = this.skillMatchSummary().percentage;
+    if (pct >= 75) return 'match-high';
+    if (pct >= 40) return 'match-medium';
+    return 'match-low';
+  });
   shortlist(): void {
     const app = this.data()?.application;
     if (!app) return;
@@ -782,7 +950,38 @@ export class ApplicationReviewComponent implements OnInit {
       year: 'numeric',
     });
   }
+  docLabel(type: string): string {
+    return DOCUMENT_TYPE_LABELS[type as DocumentTypeKey] ?? type;
+  }
 
+  isPdf(doc: CandidateDocumentResponse): boolean {
+    return doc.originalFileName.toLowerCase().endsWith('.pdf');
+  }
+
+  toggleDocPreview(doc: CandidateDocumentResponse): void {
+    if (this.isPdf(doc)) {
+      this.expandedDocId.set(
+        this.expandedDocId() === doc.candidateDocumentId
+          ? null
+          : doc.candidateDocumentId,
+      );
+    } else {
+      this.previewModalDoc.set(doc);
+    }
+  }
+
+  closeDocModal(): void {
+    this.previewModalDoc.set(null);
+  }
+
+  safeDocUrl(doc: CandidateDocumentResponse): SafeResourceUrl {
+    const full = `${environment.apiUrl.replace('/api', '')}${doc.fileUrl}#toolbar=0&navpanes=0&zoom=page-width`;
+    return this.sanitizer.bypassSecurityTrustResourceUrl(full);
+  }
+
+  docDownloadUrl(doc: CandidateDocumentResponse): string {
+    return `${environment.apiUrl.replace('/api', '')}${doc.fileUrl}`;
+  }
   goBack(): void {
     this.router.navigate(['/admin/applications']);
   }

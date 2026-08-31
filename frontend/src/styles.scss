@@ -125,6 +125,7 @@ body {
   transition: margin-left 0.3s ease;
   &.sidebar-collapsed {
     margin-left: 64px;
+    min-width: 0;
   }
 }
 
@@ -478,7 +479,11 @@ body {
   gap: 14px;
   margin-bottom: 20px;
 }
-
+.metric-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 .metric-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -487,6 +492,7 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-height: 92px;
   box-shadow: var(--shadow-sm);
   transition:
     box-shadow 0.2s,
@@ -498,27 +504,32 @@ body {
 }
 
 .metric-icon {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
   flex-shrink: 0;
+  align-self: center;
 }
 
 .metric-val {
   font-size: 24px;
   font-weight: 700;
   color: var(--text);
-  line-height: 1;
+  line-height: 1.15;
+  margin-top: 2px;
 }
 .metric-label {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 3px;
   font-weight: 500;
+  min-height: 2.6em;
+  display: flex;
+  align-items: center;
 }
 
 // ── Auth pages ────────────────────────────────────────────────────
@@ -729,9 +740,17 @@ body {
   background: var(--blue-bg);
   color: var(--blue);
 }
+.s-underreview {
+  background: var(--teal-bg);
+  color: var(--teal);
+}
 .s-shortlisted {
   background: var(--purple-bg);
   color: var(--purple);
+}
+.s-prescreening {
+  background: #fce4ec;
+  color: #ad1457;
 }
 .s-interview {
   background: var(--amber-bg);
@@ -741,6 +760,10 @@ body {
   background: var(--green-bg);
   color: #1a5c35;
 }
+.s-hired {
+  background: #dcedc8;
+  color: #33691e;
+}
 .s-rejected {
   background: var(--red-bg);
   color: var(--red);
@@ -748,18 +771,6 @@ body {
 .s-withdrawn {
   background: #f5f5f5;
   color: #616161;
-}
-.s-underreview {
-  background: var(--blue-bg);
-  color: var(--blue);
-}
-.s-prescreening {
-  background: var(--purple-bg);
-  color: var(--purple);
-}
-.s-hired {
-  background: var(--green-bg);
-  color: #1a5c35;
 }
 
 // ── Ref chips ─────────────────────────────────────────────────────
@@ -1283,6 +1294,8 @@ textarea {
 }
 .search-input {
   padding-left: 36px !important;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .filter-chips {
@@ -1485,10 +1498,6 @@ textarea {
   color: var(--red);
 }
 
-.app-main {
-  flex: 1;
-  min-width: 0;
-}
 .app-title {
   font-size: 14px;
   font-weight: 600;
@@ -1956,15 +1965,39 @@ a {
 }
 
 .app-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto 200px 1fr auto;
   align-items: center;
   gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid var(--border);
 }
+
 .app-row:last-child {
   border-bottom: none;
 }
+.app-row-main {
+  min-width: 0;
+}
+.app-status {
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.app-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  //margin-left: 12px;
+  flex-shrink: 0;
+}
+
+.app-action-btn {
+  width: 160px;
+  justify-content: center;
+  margin-left: 0;
+}
+
 .app-rank {
   width: 26px;
   height: 26px;
@@ -1977,4 +2010,30 @@ a {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+//metrics in recruier application list
+.metric-card.clickable {
+  cursor: pointer;
+}
+.metric-card.active {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 2px rgba(26, 39, 68, 0.15);
+}
+.metric-card.clickable:has(.metric-val:empty),
+.metric-card[data-zero="true"] {
+  opacity: 0.55;
+}
+
+.metric-card.summary-only {
+  border-left: 3px solid var(--navy);
+}
+
+.metric-card.zero {
+  opacity: 0.55;
+
+  .metric-icon {
+    background: var(--surface-2) !important;
+    color: var(--text-muted) !important;
+  }
 }

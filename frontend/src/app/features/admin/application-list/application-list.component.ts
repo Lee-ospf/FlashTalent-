@@ -1,4 +1,12 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import {
+  Component,
+  inject,
+  signal,
+  computed,
+  OnInit,
+  ViewChild,
+  ElementRef,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -25,6 +33,7 @@ import {
 } from '../../../core/utils/application-status';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { OfferLetterService } from '../../../core/services/offer-letter.service';
+
 // Must stay in sync with backend InterviewService.MaxRounds
 const MAX_INTERVIEW_ROUNDS = 5;
 
@@ -33,6 +42,13 @@ interface VacancyGroup {
   vacancyTitle: string;
   applications: ApplicationResponse[]; // sorted oldest-first (submission order)
 }
+
+type QuickFilterKey =
+  | 'awaiting-review'
+  | 'needs-prescreening-sent'
+  | 'awaiting-prescreening'
+  | 'ready-to-schedule'
+  | 'awaiting-response';
 
 @Component({
   selector: 'app-application-list',
@@ -54,7 +70,7 @@ interface VacancyGroup {
       <div class="page-header">
         <div>
           <h2 class="page-title">
-            <i class="ti ti-chart-arrows-vertical"></i> Manage applications
+            <i class="ti ti-chart-arrows-vertical"></i> Manage Applications
           </h2>
           <p class="page-sub">
             Move candidates through the recruitment pipeline, grouped by vacancy
@@ -68,38 +84,53 @@ interface VacancyGroup {
           class="metrics-grid"
           style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:16px"
         >
-          <div class="metric-card">
+          <div class="metric-card summary-only">
             <div class="metric-icon" style="background:#e3f2fd;color:#0d47a1">
               <i class="ti ti-send"></i>
             </div>
             <div class="metric-body">
               <div class="metric-val">{{ totalApplications() }}</div>
-              <div class="metric-label">Total applications</div>
+              <div class="metric-label">Total Applications</div>
             </div>
           </div>
-          <div class="metric-card">
-            <div class="metric-icon" style="background:#fff3e0;color:#e65100">
-              <i class="ti ti-clock"></i>
+
+          @for (qf of quickFilters(); track qf.key) {
+            <div
+              class="metric-card clickable"
+              [class.active]="activeQuickFilter() === qf.key"
+              [class.zero]="qf.count === 0"
+              (click)="applyQuickFilter(qf.key)"
+            >
+              <div
+                class="metric-icon"
+                [style.background]="qf.bg"
+                [style.color]="qf.fg"
+              >
+                <i class="ti" [class]="qf.icon"></i>
+              </div>
+              <div class="metric-body">
+                <div class="metric-val">{{ qf.count }}</div>
+                <div class="metric-label">{{ qf.label }}</div>
+              </div>
             </div>
-            <div class="metric-body">
-              <div class="metric-val">{{ pendingReviewCount() }}</div>
-              <div class="metric-label">Awaiting review</div>
-            </div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-icon" style="background:#e8f5e9;color:#1b5e20">
-              <i class="ti ti-briefcase"></i>
-            </div>
-            <div class="metric-body">
-              <div class="metric-val">{{ vacanciesWithApplicants() }}</div>
-              <div class="metric-label">Vacancies with applicants</div>
-            </div>
-          </div>
+          }
         </div>
 
+        @if (activeQuickFilter()) {
+          <div
+            class="info-banner"
+            style="cursor:pointer"
+            (click)="clearQuickFilter()"
+          >
+            <i class="ti ti-filter"></i>
+            <span
+              >Showing: {{ activeQuickFilterLabel() }} — click to clear</span
+            >
+          </div>
+        }
         <!-- Search + filters -->
         <div class="filters-row">
-          <div class="search-wrap" style="flex:1;min-width:220px">
+          <div class="search-wrap" style="flex:1;min-width:220px; height: 56px">
             <i class="ti ti-search search-icon"></i>
             <input
               [(ngModel)]="searchQ"
@@ -151,7 +182,7 @@ interface VacancyGroup {
           </button>
         </div>
       }
-
+      <div #resultsAnchor></div>
       @if (loading()) {
         <div class="empty-state"><mat-spinner diameter="32"></mat-spinner></div>
       } @else if (!rawGroups().length || !totalApplications()) {
@@ -212,26 +243,26 @@ interface VacancyGroup {
                         >
                           <i class="ti ti-user"></i>
                         </div>
-                        <div class="app-main">
+                        <div class="app-row-main">
                           <div class="app-title">{{ a.candidateName }}</div>
                           <div class="app-sub">
                             Applied {{ formatDate(a.appliedAt)
                             }}{{ i === 0 ? ' · First to apply' : '' }}
                           </div>
                         </div>
-                        <span
-                          class="status-pill s-{{ statusClass(a.status) }}"
-                          >{{ label(a.status) }}</span
-                        >
-
-                        <div
-                          style="display:flex;align-items:center;gap:8px;margin-left:12px"
-                        >
+                        <div class="app-status">
+                          <span
+                            class="status-pill"
+                            [class]="'s-' + statusClass(a.status)"
+                          >
+                            {{ label(a.status) }}
+                          </span>
+                        </div>
+                        <div class="app-actions">
                           @switch (a.status) {
                             @case ('Applied') {
                               <button
-                                mat-stroked-button
-                                style="border-radius:8px"
+                                class="btn-primary app-action-btn"
                                 (click)="openReview(a, group.vacancyId)"
                               >
                                 <i class="ti ti-eye"></i> Review
@@ -240,8 +271,7 @@ interface VacancyGroup {
 
                             @case ('UnderReview') {
                               <button
-                                mat-stroked-button
-                                style="border-radius:8px"
+                                class="btn-primary app-action-btn"
                                 (click)="openReview(a, group.vacancyId)"
                               >
                                 <i class="ti ti-eye"></i> Continue Review
@@ -250,8 +280,7 @@ interface VacancyGroup {
 
                             @case ('Shortlisted') {
                               <button
-                                mat-stroked-button
-                                style="border-radius:8px"
+                                class="btn-primary app-action-btn"
                                 (click)="openPreScreeningReview(a)"
                               >
                                 <i class="ti ti-clipboard-list"></i> Open
@@ -262,8 +291,7 @@ interface VacancyGroup {
                             @case ('PrescreeningStage') {
                               @if (prescreeningPassed().has(a.applicationId)) {
                                 <button
-                                  mat-stroked-button
-                                  style="border-radius:8px"
+                                  class="btn-primary app-action-btn"
                                   (click)="
                                     scheduleInterview(a, group.vacancyId)
                                   "
@@ -273,8 +301,7 @@ interface VacancyGroup {
                                 </button>
                               } @else {
                                 <button
-                                  mat-stroked-button
-                                  style="border-radius:8px"
+                                  class="btn-primary app-action-btn"
                                   (click)="openPreScreeningReview(a)"
                                 >
                                   <i class="ti ti-clock"></i> Awaiting
@@ -298,13 +325,12 @@ interface VacancyGroup {
                                 </span>
                               } @else {
                                 <button
-                                  mat-stroked-button
-                                  style="border-radius:8px"
+                                  class="btn-primary app-action-btn"
                                   (click)="
                                     scheduleInterview(a, group.vacancyId)
                                   "
                                 >
-                                  <i class="ti ti-calendar-event"></i> view
+                                  <i class="ti ti-calendar-event"></i> View
                                   Interview
                                 </button>
                               }
@@ -313,8 +339,7 @@ interface VacancyGroup {
                             @case ('OfferExtended') {
                               @if (offerAccepted().has(a.applicationId)) {
                                 <button
-                                  mat-stroked-button
-                                  style="border-radius:8px"
+                                  class="btn-primary app-action-btn"
                                   (click)="openOfferLetter(a)"
                                 >
                                   <i class="ti ti-circle-check"></i> Offer
@@ -322,8 +347,7 @@ interface VacancyGroup {
                                 </button>
                               } @else {
                                 <button
-                                  mat-stroked-button
-                                  style="border-radius:8px"
+                                  class="btn-primary app-action-btn"
                                   (click)="openOfferLetter(a)"
                                 >
                                   <i class="ti ti-clock"></i> Awaiting candidate
@@ -449,30 +473,6 @@ interface VacancyGroup {
         text-transform: uppercase;
         letter-spacing: 0.05em;
       }
-
-      .app-row {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px 0;
-        border-bottom: 1px solid var(--border);
-      }
-      .app-row:last-child {
-        border-bottom: none;
-      }
-      .app-rank {
-        width: 26px;
-        height: 26px;
-        border-radius: 50%;
-        background: var(--navy);
-        color: #fff;
-        font-size: 11px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
     </style>
   `,
 })
@@ -485,6 +485,69 @@ export class ApplicationListComponent implements OnInit {
   private offerLetterService = inject(OfferLetterService);
   offerAccepted = signal<Set<number>>(new Set());
   private router = inject(Router);
+
+  private matchesQuickFilter(
+    a: ApplicationResponse,
+    key: QuickFilterKey,
+  ): boolean {
+    switch (key) {
+      case 'awaiting-review':
+        return a.status === 'Applied' || a.status === 'UnderReview';
+      case 'needs-prescreening-sent':
+        return a.status === 'Shortlisted';
+      case 'awaiting-prescreening':
+        return (
+          a.status === 'PrescreeningStage' &&
+          !this.prescreeningPassed().has(a.applicationId)
+        );
+      case 'ready-to-schedule':
+        return (
+          a.status === 'PrescreeningStage' &&
+          this.prescreeningPassed().has(a.applicationId)
+        );
+      case 'awaiting-response':
+        return (
+          a.status === 'OfferExtended' &&
+          !this.offerAccepted().has(a.applicationId)
+        );
+    }
+  }
+
+  applyQuickFilter(key: QuickFilterKey): void {
+    if (this.activeQuickFilter() === key) {
+      this.clearQuickFilter();
+      return;
+    }
+    this.searchQ = '';
+    this.vacancyFilter = '';
+    this.statusFilter = '';
+    this.activeQuickFilter.set(key);
+
+    const matchingGroupIds = this.rawGroups()
+      .filter((g) =>
+        g.applications.some((a) => this.matchesQuickFilter(a, key)),
+      )
+      .map((g) => g.vacancyId);
+    this.expandedIds.set(new Set(matchingGroupIds));
+
+    setTimeout(() =>
+      this.resultsAnchor?.nativeElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      }),
+    );
+  }
+
+  clearQuickFilter(): void {
+    this.activeQuickFilter.set(null);
+    this.expandedIds.set(
+      new Set(
+        this.rawGroups()
+          .filter((g) => g.applications.length > 0)
+          .map((g) => g.vacancyId),
+      ),
+    );
+  }
 
   prescreeningPassed = signal<Set<number>>(new Set());
   maxRoundsReached = signal<Set<number>>(new Set());
@@ -523,9 +586,6 @@ export class ApplicationListComponent implements OnInit {
       0,
     ),
   );
-  vacanciesWithApplicants = computed(
-    () => this.rawGroups().filter((g) => g.applications.length > 0).length,
-  );
 
   vacancyOptions = computed(() =>
     this.rawGroups()
@@ -537,6 +597,7 @@ export class ApplicationListComponent implements OnInit {
     const q = this.searchQ.trim().toLowerCase();
     const vf = this.vacancyFilter;
     const sf = this.statusFilter;
+    const qf = this.activeQuickFilter();
 
     return this.rawGroups()
       .filter((g) => vf === '' || g.vacancyId === vf)
@@ -547,7 +608,8 @@ export class ApplicationListComponent implements OnInit {
             (!q ||
               a.candidateName.toLowerCase().includes(q) ||
               g.vacancyTitle.toLowerCase().includes(q)) &&
-            (!sf || a.status === sf),
+            (!sf || a.status === sf) &&
+            (!qf || this.matchesQuickFilter(a, qf)),
         ),
       }))
       .filter((g) => g.applications.length > 0);
@@ -560,7 +622,102 @@ export class ApplicationListComponent implements OnInit {
       groups.every((g) => this.expandedIds().has(g.vacancyId))
     );
   });
+  @ViewChild('resultsAnchor') resultsAnchor?: ElementRef<HTMLElement>;
 
+  activeQuickFilter = signal<QuickFilterKey | null>(null);
+
+  awaitingPrescreeningCount = computed(() =>
+    this.rawGroups().reduce(
+      (sum, g) =>
+        sum +
+        g.applications.filter(
+          (a) =>
+            a.status === 'PrescreeningStage' &&
+            !this.prescreeningPassed().has(a.applicationId),
+        ).length,
+      0,
+    ),
+  );
+  needsPrescreeningSentCount = computed(() =>
+    this.rawGroups().reduce(
+      (sum, g) =>
+        sum + g.applications.filter((a) => a.status === 'Shortlisted').length,
+      0,
+    ),
+  );
+  readyToScheduleCount = computed(() =>
+    this.rawGroups().reduce(
+      (sum, g) =>
+        sum +
+        g.applications.filter(
+          (a) =>
+            a.status === 'PrescreeningStage' &&
+            this.prescreeningPassed().has(a.applicationId),
+        ).length,
+      0,
+    ),
+  );
+
+  awaitingResponseCount = computed(() =>
+    this.rawGroups().reduce(
+      (sum, g) =>
+        sum +
+        g.applications.filter(
+          (a) =>
+            a.status === 'OfferExtended' &&
+            !this.offerAccepted().has(a.applicationId),
+        ).length,
+      0,
+    ),
+  );
+  quickFilters = computed(() => [
+    {
+      key: 'awaiting-review' as const,
+      icon: 'ti-clock',
+      bg: '#fff3e0',
+      fg: '#e65100',
+      label: 'Awaiting review',
+      count: this.pendingReviewCount(),
+    },
+    {
+      key: 'needs-prescreening-sent' as const,
+      icon: 'ti-send',
+      bg: '#ede7f6',
+      fg: '#4527a0',
+      label: 'Needs pre-screening form sent',
+      count: this.needsPrescreeningSentCount(),
+    },
+    {
+      key: 'awaiting-prescreening' as const,
+      icon: 'ti-clipboard-list',
+      bg: '#fce4ec',
+      fg: '#ad1457',
+      label: 'Awaiting pre-screening outcome',
+      count: this.awaitingPrescreeningCount(),
+    },
+    {
+      key: 'ready-to-schedule' as const,
+      icon: 'ti-calendar-plus',
+      bg: '#e0f2f1',
+      fg: '#00695c',
+      label: 'Ready for interview scheduling',
+      count: this.readyToScheduleCount(),
+    },
+    {
+      key: 'awaiting-response' as const,
+      icon: 'ti-mail',
+      bg: '#e8f5e9',
+      fg: '#1b5e20',
+      label: 'Awaiting candidate response',
+      count: this.awaitingResponseCount(),
+    },
+  ]);
+
+  activeQuickFilterLabel = computed(
+    () =>
+      this.quickFilters().find((f) => f.key === this.activeQuickFilter())
+        ?.label ?? '',
+  );
   isExpanded(vacancyId: number): boolean {
     return this.expandedIds().has(vacancyId);
   }
@@ -657,9 +814,7 @@ export class ApplicationListComponent implements OnInit {
                 this.offerAccepted.set(new Set(acceptedIds));
               });
             }
-            // Check whether applications currently in InterviewStage have
-            // exhausted all rounds (last round Completed + Passed at MaxRounds),
-            // so we don't send the recruiter into a form that only fails server-side.
+
             const interviewStageApps = groups
               .flatMap((g) => g.applications)
               .filter((a) => a.status === 'InterviewStage');
@@ -694,10 +849,6 @@ export class ApplicationListComponent implements OnInit {
               });
             }
 
-            // Preload pre-screening records for every application so
-            // status pills and the assessment panel can read them synchronously.
-            // (A record can exist from PrescreeningStage onward - Applied/
-            // UnderReview/Shortlisted never have one, but it's cheap to just ask.)
             const allIds = groups
               .flatMap((g) => g.applications)
               .map((a) => a.applicationId);
@@ -775,12 +926,14 @@ export class ApplicationListComponent implements OnInit {
   openOfferLetter(a: ApplicationResponse): void {
     this.router.navigate(['/admin/applications', a.applicationId, 'offer']);
   }
-  scheduleInterview(a: ApplicationResponse, vacancyId: number): void {
+  scheduleInterview(a: ApplicationResponse, vacancyId: number, interviewId?: number): void {
+     const queryParams: any = { vacancyId };
+  if (interviewId) {
+    queryParams.interviewId = interviewId;  // Add when rescheduling
+  }
     this.router.navigate(
       ['/applications', a.applicationId, 'schedule-interview'],
-      {
-        queryParams: { vacancyId },
-      },
+       { queryParams },
     );
   }
 }

@@ -371,10 +371,16 @@ export interface QualificationResponse {
   yearCompleted: string;
 }
 // ── Interviews ────────────────────────────────────────────────────
-export type InterviewType = 'InPerson' | 'Virtual' | 'Phone';
+export type InterviewType = 'InPerson' | 'Virtual';
+export type InterviewCategory =
+  | 'Technical'
+  | 'Behavioral'
+  | 'Panel'
+  | 'Managerial';
 
 export interface ScheduleInterviewRequest {
   interviewType: InterviewType;
+  interviewCategory: InterviewCategory;
   scheduledAt: string; // ISO string
   location?: string;
   meetingLink?: string;
@@ -382,6 +388,8 @@ export interface ScheduleInterviewRequest {
 
 export interface RescheduleInterviewRequest {
   scheduledAt: string;
+  interviewType?: InterviewType;
+  interviewCategory?: InterviewCategory;
   location?: string;
   meetingLink?: string;
 }
@@ -400,6 +408,7 @@ export interface InterviewResponse {
   vacancyTitle: string;
   roundNumber: number;
   interviewType: string;
+  interviewCategory: InterviewCategory;
   scheduledAt: string;
   location?: string;
   meetingLink?: string;

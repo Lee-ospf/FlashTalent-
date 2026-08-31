@@ -18,6 +18,7 @@ import { AddressResponse, AddressType } from '../../core/models';
 import { AddressAutocompleteService } from '../../core/services/address-autocomplete.service';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { Subject, of } from 'rxjs';
+import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-trigger.directive';
 
 
 @Component({
@@ -27,7 +28,7 @@ import { Subject, of } from 'rxjs';
     CommonModule, ReactiveFormsModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatButtonModule, MatIconModule, MatCardModule,
-    MatProgressSpinnerModule, MatDividerModule
+    MatProgressSpinnerModule, MatDividerModule,DatePickerTriggerDirective 
   ],
   template: `
     <div class="page-container">

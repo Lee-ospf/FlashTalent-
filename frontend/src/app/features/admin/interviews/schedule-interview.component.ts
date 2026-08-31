@@ -24,10 +24,12 @@ import {
   ApplicationResponse,
   InterviewResponse,
   InterviewType,
+  InterviewCategory,
 } from '../../../core/models';
 
-type ViewMode = 'schedule' | 'view' | 'reschedule' | 'outcome';
+type ViewMode = 'schedule' | 'view' | 'reschedule' | 'outcome' | 'decision';
 
+const MAX_INTERVIEW_ROUNDS = 5;
 @Component({
   selector: 'app-schedule-interview',
   standalone: true,
@@ -42,6 +44,7 @@ type ViewMode = 'schedule' | 'view' | 'reschedule' | 'outcome';
     MatProgressSpinnerModule,
     MatDividerModule,
   ],
+
   template: `
     <div class="page-container">
       <div class="page-header">
@@ -106,6 +109,16 @@ type ViewMode = 'schedule' | 'view' | 'reschedule' | 'outcome';
             <mat-divider style="margin:8px 0 20px"></mat-divider>
 
             <div class="field-grid">
+              <mat-form-field appearance="outline" style="width:100%">
+                <mat-label>Category</mat-label>
+                <input
+                  matInput
+                  [value]="
+                    categoryLabel(existingInterview()!.interviewCategory)
+                  "
+                  disabled
+                />
+              </mat-form-field>
               <mat-form-field appearance="outline" style="width:100%">
                 <mat-label>Interview type</mat-label>
                 <input
@@ -221,52 +234,56 @@ type ViewMode = 'schedule' | 'view' | 'reschedule' | 'outcome';
 
               <div class="field-grid">
                 <mat-form-field appearance="outline" style="width:100%">
+                  <mat-label>Interview category</mat-label>
+                  <mat-select formControlName="interviewCategory">
+                    <mat-option value="Technical">Technical</mat-option>
+                    <mat-option value="Behavioral">Behavioral</mat-option>
+                    <mat-option value="Panel">Panel</mat-option>
+                    <mat-option value="Managerial">Managerial</mat-option>
+                  </mat-select>
+                  @if (rescheduleInvalid('interviewCategory')) {
+                    <mat-error>Interview category is required</mat-error>
+                  }
+                </mat-form-field>
+                <mat-form-field appearance="outline" style="width:100%">
                   <mat-label>Interview type</mat-label>
+                  <mat-select formControlName="interviewType">
+                    <mat-option value="InPerson">In person</mat-option>
+                    <mat-option value="Virtual">Virtual</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+              @if (rescheduleForm.value.interviewType === 'InPerson') {
+                <mat-form-field appearance="outline" style="width:100%">
+                  <mat-label>Location</mat-label>
                   <input
                     matInput
-                    [value]="typeLabel(existingInterview()!.interviewType)"
-                    disabled
+                    formControlName="location"
+                    placeholder="e.g. Head office, 3rd floor boardroom"
                   />
+                  @if (rescheduleInvalid('location')) {
+                    <mat-error
+                      >Location is required for an in-person
+                      interview</mat-error
+                    >
+                  }
                 </mat-form-field>
-
-                @if (existingInterview()!.interviewType === 'InPerson') {
-                  <mat-form-field appearance="outline" style="width:100%">
-                    <mat-label>Location</mat-label>
-                    <input
-                      matInput
-                      formControlName="location"
-                      placeholder="e.g. Head office, 3rd floor boardroom"
-                    />
-                    @if (rescheduleInvalid('location')) {
-                      <mat-error
-                        >Location is required for an in-person
-                        interview</mat-error
-                      >
-                    }
-                  </mat-form-field>
-                } @else if (existingInterview()!.interviewType === 'Virtual') {
-                  <mat-form-field appearance="outline" style="width:100%">
-                    <mat-label>Meeting link</mat-label>
-                    <input
-                      matInput
-                      formControlName="meetingLink"
-                      placeholder="e.g. https://meet.google.com/..."
-                    />
-                    @if (rescheduleInvalid('meetingLink')) {
-                      <mat-error
-                        >Meeting link is required for a virtual
-                        interview</mat-error
-                      >
-                    }
-                  </mat-form-field>
-                } @else {
-                  <p class="form-note" style="align-self:center">
-                    <i class="ti ti-phone"></i> No location needed for a phone
-                    interview
-                  </p>
-                }
-              </div>
-
+              } @else if (rescheduleForm.value.interviewType === 'Virtual') {
+                <mat-form-field appearance="outline" style="width:100%">
+                  <mat-label>Meeting link</mat-label>
+                  <input
+                    matInput
+                    formControlName="meetingLink"
+                    placeholder="e.g. https://meet.google.com/..."
+                  />
+                  @if (rescheduleInvalid('meetingLink')) {
+                    <mat-error
+                      >Meeting link is required for a virtual
+                      interview</mat-error
+                    >
+                  }
+                </mat-form-field>
+              }
               <div class="field-grid">
                 <mat-form-field appearance="outline" style="width:100%">
                   <mat-label>Date</mat-label>
@@ -362,15 +379,6 @@ type ViewMode = 'schedule' | 'view' | 'reschedule' | 'outcome';
           >
             <mat-card-content style="padding:20px 24px">
               <mat-form-field appearance="outline" style="width:100%">
-                <mat-label>Name</mat-label>
-                <input
-                  matInput
-                  [value]="existingInterview()!.candidateName"
-                  disabled
-                />
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" style="width:100%">
                 <mat-label>Round</mat-label>
                 <input
                   matInput
@@ -378,8 +386,19 @@ type ViewMode = 'schedule' | 'view' | 'reschedule' | 'outcome';
                     'Round ' +
                     existingInterview()!.roundNumber +
                     ' — ' +
+                    categoryLabel(existingInterview()!.interviewCategory) +
+                    ' — ' +
                     formatDateTime(existingInterview()!.scheduledAt)
                   "
+                  disabled
+                />
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" style="width:100%">
+                <mat-label>Name</mat-label>
+                <input
+                  matInput
+                  [value]="existingInterview()!.candidateName"
                   disabled
                 />
               </mat-form-field>
@@ -440,6 +459,48 @@ type ViewMode = 'schedule' | 'view' | 'reschedule' | 'outcome';
             </button>
           </div>
         </form>
+      } @else if (mode() === 'decision' && existingInterview()) {
+        <!-- DECISION: candidate passed — choose next step -->
+        <mat-card
+          class="mat-elevation-z1"
+          style="border-radius:12px;margin-bottom:16px"
+        >
+          <mat-card-content style="padding:24px;text-align:center">
+            <i
+              class="ti ti-circle-check"
+              style="font-size:40px;color:var(--green);margin-bottom:12px;display:block"
+            ></i>
+            <h3 style="margin-bottom:6px">
+              {{ existingInterview()!.candidateName }} passed Round
+              {{ existingInterview()!.roundNumber }}
+            </h3>
+            <p
+              class="form-note"
+              style="justify-content:center;margin-bottom:20px"
+            >
+              What would you like to do next?
+            </p>
+            <div style="display:flex;gap:12px;justify-content:center">
+              @if (canScheduleNextRound()) {
+                <button
+                  mat-stroked-button
+                  style="border-radius:8px"
+                  (click)="scheduleNextRound()"
+                >
+                  <i class="ti ti-calendar-plus"></i> Schedule Next Round
+                </button>
+              }
+              <button
+                mat-raised-button
+                color="primary"
+                style="border-radius:8px"
+                (click)="extendOffer()"
+              >
+                <i class="ti ti-mail"></i> Extend Offer
+              </button>
+            </div>
+          </mat-card-content>
+        </mat-card>
       } @else {
         <!-- SCHEDULE: no existing interview, create a new one -->
         <form [formGroup]="form" (ngSubmit)="save()">
@@ -467,54 +528,59 @@ type ViewMode = 'schedule' | 'view' | 'reschedule' | 'outcome';
               </mat-form-field>
 
               <mat-divider style="margin:8px 0 20px"></mat-divider>
-
               <div class="field-grid">
+                <mat-form-field appearance="outline" style="width:100%">
+                  <mat-label>Interview category</mat-label>
+                  <mat-select formControlName="interviewCategory">
+                    <mat-option value="Technical">Technical</mat-option>
+                    <mat-option value="Behavioral">Behavioral</mat-option>
+                    <mat-option value="Panel">Panel</mat-option>
+                    <mat-option value="Managerial">Managerial</mat-option>
+                  </mat-select>
+                  @if (invalid('interviewCategory')) {
+                    <mat-error>Interview category is required</mat-error>
+                  }
+                </mat-form-field>
                 <mat-form-field appearance="outline" style="width:100%">
                   <mat-label>Interview type</mat-label>
                   <mat-select formControlName="interviewType">
                     <mat-option value="InPerson">In person</mat-option>
                     <mat-option value="Virtual">Virtual</mat-option>
-                    <mat-option value="Phone">Phone</mat-option>
                   </mat-select>
                 </mat-form-field>
-
-                @if (form.value.interviewType === 'InPerson') {
-                  <mat-form-field appearance="outline" style="width:100%">
-                    <mat-label>Location</mat-label>
-                    <input
-                      matInput
-                      formControlName="location"
-                      placeholder="e.g. Head office, 3rd floor boardroom"
-                    />
-                    @if (invalid('location')) {
-                      <mat-error
-                        >Location is required for an in-person
-                        interview</mat-error
-                      >
-                    }
-                  </mat-form-field>
-                } @else if (form.value.interviewType === 'Virtual') {
-                  <mat-form-field appearance="outline" style="width:100%">
-                    <mat-label>Meeting link</mat-label>
-                    <input
-                      matInput
-                      formControlName="meetingLink"
-                      placeholder="e.g. https://meet.google.com/..."
-                    />
-                    @if (invalid('meetingLink')) {
-                      <mat-error
-                        >Meeting link is required for a virtual
-                        interview</mat-error
-                      >
-                    }
-                  </mat-form-field>
-                } @else {
-                  <p class="form-note" style="align-self:center">
-                    <i class="ti ti-phone"></i> No location needed for a phone
-                    interview
-                  </p>
-                }
               </div>
+
+              @if (form.value.interviewType === 'InPerson') {
+                <mat-form-field appearance="outline" style="width:100%">
+                  <mat-label>Location</mat-label>
+                  <input
+                    matInput
+                    formControlName="location"
+                    placeholder="e.g. Head office, 3rd floor boardroom"
+                  />
+                  @if (invalid('location')) {
+                    <mat-error
+                      >Location is required for an in-person
+                      interview</mat-error
+                    >
+                  }
+                </mat-form-field>
+              } @else if (form.value.interviewType === 'Virtual') {
+                <mat-form-field appearance="outline" style="width:100%">
+                  <mat-label>Meeting link</mat-label>
+                  <input
+                    matInput
+                    formControlName="meetingLink"
+                    placeholder="e.g. https://meet.google.com/..."
+                  />
+                  @if (invalid('meetingLink')) {
+                    <mat-error
+                      >Meeting link is required for a virtual
+                      interview</mat-error
+                    >
+                  }
+                </mat-form-field>
+              }
 
               <div class="field-grid">
                 <mat-form-field appearance="outline" style="width:100%">
@@ -629,12 +695,14 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
   saving = signal(false);
   cancelling = signal(false);
   apiError = '';
+  maxRounds = MAX_INTERVIEW_ROUNDS;
 
   minDate = new Date().toISOString().substring(0, 10);
 
   form = this.fb.group(
     {
       interviewType: ['InPerson' as InterviewType, Validators.required],
+      interviewCategory: ['' as InterviewCategory | '', Validators.required],
       scheduledDate: ['', Validators.required],
       scheduledTime: ['', Validators.required],
       location: [''],
@@ -645,6 +713,8 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
 
   rescheduleForm = this.fb.group(
     {
+      interviewType: ['InPerson' as InterviewType, Validators.required],
+      interviewCategory: ['' as InterviewCategory | '', Validators.required],
       scheduledDate: ['', Validators.required],
       scheduledTime: ['', Validators.required],
       location: [''],
@@ -687,13 +757,11 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
   }
 
   typeLabel(type: string): string {
-    return type === 'InPerson'
-      ? 'In person'
-      : type === 'Virtual'
-        ? 'Virtual'
-        : 'Phone';
+    return type === 'InPerson' ? 'In person' : 'Virtual';
   }
-
+  categoryLabel(category: string): string {
+    return category; // enum values already read naturally: Technical, Behavioral, Panel, Managerial
+  }
   formatDateTime(iso: string): string {
     return new Date(iso).toLocaleString('en-ZA', {
       day: 'numeric',
@@ -725,7 +793,7 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
   rescheduleInvalid(field: string): boolean {
     const c = this.rescheduleForm.get(field);
     if (!c) return false;
-    const type = this.existingInterview()?.interviewType;
+    const type = this.rescheduleForm.value.interviewType;
     if (field === 'location')
       return (
         type === 'InPerson' &&
@@ -801,6 +869,8 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
     this.interviewService
       .schedule(this.applicationId, {
         interviewType: type,
+        interviewCategory: this.form.value
+          .interviewCategory as InterviewCategory,
         scheduledAt,
         location: type === 'InPerson' ? this.form.value.location! : undefined,
         meetingLink:
@@ -828,6 +898,8 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
     const time = dt.toTimeString().substring(0, 5);
 
     this.rescheduleForm.reset({
+      interviewType: interview.interviewType as InterviewType,
+      interviewCategory: interview.interviewCategory as InterviewCategory,
       scheduledDate: date,
       scheduledTime: time,
       location: interview.location ?? '',
@@ -846,7 +918,9 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
     const interview = this.existingInterview();
     if (!interview) return;
 
-    const type = interview.interviewType;
+    const type = this.rescheduleForm.value.interviewType as InterviewType;
+    const category = this.rescheduleForm.value
+      .interviewCategory as InterviewCategory;
     if (type === 'InPerson' && !this.rescheduleForm.value.location) {
       this.rescheduleForm.get('location')?.markAsTouched();
       return;
@@ -870,6 +944,11 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
     this.interviewService
       .reschedule(interview.interviewId, {
         scheduledAt,
+        // Only send interviewType if it actually changed — backend keeps
+        // the current type when this is omitted.
+        interviewType: type !== interview.interviewType ? type : undefined,
+        interviewCategory:
+          category !== interview.interviewCategory ? category : undefined,
         location:
           type === 'InPerson' ? this.rescheduleForm.value.location! : undefined,
         meetingLink:
@@ -922,15 +1001,20 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
         recruiterNotes: this.outcomeForm.value.recruiterNotes || undefined,
       })
       .subscribe({
-        next: () => {
+        next: (updated) => {
           this.saving.set(false);
-          this.toast.show(
-            outcome === 'Passed'
-              ? 'Outcome recorded — candidate passed.'
-              : 'Outcome recorded — candidate not selected.',
-            'success',
-          );
-          this.router.navigate(['/admin/applications']);
+          this.existingInterview.set(updated);
+
+          if (outcome === 'Passed') {
+            this.toast.show('Outcome recorded — candidate passed.', 'success');
+            this.mode.set('decision');
+          } else {
+            this.toast.show(
+              'Outcome recorded — candidate not selected.',
+              'success',
+            );
+            this.router.navigate(['/admin/applications']);
+          }
         },
         error: (err: Error) => {
           this.saving.set(false);
@@ -939,6 +1023,44 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
       });
   }
 
+  canScheduleNextRound = computed(() => {
+    const iv = this.existingInterview();
+    return !!iv && iv.roundNumber < this.maxRounds;
+  });
+
+  scheduleNextRound(): void {
+    this.existingInterview.set(null);
+    this.form.reset({
+      interviewType: 'InPerson',
+      scheduledDate: '',
+      scheduledTime: '',
+      location: '',
+      meetingLink: '',
+    });
+    this.apiError = '';
+    this.mode.set('schedule');
+  }
+
+  extendOffer(): void {
+    this.saving.set(true);
+    this.appService
+      .updateStatus(this.applicationId, { newStatus: 'OfferExtended' })
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
+          this.router.navigate([
+            '/admin/applications',
+            this.applicationId,
+            'offer',
+          ]);
+        },
+        error: (err: Error) => {
+          this.saving.set(false);
+          this.apiError = err.message;
+          this.toast.show(err.message, 'error');
+        },
+      });
+  }
   cancelInterview(): void {
     const interview = this.existingInterview();
     if (!interview) return;
