@@ -1558,6 +1558,16 @@ textarea {
   }
 }
 
+.pip-clickable {
+  cursor: pointer;
+}
+.pip-selected .pip-dot {
+  box-shadow: 0 0 0 3px rgba(26, 39, 68, 0.25);
+}
+.pip-selected .pip-label {
+  text-decoration: underline;
+}
+
 .pip-dot {
   width: 30px;
   height: 30px;

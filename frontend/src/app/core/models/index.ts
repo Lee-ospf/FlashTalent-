@@ -76,7 +76,6 @@ export type AddressType = 'Residential' | 'Postal';
 export interface CreateAddressRequest {
   addressType: AddressType;
   line1: string;
-  line2?: string;
   city: string;
   province: string;
   postalCode: string; // 4-digit SA format, e.g. "2196"
@@ -85,7 +84,6 @@ export interface CreateAddressRequest {
 
 export interface UpdateAddressRequest {
   line1: string;
-  line2?: string;
   city: string;
   province: string;
   postalCode: string;
@@ -97,13 +95,20 @@ export interface AddressResponse {
   candidateId: number;
   addressType: string; // 'Residential' | 'Postal'
   line1: string;
-  line2?: string;
   city: string;
   province: string;
   postalCode: string;
   country: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface AddressDetails {
+  line1: string | null;
+  city: string | null;
+  province: string | null;
+  postalCode: string | null;
+  country: string | null;
 }
 
 // ── Documents ─────────────────────────────────────────────────────

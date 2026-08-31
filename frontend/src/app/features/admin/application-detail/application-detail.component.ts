@@ -2,15 +2,14 @@ import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { DomSanitizer, SafeResourceUrl, SafeHtml } from '@angular/platform-browser';
 import { MatCardModule } from '@angular/material/card';
-import { MatSelectModule } from '@angular/material/select';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import * as mammoth from 'mammoth';
 
 import { ApplicationService } from '../../../core/services/application.service';
 import { CandidateService } from '../../../core/services/candidate.service';
@@ -19,8 +18,11 @@ import { CandidateSkillService } from '../../../core/services/candidate-skill.se
 import { CandidateExperienceService } from '../../../core/services/candidate-experience.service';
 import { CandidateQualificationService } from '../../../core/services/candidate-qualification.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { PrescreeningService, PrescreeningResponse, PrescreeningTemplateResponse, PrescreeningOutcome, validatePrescreeningFile } from '../../../core/services/prescreening.service';
-import { OfferLetterService, OfferLetterResponse } from '../../../core/services/offer-letter.service';
+import {
+  PrescreeningService, PrescreeningResponse, PrescreeningTemplateResponse,
+  PrescreeningOutcome, previewKindFor, FilePreviewKind
+} from '../../../core/services/prescreening.service';
+import { OfferLetterService } from '../../../core/services/offer-letter.service';
 import { VacancyService } from '../../../core/services/vacancy.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { environment } from '../../../../environments/environment';
@@ -37,20 +39,27 @@ const STATUS_CLASS: Record<string, string> = {
   OfferSent: 'offer', OfferAccepted: 'offer', OfferDeclined: 'rejected'
 };
 
-type PreviewKind = 'pdf' | 'image' | 'text' | 'unsupported';
 
 @Component({
   selector: 'app-application-detail',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterLink, MatCardModule, MatSelectModule,
-    MatFormFieldModule, MatButtonModule, MatProgressSpinnerModule, MatDividerModule
+    CommonModule, FormsModule, RouterLink, MatCardModule,
+    MatButtonModule, MatProgressSpinnerModule, MatDividerModule
   ],
   template: `
     <div class="page-container ad-page">
-      <a routerLink="/admin/applications" class="back-link">
-        <i class="ti ti-arrow-left"></i> Back to applications
-      </a>
+      <div class="ad-top-bar">
+        <a routerLink="/admin/applications" class="back-link">
+          <i class="ti ti-arrow-left"></i> Back to applications
+        </a>
+        @if (application(); as topApp) {
+          <a class="btn-secondary ad-top-btn"
+             [routerLink]="['/admin/applications', topApp.applicationId, 'candidate']">
+            <i class="ti ti-user"></i> Candidate details
+          </a>
+        }
+      </div>
 
       @if (loading()) {
         <div class="empty-state"><mat-spinner diameter="32"></mat-spinner></div>
@@ -59,304 +68,178 @@ type PreviewKind = 'pdf' | 'image' | 'text' | 'unsupported';
       } @else if (application()) {
         @if (application(); as app) {
 
-        <!-- Header -->
-        <div class="ad-header">
-          <div class="ad-avatar">{{ initials(app.candidateName) }}</div>
-          <div class="ad-header-info">
-            <div class="ad-name">{{ app.candidateName }}</div>
-            <div class="ad-sub">
-              <i class="ti ti-briefcase"></i>
-              Applied for <strong>{{ app.vacancyTitle }}</strong>
-              <span class="ad-sub-dot">·</span>
-              <i class="ti ti-calendar"></i>
-              {{ formatDate(app.appliedAt) }}
-            </div>
-          </div>
-          <span class="status-pill-lg s-{{ statusClass(effectiveStatus()) }}">
-            <span class="status-dot"></span>{{ label(effectiveStatus()) }}
-          </span>
-        </div>
-
         <div class="ad-grid">
-          <!-- LEFT: candidate profile -->
+          <!-- Candidate header + Pre-screening + offer letter + status actions -->
           <div class="ad-col">
 
             <mat-card class="mat-elevation-z1 ad-card">
-              <div class="vd-section-label">Candidate details</div>
-              @if (candidate(); as c) {
-                <div class="kv-grid" style="margin-top:10px">
-                  <div class="kv"><span class="kv-icon"><i class="ti ti-mail"></i></span><div><span class="kv-label">Email</span><span class="kv-val">{{ c.email }}</span></div></div>
-                  <div class="kv"><span class="kv-icon"><i class="ti ti-phone"></i></span><div><span class="kv-label">Phone</span><span class="kv-val">{{ c.phone || '—' }}</span></div></div>
-                  <div class="kv"><span class="kv-icon"><i class="ti ti-gender-bigender"></i></span><div><span class="kv-label">Gender</span><span class="kv-val">{{ c.gender || '—' }}</span></div></div>
-                  <div class="kv"><span class="kv-icon"><i class="ti ti-flag"></i></span><div><span class="kv-label">Nationality</span><span class="kv-val">{{ c.nationality || '—' }}</span></div></div>
-                  <div class="kv"><span class="kv-icon"><i class="ti ti-cake"></i></span><div><span class="kv-label">Date of birth</span><span class="kv-val">{{ c.dateOfBirth ? formatDate(c.dateOfBirth) : '—' }}</span></div></div>
-                  <div class="kv"><span class="kv-icon"><i class="ti ti-calendar-event"></i></span><div><span class="kv-label">Registered</span><span class="kv-val">{{ formatDate(c.registeredAt) }}</span></div></div>
+              <div class="ad-header-inline">
+                <div class="ad-avatar">{{ initials(app.candidateName) }}</div>
+                <div class="ad-header-info">
+                  <div class="ad-name">{{ app.candidateName }}</div>
+                  <div class="ad-sub">
+                    <i class="ti ti-briefcase"></i>
+                    Applied for <strong>{{ app.vacancyTitle }}</strong>
+                    <span class="ad-sub-dot">·</span>
+                    <i class="ti ti-calendar"></i>
+                    {{ formatDate(app.appliedAt) }}
+                  </div>
                 </div>
-              } @else {
-                <p class="form-note" style="margin-top:8px">Candidate profile unavailable.</p>
-              }
-
-              <mat-divider style="margin:18px 0"></mat-divider>
-
-              <div class="vd-section-label">Experience</div>
-              @if (experience().length) {
-                <div class="exp-list" style="margin-top:10px">
-                  @for (e of experience(); track e.candidateExperienceId) {
-                    <div class="exp-row">
-                      <span class="exp-icon"><i class="ti ti-briefcase-2"></i></span>
-                      <div class="exp-body">
-                        <div class="exp-role">{{ e.role }} <span class="exp-at">at {{ e.company }}</span></div>
-                        <div class="exp-dates"><i class="ti ti-calendar"></i>{{ formatDate(e.startDate) }} – {{ e.endDate ? formatDate(e.endDate) : 'Present' }}</div>
-                        @if (e.projectsAndDuties) { <div class="exp-notes">{{ e.projectsAndDuties }}</div> }
-                      </div>
-                    </div>
-                  }
-                </div>
-              } @else {
-                <p class="form-note" style="margin-top:8px">No experience captured.</p>
-              }
-
-              <mat-divider style="margin:18px 0"></mat-divider>
-
-              <div class="vd-section-label">Qualifications</div>
-              @if (qualifications().length) {
-                <div class="qual-list" style="margin-top:10px">
-                  @for (q of qualifications(); track q.candidateQualificationId) {
-                    <div class="qual-row">
-                      <span class="qual-icon">
-                        <i class="ti" [class.ti-certificate]="q.qualificationType === 'Certification'" [class.ti-books]="q.qualificationType !== 'Certification'"></i>
-                      </span>
-                      <div>
-                        <div class="qual-name">{{ q.name }}</div>
-                        <div class="qual-sub">{{ q.institution }} · {{ formatDate(q.yearCompleted) }}</div>
-                      </div>
-                    </div>
-                  }
-                </div>
-              } @else {
-                <p class="form-note" style="margin-top:8px">No qualifications captured.</p>
-              }
-
-              <mat-divider style="margin:18px 0"></mat-divider>
-
-              <div class="vd-section-label">Skills</div>
-              @if (skills().length) {
-                <div class="skill-chips" style="margin-top:10px">
-                  @for (s of skills(); track s.candidateSkillId) {
-                    <span class="skill-chip"><span class="skill-dot" [ngClass]="skillClass(s.proficiencyLevel)"></span>{{ s.skillName }}<span class="skill-level">{{ s.proficiencyLevel }}</span></span>
-                  }
-                </div>
-              } @else {
-                <p class="form-note" style="margin-top:8px">No skills captured.</p>
-              }
-
-              <mat-divider style="margin:18px 0"></mat-divider>
-
-              <div class="vd-section-label">Submitted documents</div>
-              @if (documents().length) {
-                <div class="doc-list" style="margin-top:10px">
-                  @for (d of documents(); track d.candidateDocumentId) {
-                    <div class="doc-row">
-                      <span class="doc-icon"><i class="ti ti-file-text"></i></span>
-                      <div class="doc-meta">
-                        <div class="doc-name">{{ docLabel(d.documentType) }}</div>
-                        <div class="doc-sub">{{ d.originalFileName }} · uploaded {{ formatDate(d.uploadedAt) }}</div>
-                      </div>
-                      <a class="btn-secondary doc-view-btn" [href]="fileHref(d.fileUrl)" target="_blank" rel="noopener">
-                        <i class="ti ti-eye"></i> View
-                      </a>
-                    </div>
-                  }
-                </div>
-              } @else {
-                <p class="form-note" style="margin-top:8px">No documents on file.</p>
-              }
-            </mat-card>
-          </div>
-
-          <!-- RIGHT: pre-screening + offer letter + status actions -->
-          <div class="ad-col">
-
-            <mat-card class="mat-elevation-z1 ad-card">
-              <div class="ps-header">
-                <div>
-                  <div class="vd-title-sm">Pre-screening assessment</div>
-                  <div class="vd-ref">Candidate-submitted screening documentation</div>
-                </div>
-                @if (doc(); as d) {
-                  <span class="pill" [class.pill-pub]="d.status === 'Submitted'" [class.pill-dept]="d.status === 'Sent'" [class.pill-type]="d.status === 'Reviewed'">
-                    {{ d.status === 'Reviewed' ? d.outcome : (d.status === 'Submitted' ? 'Submitted' : 'Awaiting upload') }}
+                <div class="ad-header-actions">
+                  <span class="status-pill-lg s-{{ statusClass(effectiveStatus()) }}">
+                    <span class="status-dot"></span>{{ label(effectiveStatus()) }}
                   </span>
-                }
+                </div>
               </div>
 
-              <!-- Template management -->
+              <mat-divider style="margin:20px 0"></mat-divider>
+
+              <!-- Pre-screening assessment (full, inline) -->
+              <div class="vd-section-label">Pre-screening assessment</div>
+              <div class="vd-ref" style="margin-bottom:14px">Candidate-submitted screening documentation</div>
+
               <div class="tmpl-row">
                 @if (template(); as t) {
-                  <span class="form-note"><i class="ti ti-file-text"></i> Template: <a [href]="fileHref(t.fileUrl)" target="_blank" rel="noopener">{{ t.originalFileName }}</a></span>
-                } @else {
-                  <span class="form-note"><i class="ti ti-alert-triangle"></i> No pre-screening template has been uploaded yet.</span>
-                }
-                <input type="file" class="ps-file-input" id="tmpl-file" accept=".pdf,.doc,.docx" (change)="onTemplateFileSelected($event)">
-                <label class="btn-secondary tmpl-upload-btn" for="tmpl-file">
-                  @if (uploadingTemplate()) { <mat-spinner diameter="14"></mat-spinner> } @else { <i class="ti ti-upload"></i> }
-                  {{ template() ? 'Replace' : 'Upload template' }}
-                </label>
-              </div>
-
-              @if (psLoading()) {
-                <div class="empty-state" style="padding: 1.5rem 0"><mat-spinner diameter="24"></mat-spinner></div>
-              } @else if (!doc()) {
-                <div class="empty-state" style="padding: 1.5rem 0">
-                  <i class="ti ti-clipboard-off"></i>
-                  <p>No pre-screening assessment has been sent for this application yet.</p>
-                </div>
-                @if (app.status === 'Shortlisted') {
-                  <div class="ps-actions" style="padding-bottom:4px">
-                    <button class="btn-primary" [disabled]="sendingPrescreening()" (click)="sendPrescreening()">
-                      @if (sendingPrescreening()) { <mat-spinner diameter="14" class="move-btn-spinner"></mat-spinner> } @else { <i class="ti ti-send-2"></i> }
-                      Send pre-screening form
+                  <span class="form-note"><i class="ti ti-file-text"></i> Template: {{ t.originalFileName }}</span>
+                  <div style="display:flex;gap:8px;flex-shrink:0;margin-left:auto">
+                    <button type="button" class="btn-secondary doc-view-btn"
+                            [disabled]="isFileActionLoading('template-view')"
+                            (click)="viewFile(t.fileUrl, t.originalFileName, 'template-view')">
+                      @if (isFileActionLoading('template-view')) { <mat-spinner diameter="14" style="display:inline-block;margin-right:2px"></mat-spinner> } @else { <i class="ti ti-eye"></i> }
+                      View
+                    </button>
+                    <button type="button" class="btn-secondary doc-view-btn"
+                            [disabled]="isFileActionLoading('template-dl')"
+                            (click)="downloadFile(t.fileUrl, t.originalFileName, 'template-dl')">
+                      @if (isFileActionLoading('template-dl')) { <mat-spinner diameter="14" style="display:inline-block;margin-right:2px"></mat-spinner> } @else { <i class="ti ti-download"></i> }
+                      Download
                     </button>
                   </div>
                 } @else {
-                  <p class="form-note"><i class="ti ti-info-circle"></i> A pre-screening form can only be sent once the candidate is Shortlisted.</p>
-                }
-              } @else {
-                <div class="vc-meta" style="margin-top:14px">
-                  <span><i class="ti ti-send-2"></i> Sent {{ formatDateTime(doc()!.sentAt) }}</span>
-                  @if (doc()!.status !== 'Sent') {
-                    <span><i class="ti ti-circle-check"></i> Received {{ formatDateTime(doc()!.submittedAt!) }}</span>
-                  } @else {
-                    <span><i class="ti ti-hourglass"></i> Not yet received</span>
-                  }
-                </div>
-
-                <mat-divider style="margin:16px 0"></mat-divider>
-
-                @if (doc()!.status !== 'Sent') {
-                  <div class="vd-section-label">Submitted document</div>
-                  <div class="doc-row" style="margin-top:10px">
-                    <span class="doc-icon"><i class="ti ti-file-description"></i></span>
-                    <div class="doc-meta">
-                      <div class="doc-name">{{ doc()!.completedOriginalFileName }}</div>
-                      <div class="doc-sub">Submitted assessment document</div>
-                    </div>
-                    <div style="display:flex;gap:8px;flex-shrink:0">
-                      <button class="btn-secondary doc-view-btn" (click)="openPreview()"><i class="ti ti-eye"></i> View</button>
-                      <a class="btn-secondary doc-view-btn" [href]="fileHref(doc()!.completedFileUrl!)" [download]="doc()!.completedOriginalFileName">
-                        <i class="ti ti-download"></i> Download
-                      </a>
-                    </div>
-                  </div>
-
-                  @if (doc()!.status === 'Submitted') {
-                    <div class="vd-section-label" style="margin-top:20px">Assessment</div>
-                    <div class="assess-toggle">
-                      <button type="button" class="assess-btn assess-pass" [class.active]="assessmentDraftResult() === 'Passed'" (click)="setAssessmentResult('Passed')">
-                        <i class="ti ti-circle-check"></i> Pass
-                      </button>
-                      <button type="button" class="assess-btn assess-fail" [class.active]="assessmentDraftResult() === 'Failed'" (click)="setAssessmentResult('Failed')">
-                        <i class="ti ti-circle-x"></i> Fail
-                      </button>
-                    </div>
-                    <textarea class="assess-comment" rows="3" placeholder="Add a comment about this candidate's assessment (optional)…"
-                              [ngModel]="assessmentDraftComment()" (ngModelChange)="assessmentDraftComment.set($event)"></textarea>
-                    <div class="assess-footer">
-                      <span class="form-note"><i class="ti ti-info-circle"></i> Not assessed yet</span>
-                      <button class="btn-primary" [disabled]="!assessmentDraftResult() || savingAssessment()" (click)="saveAssessment()">
-                        @if (savingAssessment()) { <mat-spinner diameter="14" class="move-btn-spinner"></mat-spinner> } @else { <i class="ti ti-device-floppy"></i> }
-                        Save assessment
-                      </button>
-                    </div>
-                  } @else {
-                    <div class="vd-section-label" style="margin-top:20px">Assessment</div>
-                    <p class="form-note">
-                      <i class="ti" [class.ti-circle-check]="doc()!.outcome === 'Passed'" [class.ti-circle-x]="doc()!.outcome === 'Failed'"></i>
-                      Reviewed as <strong>{{ doc()!.outcome }}</strong>@if (doc()!.reviewedAt) { on {{ formatDateTime(doc()!.reviewedAt!) }} }
-                    </p>
-                    @if (doc()!.recruiterNotes) {
-                      <p class="form-note" style="white-space:pre-line">{{ doc()!.recruiterNotes }}</p>
-                    }
-                  }
-                } @else {
-                  <p class="form-note"><i class="ti ti-hourglass"></i> The candidate hasn't uploaded their completed assessment yet.</p>
-                }
-              }
-
-              @if (app.status === 'OfferExtended' || offer()) {
-                <mat-divider style="margin:18px 0"></mat-divider>
-
-                <div class="vd-section-label">Offer letter</div>
-                <div style="margin-top:10px">
-                  @if (!offer()) {
-                    <p class="form-note">No offer letter has been generated for this application yet.</p>
-                  } @else {
-                    <span class="pill" [class.pill-pub]="offer()!.status === 'Sent' || offer()!.status === 'Accepted'"
-                          [class.pill-type]="offer()!.status === 'Declined'"
-                          style="margin-bottom:14px;display:inline-flex">
-                      {{ offer()!.status }}
-                    </span>
-                    <p class="form-note" style="margin-bottom:14px">{{ offer()!.jobTitle }} · {{ offer()!.location || '—' }}</p>
-                    @if (offer()!.status === 'Sent') {
-                      <p class="form-note" style="margin-bottom:14px"><i class="ti ti-hourglass"></i> Waiting for the candidate to accept or decline the offer.</p>
-                    } @else if (offer()!.status === 'Accepted') {
-                      <p class="form-note" style="margin-bottom:14px;color:#1a5c35"><i class="ti ti-circle-check"></i> The candidate has accepted the offer.</p>
-                    } @else if (offer()!.status === 'Declined') {
-                      <p class="form-note" style="margin-bottom:14px;color:var(--red)"><i class="ti ti-circle-x"></i> The candidate has declined the offer.</p>
-                    }
-                  }
-
-                  <a class="btn-primary" style="text-decoration:none;display:inline-flex"
-                     [routerLink]="['/admin/applications', app.applicationId, 'offer']">
-                    <i class="ti ti-file-certificate"></i>
-                    {{ offer() ? 'View offer letter' : 'Generate offer letter' }}
-                  </a>
-                </div>
-              }
-
-              <mat-divider style="margin:18px 0"></mat-divider>
-
-              <div class="vd-section-label">Move application forward</div>
-              <div style="margin-top:10px">
-                @if (nextOptions().length) {
-                  <mat-form-field appearance="outline" class="compact-select move-select">
-                    <mat-label>Move to</mat-label>
-                    <mat-select [(ngModel)]="pendingStatus">
-                      @for (s of nextOptions(); track s) {
-                        <mat-option [value]="s">{{ label(s) }}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-                  <button mat-raised-button color="primary" class="move-btn"
-                          [disabled]="!pendingStatus || updating()" (click)="updateStatus()">
-                    @if (updating()) {
-                      <mat-spinner diameter="16" class="move-btn-spinner"></mat-spinner>
-                    } @else {
-                      <i class="ti ti-arrow-right"></i>
-                    }
-                    Update status
-                  </button>
-                } @else {
-                  <p class="form-note"><i class="ti ti-lock"></i> This is a final stage — no further moves are possible.</p>
+                  <span class="form-note"><i class="ti ti-alert-triangle"></i> No pre-screening template has been uploaded yet.</span>
                 }
               </div>
+
+              @if (psLoading()) {
+                <div class="empty-state" style="padding:1.5rem 0"><mat-spinner diameter="24"></mat-spinner></div>
+              } @else {
+                @if (!doc()) {
+                  <div class="empty-state" style="padding:1.5rem 0">
+                    <i class="ti ti-clipboard-off"></i>
+                    <p>No pre-screening assessment has been sent for this application yet.</p>
+                  </div>
+                  @if (app.status === 'Shortlisted') {
+                    <div class="assess-footer" style="justify-content:flex-end">
+                      <button class="btn-primary" [disabled]="sendingPrescreening()" (click)="sendPrescreening()">
+                        @if (sendingPrescreening()) { <mat-spinner diameter="14" class="move-btn-spinner"></mat-spinner> } @else { <i class="ti ti-send-2"></i> }
+                        Send pre-screening form
+                      </button>
+                    </div>
+                  } @else {
+                    <p class="form-note"><i class="ti ti-info-circle"></i> A pre-screening form can only be sent once the candidate is Shortlisted.</p>
+                  }
+                } @else {
+                  <div class="vc-meta" style="margin-top:14px">
+                    <span><i class="ti ti-send-2"></i> Sent {{ formatDateTime(doc()!.sentAt) }}</span>
+                    @if (doc()!.status !== 'Sent') {
+                      <span><i class="ti ti-circle-check"></i> Received {{ formatDateTime(doc()!.submittedAt!) }}</span>
+                    } @else {
+                      <span><i class="ti ti-hourglass"></i> Not yet received</span>
+                    }
+                  </div>
+
+                  @if (doc()!.status !== 'Sent') {
+                    <mat-divider style="margin:16px 0"></mat-divider>
+
+                    <div class="vd-section-label">Submitted document</div>
+                    <div class="doc-row" style="margin-top:10px">
+                      <span class="doc-icon"><i class="ti ti-file-description"></i></span>
+                      <div class="doc-meta">
+                        <div class="doc-name">{{ doc()!.completedOriginalFileName }}</div>
+                        <div class="doc-sub">Submitted assessment document</div>
+                      </div>
+                      <div style="display:flex;gap:8px;flex-shrink:0">
+                        <button type="button" class="btn-secondary doc-view-btn"
+                                [disabled]="isFileActionLoading('submitted-view')"
+                                (click)="viewFile(doc()!.completedFileUrl, doc()!.completedOriginalFileName || 'document', 'submitted-view')">
+                          @if (isFileActionLoading('submitted-view')) { <mat-spinner diameter="14" style="display:inline-block;margin-right:2px"></mat-spinner> } @else { <i class="ti ti-eye"></i> }
+                          View
+                        </button>
+                        <button type="button" class="btn-secondary doc-view-btn"
+                                [disabled]="isFileActionLoading('submitted-dl')"
+                                (click)="downloadFile(doc()!.completedFileUrl, doc()!.completedOriginalFileName || 'document', 'submitted-dl')">
+                          @if (isFileActionLoading('submitted-dl')) { <mat-spinner diameter="14" style="display:inline-block;margin-right:2px"></mat-spinner> } @else { <i class="ti ti-download"></i> }
+                          Download
+                        </button>
+                      </div>
+                    </div>
+
+                    @if (doc()!.status === 'Submitted') {
+                      <div class="vd-section-label" style="margin-top:20px">Assessment</div>
+                      <div class="assess-toggle">
+                        <button type="button" class="assess-btn assess-pass" [class.active]="assessmentDraftResult() === 'Passed'" (click)="setAssessmentResult('Passed')">
+                          <i class="ti ti-circle-check"></i> Pass
+                        </button>
+                        <button type="button" class="assess-btn assess-fail" [class.active]="assessmentDraftResult() === 'Failed'" (click)="setAssessmentResult('Failed')">
+                          <i class="ti ti-circle-x"></i> Fail
+                        </button>
+                      </div>
+                      <textarea class="assess-comment" rows="3" placeholder="Add a comment about this candidate's assessment (optional)…"
+                                [ngModel]="assessmentDraftComment()" (ngModelChange)="assessmentDraftComment.set($event)"></textarea>
+                      <div class="assess-footer">
+                        <span class="form-note"><i class="ti ti-info-circle"></i> Not assessed yet</span>
+                        <button class="btn-primary" [disabled]="!assessmentDraftResult() || savingAssessment()" (click)="saveAssessment()">
+                          @if (savingAssessment()) { <mat-spinner diameter="14" class="move-btn-spinner"></mat-spinner> } @else { <i class="ti ti-device-floppy"></i> }
+                          Save assessment
+                        </button>
+                      </div>
+                    } @else {
+                      <div class="vd-section-label" style="margin-top:20px">Assessment</div>
+                      <p class="form-note">
+                        <i class="ti" [class.ti-circle-check]="doc()!.outcome === 'Passed'" [class.ti-circle-x]="doc()!.outcome === 'Failed'"></i>
+                        Reviewed as <strong>{{ doc()!.outcome }}</strong>@if (doc()!.reviewedAt) { on {{ formatDateTime(doc()!.reviewedAt!) }} }
+                      </p>
+                      @if (doc()!.recruiterNotes) {
+                        <p class="form-note" style="white-space:pre-line">{{ doc()!.recruiterNotes }}</p>
+                      }
+                    }
+                  } @else {
+                    <p class="form-note"><i class="ti ti-hourglass"></i> The candidate hasn't uploaded their completed assessment yet.</p>
+                  }
+                }
+              }
+
             </mat-card>
+
           </div>
         </div>
         }
       }
     </div>
 
-    @if (previewOpen()) {
-      <div class="ps-modal-backdrop" (click)="closePreview()">
+    @if (previewingFile(); as pf) {
+      <div class="ps-modal-backdrop" (click)="closeFilePreview()">
         <div class="ps-modal" (click)="$event.stopPropagation()">
           <div class="ps-modal-header">
-            <div><i class="ti ti-file-description"></i> {{ doc()?.completedOriginalFileName }}</div>
-            <button class="ps-modal-close" (click)="closePreview()"><i class="ti ti-x"></i></button>
+            <div><i class="ti ti-file-description"></i> {{ pf.fileName }}</div>
+            <button class="ps-modal-close" (click)="closeFilePreview()"><i class="ti ti-x"></i></button>
           </div>
           <div class="ps-modal-body">
-            @if (previewKind() === 'pdf') {
-              <iframe [src]="previewUrl()" class="ps-modal-iframe"></iframe>
+            @if (pf.kind === 'pdf') {
+              <iframe [src]="pf.safeUrl" class="ps-modal-iframe"></iframe>
+            } @else if (pf.kind === 'image') {
+              <div class="ps-modal-image-wrap"><img [src]="pf.safeUrl" alt="{{ pf.fileName }}"></div>
+            } @else if (pf.kind === 'docx') {
+              @if (docxConverting()) {
+                <div class="empty-state"><mat-spinner diameter="28"></mat-spinner></div>
+              } @else if (docxError()) {
+                <div class="empty-state">
+                  <i class="ti ti-file-unknown"></i>
+                  <p>Couldn't render this document. Download it to view the contents.</p>
+                </div>
+              } @else if (docxHtml()) {
+                <div class="ps-docx-preview" [innerHTML]="docxHtml()"></div>
+              }
             } @else {
               <div class="empty-state">
                 <i class="ti ti-file-unknown"></i>
@@ -365,25 +248,27 @@ type PreviewKind = 'pdf' | 'image' | 'text' | 'unsupported';
             }
           </div>
           <div class="ps-modal-footer">
-            <button class="btn-secondary" (click)="closePreview()">Close</button>
-            <a class="btn-primary" [href]="doc() ? fileHref(doc()!.completedFileUrl!) : ''" [download]="doc()?.completedOriginalFileName">
+            <button class="btn-secondary" (click)="closeFilePreview()">Close</button>
+            <button class="btn-primary" (click)="downloadFromPreview()">
               <i class="ti ti-download"></i> Download
-            </a>
+            </button>
           </div>
         </div>
       </div>
     }
 
     <style>
-      .ad-page { max-width: 1120px; }
+      .ad-page { max-width: 1320px; }
 
-      .back-link { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; }
+      .back-link { display: inline-flex; align-items: center; gap: 6px; }
+      .back-link:hover { color: var(--navy); }
 
-      /* ── Header ── */
-      .ad-header {
-        display: flex; align-items: center; gap: 18px; margin-bottom: 22px;
-        background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-        padding: 22px 26px; box-shadow: var(--shadow-sm);
+      .ad-top-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+      .ad-top-btn { text-decoration: none; font-weight: 700; padding: 11px 22px; font-size: 13.5px; }
+
+      /* ── Header (now nested inline at the top of the pre-screening card) ── */
+      .ad-header-inline {
+        display: flex; align-items: center; gap: 18px;
       }
       .ad-avatar {
         width: 58px; height: 58px; border-radius: 50%;
@@ -409,12 +294,14 @@ type PreviewKind = 'pdf' | 'image' | 'text' | 'unsupported';
       }
       .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 
+      .ad-header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+      .btn-sm { padding: 7px 14px !important; font-size: 12px !important; }
+
       /* ── Layout ── */
-      .ad-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; align-items: start; }
-      @media (max-width: 860px) { .ad-grid { grid-template-columns: 1fr; } }
+      .ad-grid { display: grid; grid-template-columns: 1fr; max-width: 920px; margin: 0 auto; gap: 18px; align-items: start; }
       .ad-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
-      .ad-card { border-radius: 14px !important; padding: 20px 22px; }
+      .ad-card { border-radius: 16px !important; padding: 26px 30px; }
       .ad-card ::ng-deep .mat-mdc-card-content { padding: 0; }
 
       /* ── Section headers ── */
@@ -499,7 +386,12 @@ type PreviewKind = 'pdf' | 'image' | 'text' | 'unsupported';
       .doc-meta { flex: 1; min-width: 0; }
       .doc-name { font-size: 13px; font-weight: 700; color: var(--text); }
       .doc-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-      .doc-view-btn { padding: 6px 12px; font-size: 12px; flex-shrink: 0; }
+      .doc-view-btn {
+        padding: 6px 12px; font-size: 12px; flex-shrink: 0; border-radius: 20px;
+        background: var(--blue-bg); border-color: var(--blue); color: var(--blue);
+      }
+      .doc-view-btn:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
+      .doc-view-btn:disabled { opacity: 0.6; cursor: default; }
 
       /* ── Offer letter card ── */
       .offer-form { display: flex; flex-direction: column; gap: 4px; }
@@ -514,14 +406,16 @@ type PreviewKind = 'pdf' | 'image' | 'text' | 'unsupported';
       .move-btn-spinner { display: inline-block; }
       .move-btn-spinner ::ng-deep circle { stroke: #fff; }
 
-      /* ── Pre-screening card (plain style, matches vacancy detail) ── */
-      .ps-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-      .tmpl-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; padding-bottom: 10px; border-bottom: 1px dashed var(--border); }
-      .tmpl-row .form-note { margin: 0; }
-      .tmpl-upload-btn { padding: 5px 10px; font-size: 11.5px; flex-shrink: 0; margin-left: auto; cursor: pointer; }
+      /* ── Pre-screening / offer letter section labels ── */
       .vd-title-sm { font-size: 15px; font-weight: 700; color: var(--text); }
       .vd-ref { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
       .vd-section-label { font-size: 11px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: 0.05em; }
+
+      /* ── Pre-screening template + assessment (inline) ── */
+      .tmpl-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; padding-bottom: 14px; border-bottom: 1px dashed var(--border); }
+      .tmpl-row .form-note { margin: 0; }
+      .tmpl-upload-btn { padding: 5px 10px; font-size: 11.5px; flex-shrink: 0; margin-left: auto; cursor: pointer; }
+      .ps-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
 
       .assess-toggle { display: flex; gap: 10px; margin-top: 10px; }
       .assess-btn {
@@ -562,8 +456,17 @@ type PreviewKind = 'pdf' | 'image' | 'text' | 'unsupported';
       .ps-modal-close:hover { background: var(--surface-2); color: var(--text); }
       .ps-modal-body { flex: 1; overflow: auto; background: var(--surface-2); min-height: 300px; }
       .ps-modal-iframe { width: 100%; height: 65vh; border: none; display: block; background: #fff; }
-      .ps-modal-image { max-width: 100%; display: block; margin: 0 auto; }
-      .ps-modal-text { padding: 18px; font-size: 12.5px; white-space: pre-wrap; color: var(--text); font-family: 'SFMono-Regular', Consolas, monospace; }
+      .ps-modal-image-wrap { display: flex; align-items: center; justify-content: center; min-height: 300px; padding: 16px; }
+      .ps-modal-image-wrap img { max-width: 100%; max-height: 65vh; border-radius: 6px; box-shadow: var(--shadow-sm); }
+      .ps-docx-preview {
+        background: #fff; padding: 32px 40px; max-height: 65vh; overflow: auto;
+        font-size: 14px; line-height: 1.6; color: var(--text);
+      }
+      .ps-docx-preview :is(h1,h2,h3,h4,h5,h6) { color: var(--navy); margin: 1.2em 0 0.5em; }
+      .ps-docx-preview p { margin: 0 0 0.8em; }
+      .ps-docx-preview table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
+      .ps-docx-preview td, .ps-docx-preview th { border: 1px solid var(--border); padding: 6px 10px; }
+      .ps-docx-preview img { max-width: 100%; }
       .ps-modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--border); background: #fff; }
     </style>
   `
@@ -598,18 +501,32 @@ export class ApplicationDetailComponent implements OnInit {
 
   pendingStatus: ApplicationStatusKey | '' = '';
 
-  previewOpen = signal(false);
-
-  assessmentDraftResult = signal<PrescreeningOutcome | null>(null);
-  assessmentDraftComment = signal('');
-  savingAssessment = signal(false);
-
   psDoc = signal<PrescreeningResponse | null>(null);
   psLoading = signal(false);
   sendingPrescreening = signal(false);
 
   template = signal<PrescreeningTemplateResponse | null>(null);
-  uploadingTemplate = signal(false);
+
+  // ── File view/download (submitted assessment) ─────────────────────
+  // Plain `<a href>` navigation doesn't go through the auth interceptor,
+  // so if the file endpoint needs the bearer token it just silently fails.
+  // Fetching via HttpClient (through PrescreeningService) attaches the
+  // token and gives a real object URL to preview/download instead - the
+  // same approach used on the candidate-facing applications page.
+  private fileActionKey = signal<string | null>(null);
+  previewingFile = signal<{
+    fileName: string;
+    kind: FilePreviewKind;
+    safeUrl: SafeResourceUrl;
+    objectUrl: string;
+  } | null>(null);
+  docxHtml = signal<SafeHtml | null>(null);
+  docxConverting = signal(false);
+  docxError = signal(false);
+
+  assessmentDraftResult = signal<PrescreeningOutcome | null>(null);
+  assessmentDraftComment = signal('');
+  savingAssessment = signal(false);
 
   ngOnInit(): void {
     const id = Number(this.route.snapshot.paramMap.get('id'));
@@ -670,6 +587,13 @@ export class ApplicationDetailComponent implements OnInit {
   statusClass(s: string): string { return STATUS_CLASS[s] ?? 'applied'; }
   docLabel(t: string): string { return (DOCUMENT_TYPE_LABELS as Record<string, string>)[t] ?? t; }
 
+  // ── Schedule / view interview quick action ───────────────────────
+  showScheduleInterview(app: ApplicationResponse): boolean {
+    if (app.status === 'InterviewStage') return true;
+    const d = this.doc();
+    return app.status === 'PrescreeningStage' && !!d && d.status === 'Reviewed' && d.outcome === 'Passed';
+  }
+
   initials(name: string): string {
     if (!name) return '?';
     const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -716,23 +640,6 @@ export class ApplicationDetailComponent implements OnInit {
     });
   }
 
-  // ── Pre-screening template (Recruiter/Admin uploads the blank form once) ─
-  onTemplateFileSelected(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
-
-    const error = validatePrescreeningFile(file);
-    if (error) { this.toast.show(error, 'error'); return; }
-
-    this.uploadingTemplate.set(true);
-    this.prescreening.uploadTemplate(file).subscribe({
-      next: t => { this.template.set(t); this.uploadingTemplate.set(false); this.toast.show('Pre-screening template uploaded.', 'success'); },
-      error: (err: Error) => { this.uploadingTemplate.set(false); this.toast.show(err.message, 'error'); }
-    });
-  }
-
   // ── Send / review the pre-screening form ────────────────────────
   sendPrescreening(): void {
     const app = this.application();
@@ -752,21 +659,84 @@ export class ApplicationDetailComponent implements OnInit {
     });
   }
 
-  // ── Preview modal ──────────────────────────────────────────────
-  previewKind(): PreviewKind {
-    const name = (this.doc()?.completedOriginalFileName || '').toLowerCase();
-    if (name.endsWith('.pdf')) return 'pdf';
-    return 'unsupported';
+  // ── File view/download ──────────────────────────────────────────
+  isFileActionLoading(key: string): boolean {
+    return this.fileActionKey() === key;
   }
 
-  previewUrl(): SafeResourceUrl {
-    const d = this.doc();
-    const url = d?.completedFileUrl ? this.fileHref(d.completedFileUrl) : '';
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  viewFile(relativeUrl: string | null | undefined, fileName: string, key: string): void {
+    if (!relativeUrl) return;
+    this.fileActionKey.set(key);
+    this.prescreening.getFileBlob(relativeUrl).subscribe({
+      next: (blob) => {
+        this.fileActionKey.set(null);
+        const objectUrl = URL.createObjectURL(blob);
+        const kind = previewKindFor(fileName);
+        this.previewingFile.set({
+          fileName,
+          kind,
+          safeUrl: this.sanitizer.bypassSecurityTrustResourceUrl(objectUrl),
+          objectUrl
+        });
+        this.docxHtml.set(null);
+        this.docxError.set(false);
+        if (kind === 'docx') this.convertDocxPreview(blob);
+      },
+      error: (err: Error) => {
+        this.fileActionKey.set(null);
+        this.toast.show(err.message || 'Could not open the document.', 'error');
+      }
+    });
   }
 
-  openPreview(): void { this.previewOpen.set(true); }
-  closePreview(): void { this.previewOpen.set(false); }
+  // .docx has no native browser renderer, but it's a zipped XML format we
+  // can convert to HTML entirely client-side with mammoth - no server
+  // changes or public URL needed, unlike Office/Google's online viewers.
+  private convertDocxPreview(blob: Blob): void {
+    this.docxConverting.set(true);
+    blob.arrayBuffer()
+      .then(arrayBuffer => mammoth.convertToHtml({ arrayBuffer }))
+      .then(result => {
+        this.docxConverting.set(false);
+        this.docxHtml.set(this.sanitizer.bypassSecurityTrustHtml(result.value));
+      })
+      .catch(() => {
+        this.docxConverting.set(false);
+        this.docxError.set(true);
+      });
+  }
+
+  downloadFile(relativeUrl: string | null | undefined, fileName: string, key: string): void {
+    if (!relativeUrl) return;
+    this.fileActionKey.set(key);
+    this.prescreening.downloadFile(relativeUrl, fileName).subscribe({
+      next: () => this.fileActionKey.set(null),
+      error: (err: Error) => {
+        this.fileActionKey.set(null);
+        this.toast.show(err.message || 'Could not download the document.', 'error');
+      }
+    });
+  }
+
+  downloadFromPreview(): void {
+    const pf = this.previewingFile();
+    if (!pf) return;
+    const a = document.createElement('a');
+    a.href = pf.objectUrl;
+    a.download = pf.fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  closeFilePreview(): void {
+    const pf = this.previewingFile();
+    if (pf) URL.revokeObjectURL(pf.objectUrl);
+    this.previewingFile.set(null);
+    this.docxHtml.set(null);
+    this.docxConverting.set(false);
+    this.docxError.set(false);
+  }
 
   // ── Assessment (Pass/Fail + comment) ───────────────────────────
   private syncAssessmentDraft(): void {
@@ -792,7 +762,7 @@ export class ApplicationDetailComponent implements OnInit {
         // the outcome is Failed (see PrescreeningController.SetOutcome) -
         // reflect that immediately without a full reload. On Passed, the
         // status stays at 'PrescreeningStage' until the recruiter moves it
-        // forward manually via "Move application forward".
+        // forward manually via "Schedule interview".
         if (result === 'Failed') {
           this.application.set({ ...app, status: 'NotSelected' });
         }
@@ -801,11 +771,5 @@ export class ApplicationDetailComponent implements OnInit {
       },
       error: (err: Error) => { this.savingAssessment.set(false); this.toast.show(err.message, 'error'); }
     });
-  }
-
-  // ── Offer letter ────────────────────────────────────────────────
-  offer(): OfferLetterResponse | undefined {
-    const app = this.application();
-    return app ? this.offerLetter.peek(app.applicationId) : undefined;
   }
 }

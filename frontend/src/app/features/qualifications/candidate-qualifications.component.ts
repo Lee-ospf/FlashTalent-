@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -20,13 +20,15 @@ import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-
   standalone: true,
   imports: [CommonModule,DatePickerTriggerDirective , ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatCardModule, MatProgressSpinnerModule],
   template: `
-    <div class="page-container">
-      <div class="page-header">
-        <div>
-          <h2 class="page-title"><i class="ti ti-school"></i> Qualifications</h2>
-          <p class="page-sub">Education and certifications, visible to recruiters</p>
+    <div [class.page-container]="!embedded" [class.step-body-padded]="embedded">
+      @if (!embedded) {
+        <div class="page-header">
+          <div>
+            <h2 class="page-title"><i class="ti ti-school"></i> Qualifications</h2>
+            <p class="page-sub">Education and certifications, visible to recruiters</p>
+          </div>
         </div>
-      </div>
+      }
 
       <mat-card class="mat-elevation-z1" style="border-radius:12px;margin-bottom:16px">
         <mat-card-content style="padding:18px 20px">
@@ -57,7 +59,6 @@ import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-
               </mat-form-field>
             </div>
 
-            <!-- ── Optional certificate/transcript attachment ── -->
             <div class="attach-row">
               <button type="button" mat-stroked-button style="border-radius:8px" (click)="fileInput.click()">
                 <i class="ti ti-paperclip"></i>&nbsp;{{ selectedFile() ? 'Change file' : 'Attach certificate / transcript (optional)' }}
@@ -114,6 +115,7 @@ import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-
     </div>
 
     <style>
+      .step-body-padded { padding: 1.5rem; }
       .attach-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
       .attach-filename {
         display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #1a5c35;
@@ -128,9 +130,12 @@ import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-
       .attach-link:hover { text-decoration: underline; }
       .attach-missing { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); margin-top: 4px; }
     </style>
-  `
+  `,
 })
 export class CandidateQualificationsComponent implements OnInit {
+  @Input() embedded = false;
+  @Output() saved = new EventEmitter<void>();
+
   private fb = inject(FormBuilder);
   private state = inject(CandidateStateService);
   private qualService = inject(CandidateQualificationService);
@@ -149,7 +154,7 @@ export class CandidateQualificationsComponent implements OnInit {
     qualificationType: ['Education', Validators.required],
     name: ['', Validators.required],
     institution: ['', Validators.required],
-    yearCompleted: ['', Validators.required]
+    yearCompleted: ['', Validators.required],
   });
 
   invalid(field: string): boolean {
@@ -161,8 +166,6 @@ export class CandidateQualificationsComponent implements OnInit {
     return new Date(d).getFullYear().toString();
   }
 
-  // Backend file URLs are relative (e.g. "/Uploads/12/abc.pdf") - strip the trailing "/api"
-  // from the configured API base to get the server origin they're served from.
   fileUrl(relative: string): string {
     const origin = environment.apiUrl.replace(/\/api\/?$/, '');
     return `${origin}${relative}`;
@@ -183,7 +186,7 @@ export class CandidateQualificationsComponent implements OnInit {
         this.qualifications.set(q);
         this.loadAttachments(p.candidateId);
       },
-      error: () => this.loading.set(false)
+      error: () => this.loading.set(false),
     });
   }
 
@@ -193,7 +196,7 @@ export class CandidateQualificationsComponent implements OnInit {
         this.attachments.set(docs.filter(d => d.qualificationId != null));
         this.loading.set(false);
       },
-      error: () => this.loading.set(false)
+      error: () => this.loading.set(false),
     });
   }
 
@@ -215,46 +218,46 @@ export class CandidateQualificationsComponent implements OnInit {
     if (!p || this.form.invalid) return;
     this.apiError = '';
     this.saving.set(true);
+    const wasEmpty = this.qualifications().length === 0;
     const v = this.form.value;
 
     this.qualService.create(p.candidateId, {
       qualificationType: v.qualificationType as any,
       name: v.name!,
       institution: v.institution!,
-      yearCompleted: new Date(v.yearCompleted!).toISOString()
+      yearCompleted: new Date(v.yearCompleted!).toISOString(),
     }).subscribe({
       next: created => {
         this.qualifications.update(list => [created, ...list]);
 
         const file = this.selectedFile();
         if (!file) {
-          this.finishAdd('Qualification added.');
+          this.finishAdd('Qualification added.', wasEmpty);
           return;
         }
 
-        // Qualification type maps 1:1 onto the matching DocumentType for the attachment.
         const docType: DocumentTypeKey = created.qualificationType === 'Certification' ? 'Certification' : 'Qualification';
 
         this.docService.upload(p.candidateId, docType, file, created.candidateQualificationId).subscribe({
           next: uploaded => {
             this.attachments.update(list => [...list, uploaded]);
-            this.finishAdd('Qualification added with certificate attached.');
+            this.finishAdd('Qualification added with certificate attached.', wasEmpty);
           },
           error: (err: Error) => {
-            // Qualification itself was created fine - only the attachment failed, so say so clearly.
-            this.finishAdd(`Qualification added, but the file failed to attach: ${err.message}`);
-          }
+            this.finishAdd(`Qualification added, but the file failed to attach: ${err.message}`, wasEmpty);
+          },
         });
       },
-      error: (err: Error) => { this.saving.set(false); this.apiError = err.message; }
+      error: (err: Error) => { this.saving.set(false); this.apiError = err.message; },
     });
   }
 
-  private finishAdd(message: string): void {
+  private finishAdd(message: string, wasEmpty: boolean): void {
     this.saving.set(false);
     this.selectedFile.set(null);
     this.form.reset({ qualificationType: 'Education', name: '', institution: '', yearCompleted: '' });
     this.toast.show(message, 'success');
+    if (wasEmpty) this.saved.emit();
   }
 
   remove(q: QualificationResponse): void {
@@ -267,7 +270,7 @@ export class CandidateQualificationsComponent implements OnInit {
         this.attachments.update(list => list.filter(a => a.qualificationId !== q.candidateQualificationId));
         this.toast.show('Qualification removed.', 'success');
       },
-      error: (err: Error) => this.toast.show(err.message, 'error')
+      error: (err: Error) => this.toast.show(err.message, 'error'),
     });
   }
 }

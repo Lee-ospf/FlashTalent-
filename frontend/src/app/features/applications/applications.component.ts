@@ -1,3 +1,4 @@
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -12,7 +13,7 @@ import { ApplicationService } from '../../core/services/application.service';
 import { CandidateStateService } from '../../core/services/candidate-state.service';
 import {
   ApplicationResponse,
-  ApplicationStatusHistoryResponse,
+  InterviewResponse,
 } from '../../core/models';
 import {
   statusLabel as sharedStatusLabel,
@@ -24,12 +25,18 @@ import {
   PrescreeningResponse,
   PrescreeningTemplateResponse,
   validatePrescreeningFile,
+  previewKindFor,
+  FilePreviewKind,
 } from '../../core/services/prescreening.service';
 import {
   OfferLetterService,
   OfferLetterResponse,
 } from '../../core/services/offer-letter.service';
+import { InterviewService } from '../../core/services/interview.service';
 
+// 'Hired' is a real backend status but is deliberately left off the pipeline
+// display - once an application is Hired, every step up to Offer Extended is
+// simply shown as complete (see pipelineSteps()).
 const PIPELINE = [
   'Applied',
   'UnderReview',
@@ -37,7 +44,6 @@ const PIPELINE = [
   'PrescreeningStage',
   'InterviewStage',
   'OfferExtended',
-  'Hired',
 ];
 
 @Component({
@@ -190,13 +196,19 @@ const PIPELINE = [
                     <div class="pipeline-track" style="margin-bottom:20px">
                       @for (
                         step of pipelineSteps(app);
-                        track step.label;
+                        track step.key;
                         let last = $last
                       ) {
                         <div
                           class="pip-step"
                           [class.done]="step.state === 'done'"
                           [class.pip-last]="last"
+                          [class.pip-clickable]="step.state !== 'pending'"
+                          [class.pip-selected]="
+                            currentStage(app) === step.key &&
+                            step.state !== 'pending'
+                          "
+                          (click)="selectStage(app, step)"
                         >
                           <div
                             class="pip-dot"
@@ -224,8 +236,14 @@ const PIPELINE = [
                       }
                     </div>
 
+                    <p class="ps-intro" style="margin-top:-10px">
+                      <i class="ti ti-info-circle"></i>
+                      Tap a completed stage above to see its details.
+                    </p>
+
                     <!-- Pre-Screening Assessment -->
-                    @if (prescreeningDoc(app.applicationId); as doc) {
+                    @if (currentStage(app) === 'PrescreeningStage') {
+                      @if (prescreeningDoc(app.applicationId); as doc) {
                       <div style="margin-bottom:20px">
                         <div class="ps-section-label">
                           Pre-screening assessment
@@ -239,21 +257,44 @@ const PIPELINE = [
                           </p>
                           <div class="ps-actions">
                             @if (template(); as t) {
-                              <a
-                                class="btn-secondary"
-                                [href]="fileHref(t.fileUrl)"
-                                target="_blank"
-                                rel="noopener"
+                              <button
+                                type="button"
+                                class="btn-secondary doc-view-btn"
+                                [disabled]="isFileActionLoading('tmpl-' + app.applicationId + '-view')"
+                                (click)="
+                                  viewFile(
+                                    t.fileUrl,
+                                    t.originalFileName,
+                                    'tmpl-' + app.applicationId + '-view'
+                                  )
+                                "
                               >
-                                <i class="ti ti-eye"></i> View document
-                              </a>
-                              <a
-                                class="btn-secondary"
-                                [href]="fileHref(t.fileUrl)"
-                                [download]="t.originalFileName"
+                                @if (isFileActionLoading('tmpl-' + app.applicationId + '-view')) {
+                                  <mat-spinner diameter="14" style="display:inline-block;margin-right:6px"></mat-spinner>
+                                } @else {
+                                  <i class="ti ti-eye"></i>
+                                }
+                                View document
+                              </button>
+                              <button
+                                type="button"
+                                class="btn-secondary doc-view-btn"
+                                [disabled]="isFileActionLoading('tmpl-' + app.applicationId + '-dl')"
+                                (click)="
+                                  downloadFile(
+                                    t.fileUrl,
+                                    t.originalFileName,
+                                    'tmpl-' + app.applicationId + '-dl'
+                                  )
+                                "
                               >
-                                <i class="ti ti-download"></i> Download document
-                              </a>
+                                @if (isFileActionLoading('tmpl-' + app.applicationId + '-dl')) {
+                                  <mat-spinner diameter="14" style="display:inline-block;margin-right:6px"></mat-spinner>
+                                } @else {
+                                  <i class="ti ti-download"></i>
+                                }
+                                Download document
+                              </button>
                             }
                           </div>
 
@@ -320,21 +361,44 @@ const PIPELINE = [
                               </div>
                             </div>
                             <div style="display:flex;gap:8px;flex-shrink:0">
-                              <a
+                              <button
+                                type="button"
                                 class="btn-secondary doc-view-btn"
-                                [href]="fileHref(doc.completedFileUrl!)"
-                                target="_blank"
-                                rel="noopener"
+                                [disabled]="isFileActionLoading('doc-' + app.applicationId + '-view')"
+                                (click)="
+                                  viewFile(
+                                    doc.completedFileUrl,
+                                    doc.completedOriginalFileName || 'document',
+                                    'doc-' + app.applicationId + '-view'
+                                  )
+                                "
                               >
-                                <i class="ti ti-eye"></i> View
-                              </a>
-                              <a
+                                @if (isFileActionLoading('doc-' + app.applicationId + '-view')) {
+                                  <mat-spinner diameter="14" style="display:inline-block;margin-right:6px"></mat-spinner>
+                                } @else {
+                                  <i class="ti ti-eye"></i>
+                                }
+                                View
+                              </button>
+                              <button
+                                type="button"
                                 class="btn-secondary doc-view-btn"
-                                [href]="fileHref(doc.completedFileUrl!)"
-                                [download]="doc.completedOriginalFileName"
+                                [disabled]="isFileActionLoading('doc-' + app.applicationId + '-dl')"
+                                (click)="
+                                  downloadFile(
+                                    doc.completedFileUrl,
+                                    doc.completedOriginalFileName || 'document',
+                                    'doc-' + app.applicationId + '-dl'
+                                  )
+                                "
                               >
-                                <i class="ti ti-download"></i> Download
-                              </a>
+                                @if (isFileActionLoading('doc-' + app.applicationId + '-dl')) {
+                                  <mat-spinner diameter="14" style="display:inline-block;margin-right:6px"></mat-spinner>
+                                } @else {
+                                  <i class="ti ti-download"></i>
+                                }
+                                Download
+                              </button>
                             </div>
                           </div>
                           @if (doc.status === 'Reviewed') {
@@ -351,10 +415,88 @@ const PIPELINE = [
                           }
                         }
                       </div>
+                      } @else {
+                        <div class="empty-state" style="padding:1rem 0">
+                          <i class="ti ti-clipboard-off"></i>
+                          <p>No pre-screening assessment has been sent yet.</p>
+                        </div>
+                      }
+                    }
+
+                    <!-- Interview -->
+                    @if (currentStage(app) === 'InterviewStage') {
+                      <div style="margin-bottom:20px">
+                        <div class="ps-section-label">Interview</div>
+
+                        @if (isInterviewLoading(app.applicationId)) {
+                          <p class="ps-intro">
+                            <i class="ti ti-loader"></i> Loading interview
+                            details…
+                          </p>
+                        } @else if (interviews(app.applicationId).length) {
+                          @for (
+                            iv of interviews(app.applicationId);
+                            track iv.interviewId
+                          ) {
+                            <div class="ps-doc-row" style="margin-bottom:10px">
+                              <span class="ps-doc-icon"
+                                ><i class="ti ti-calendar-event"></i
+                              ></span>
+                              <div class="ps-doc-meta">
+                                <div class="ps-doc-name">
+                                  Round {{ iv.roundNumber }} ·
+                                  {{ iv.interviewType }}
+                                </div>
+                                <div class="ps-doc-sub">
+                                  {{ formatDate(iv.scheduledAt) }}
+                                  @if (iv.location) {
+                                    · {{ iv.location }}
+                                  }
+                                  @if (iv.meetingLink) {
+                                    ·
+                                    <a
+                                      [href]="iv.meetingLink"
+                                      target="_blank"
+                                      rel="noopener"
+                                      >Meeting link</a
+                                    >
+                                  }
+                                </div>
+                                @if (iv.outcome && iv.outcome !== 'Pending') {
+                                  <div class="ps-doc-sub" style="margin-top:4px">
+                                    <i
+                                      class="ti"
+                                      [class.ti-circle-check]="
+                                        iv.outcome === 'Passed'
+                                      "
+                                      [class.ti-circle-x]="
+                                        iv.outcome === 'Failed'
+                                      "
+                                    ></i>
+                                    Outcome: <strong>{{ iv.outcome }}</strong>
+                                  </div>
+                                }
+                              </div>
+                              <span
+                                class="status-pill s-{{
+                                  interviewStatusClass(iv.status)
+                                }}"
+                                >{{ iv.status }}</span
+                              >
+                            </div>
+                          }
+                        } @else {
+                          <div class="empty-state" style="padding:1rem 0">
+                            <i class="ti ti-clipboard-off"></i>
+                            <p>No interview has been scheduled yet.</p>
+                          </div>
+                        }
+                      </div>
                     }
 
                     <!-- Offer Letter -->
-                    @if (offerDoc(app.applicationId); as offerLetter) {
+                    @if (currentStage(app) === 'OfferExtended') {
+                      @if (offerDoc(app.applicationId); as offerLetter) {
                       <div style="margin-bottom:20px">
                         <div class="ps-section-label">Offer letter</div>
 
@@ -506,62 +648,12 @@ const PIPELINE = [
                           </p>
                         }
                       </div>
-                    }
-
-                    <!-- History -->
-                    <div class="detail-label">Status history</div>
-                    @if (historyLoading().has(app.applicationId)) {
-                      <div
-                        style="font-size:12px;color:var(--text-muted);padding:8px 0;display:flex;align-items:center;gap:8px"
-                      >
-                        <mat-spinner diameter="16"></mat-spinner> Loading
-                        history…
-                      </div>
-                    } @else if (!getHistory(app.applicationId).length) {
-                      <div style="font-size:12px;color:var(--text-muted)">
-                        No status history yet.
-                      </div>
-                    } @else {
-                      <div class="timeline">
-                        @for (
-                          event of getHistory(app.applicationId);
-                          track event.applicationStatusHistoryId;
-                          let last = $last
-                        ) {
-                          <div class="tl-entry">
-                            <div class="tl-line">
-                              <div
-                                class="tl-dot"
-                                [style.background]="dotColor(event.newStatus)"
-                              ></div>
-                              @if (!last) {
-                                <div class="tl-connector"></div>
-                              }
-                            </div>
-                            <div class="tl-content">
-                              <span
-                                class="status-pill s-{{
-                                  statusClass(event.newStatus)
-                                }}"
-                              >
-                                {{ statusLabel(event.newStatus) }}
-                              </span>
-                              <div class="tl-meta">
-                                <i class="ti ti-user"></i>
-                                {{ event.changedByName }}
-                                &nbsp;·&nbsp;
-                                <i class="ti ti-clock"></i>
-                                {{ formatDate(event.changedAt) }}
-                              </div>
-                              @if (event.oldStatus !== event.newStatus) {
-                                <div class="tl-note">
-                                  Moved from {{ statusLabel(event.oldStatus) }}
-                                </div>
-                              }
-                            </div>
-                          </div>
-                        }
-                      </div>
+                      } @else {
+                        <div class="empty-state" style="padding:1rem 0">
+                          <i class="ti ti-clipboard-off"></i>
+                          <p>No offer letter has been generated yet.</p>
+                        </div>
+                      }
                     }
 
                     <!-- IDs -->
@@ -611,6 +703,37 @@ const PIPELINE = [
               Close
             </button>
             <button class="btn-primary" (click)="downloadOffer(o)">
+              <i class="ti ti-download"></i> Download
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (previewingFile(); as pf) {
+      <div class="ps-modal-backdrop" (click)="closeFilePreview()">
+        <div class="ps-modal" (click)="$event.stopPropagation()">
+          <div class="ps-modal-header">
+            <div><i class="ti ti-file-description"></i> {{ pf.fileName }}</div>
+            <button class="ps-modal-close" (click)="closeFilePreview()">
+              <i class="ti ti-x"></i>
+            </button>
+          </div>
+          <div class="ps-modal-body">
+            @if (pf.kind === 'pdf') {
+              <iframe [src]="pf.safeUrl" class="ps-modal-frame"></iframe>
+            } @else {
+              <div class="empty-state">
+                <i class="ti ti-file-unknown"></i>
+                <p>Preview isn't available for this file type. Download it to view the contents.</p>
+              </div>
+            }
+          </div>
+          <div class="ps-modal-footer">
+            <button class="btn-secondary" (click)="closeFilePreview()">
+              Close
+            </button>
+            <button class="btn-primary" (click)="downloadFromPreview()">
               <i class="ti ti-download"></i> Download
             </button>
           </div>
@@ -692,9 +815,22 @@ const PIPELINE = [
         margin-top: 2px;
       }
       .doc-view-btn {
-        padding: 6px 12px;
+        padding: 6px 14px;
         font-size: 12px;
         flex-shrink: 0;
+        border-radius: 20px;
+        background: var(--blue-bg);
+        border-color: var(--blue);
+        color: var(--blue);
+      }
+      .doc-view-btn:hover {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #fff;
+      }
+      .doc-view-btn:disabled {
+        opacity: 0.6;
+        cursor: default;
       }
 
       .offer-kv-grid {
@@ -831,6 +967,7 @@ export class ApplicationsComponent implements OnInit {
   private toast = inject(ToastService);
   private prescreening = inject(PrescreeningService);
   private offerLetter = inject(OfferLetterService);
+  private interviewService = inject(InterviewService);
   state = inject(CandidateStateService);
 
   apps = signal<ApplicationResponse[]>([]);
@@ -838,8 +975,6 @@ export class ApplicationsComponent implements OnInit {
   loadError = signal('');
 
   private expanded = signal<Set<number>>(new Set());
-  historyLoading = signal<Set<number>>(new Set());
-  private historyCache = new Map<number, ApplicationStatusHistoryResponse[]>();
 
   submittingId = signal<number | null>(null);
 
@@ -888,37 +1023,12 @@ export class ApplicationsComponent implements OnInit {
       s.delete(id);
     } else {
       s.add(id);
-      if (!this.historyCache.has(id)) this.loadHistory(id);
     }
     this.expanded.set(s);
   }
 
   isOpen(id: number): boolean {
     return this.expanded().has(id);
-  }
-
-  private loadHistory(id: number): void {
-    this.historyLoading.update((s) => new Set([...s, id]));
-    this.appService.getHistory(id).subscribe({
-      next: (h) => {
-        this.historyCache.set(id, h);
-        this.historyLoading.update((s) => {
-          const n = new Set(s);
-          n.delete(id);
-          return n;
-        });
-      },
-      error: () =>
-        this.historyLoading.update((s) => {
-          const n = new Set(s);
-          n.delete(id);
-          return n;
-        }),
-    });
-  }
-
-  getHistory(id: number): ApplicationStatusHistoryResponse[] {
-    return this.historyCache.get(id) ?? [];
   }
 
   count(status: string): number {
@@ -930,15 +1040,6 @@ export class ApplicationsComponent implements OnInit {
   }
   statusLabel(s: string): string {
     return sharedStatusLabel(s);
-  }
-
-  dotColor(s: string): string {
-    const m: Record<string, string> = {
-      Hired: '#1b5e20',
-      OfferExtended: '#2D7A4F',
-      NotSelected: '#c62828',
-    };
-    return m[s] ?? '#1A2744';
   }
 
   formatDate(d: string): string {
@@ -968,24 +1069,102 @@ export class ApplicationsComponent implements OnInit {
     // 'OfferExtended' point in the pipeline (or terminate it, for a decline).
     const isNotSelected =
       status === 'NotSelected' || status === 'OfferDeclined';
+    const isHired = status === 'Hired';
     const progressStatus =
       status === 'OfferSent' || status === 'OfferAccepted'
         ? 'OfferExtended'
         : status;
     const steps = isNotSelected ? [...PIPELINE, 'NotSelected'] : PIPELINE;
-    const ci = isNotSelected ? steps.length - 1 : steps.indexOf(progressStatus);
-    return steps.map((label, i) => {
-      if (isNotSelected && label === 'NotSelected')
-        return { label: 'Not Selected', state: 'rejected' as const };
+    // 'Hired' isn't shown as its own step - once an application is Hired,
+    // every real step is simply marked complete.
+    const ci = isHired
+      ? steps.length
+      : isNotSelected
+        ? steps.length - 1
+        : steps.indexOf(progressStatus);
+    return steps.map((key, i) => {
+      if (isNotSelected && key === 'NotSelected')
+        return { key, label: 'Not Selected', state: 'rejected' as const };
       if (i < ci)
-        return { label: sharedStatusLabel(label), state: 'done' as const };
+        return { key, label: sharedStatusLabel(key), state: 'done' as const };
       if (i === ci)
         return {
-          label: sharedStatusLabel(label),
+          key,
+          label: sharedStatusLabel(key),
           state: 'active' as const,
         };
-      return { label: sharedStatusLabel(label), state: 'pending' as const };
+      return { key, label: sharedStatusLabel(key), state: 'pending' as const };
     });
+  }
+
+  // ── Stage selection (which section is shown below the pipeline) ───
+  private selectedStage = signal<Record<number, string>>({});
+
+  selectStage(
+    app: ApplicationResponse,
+    step: { key: string; state: 'done' | 'active' | 'pending' | 'rejected' },
+  ): void {
+    if (step.state === 'pending') return; // can't preview a stage not reached yet
+    this.selectedStage.update((s) => ({
+      ...s,
+      [app.applicationId]: step.key,
+    }));
+    if (step.key === 'InterviewStage') this.loadInterviews(app.applicationId);
+  }
+
+  currentStage(app: ApplicationResponse): string {
+    const explicit = this.selectedStage()[app.applicationId];
+    if (explicit) return explicit;
+    // Default to the application's current stage.
+    const status = this.effectiveStatus(app);
+    if (status === 'OfferSent' || status === 'OfferAccepted') return 'OfferExtended';
+    if (status === 'OfferDeclined') return 'OfferExtended';
+    if (status === 'Hired') return 'OfferExtended';
+    return status;
+  }
+
+  // ── Interview details ──────────────────────────────────────────────
+  private interviewCache = new Map<number, InterviewResponse[]>();
+  private interviewLoadingIds = signal<Set<number>>(new Set());
+
+  private loadInterviews(applicationId: number): void {
+    if (this.interviewCache.has(applicationId)) return;
+    this.interviewLoadingIds.update((s) => new Set([...s, applicationId]));
+    this.interviewService.getByApplication(applicationId).subscribe({
+      next: (list) => {
+        this.interviewCache.set(applicationId, list);
+        this.interviewLoadingIds.update((s) => {
+          const n = new Set(s);
+          n.delete(applicationId);
+          return n;
+        });
+      },
+      error: () => {
+        this.interviewCache.set(applicationId, []);
+        this.interviewLoadingIds.update((s) => {
+          const n = new Set(s);
+          n.delete(applicationId);
+          return n;
+        });
+      },
+    });
+  }
+
+  interviews(applicationId: number): InterviewResponse[] {
+    return this.interviewCache.get(applicationId) ?? [];
+  }
+
+  isInterviewLoading(applicationId: number): boolean {
+    return this.interviewLoadingIds().has(applicationId);
+  }
+
+  interviewStatusClass(s: string): string {
+    const m: Record<string, string> = {
+      Scheduled: 'interview',
+      Completed: 'offer',
+      Cancelled: 'rejected',
+    };
+    return m[s] ?? 'applied';
   }
 
   // ── Pre-screening assessment ──────────────────────────────────────
@@ -995,6 +1174,85 @@ export class ApplicationsComponent implements OnInit {
 
   fileHref(relativeUrl: string): string {
     return this.prescreening.fileHref(relativeUrl);
+  }
+
+  // ── File view/download (template + submitted assessment) ──────────
+  // Plain `<a href>` navigation doesn't go through the auth interceptor,
+  // so if the file endpoint needs the bearer token it just silently fails.
+  // Fetching via HttpClient (through PrescreeningService) attaches the
+  // token and gives a real object URL to preview/download instead.
+  private sanitizer = inject(DomSanitizer);
+  private fileActionKey = signal<string | null>(null);
+  previewingFile = signal<{
+    fileName: string;
+    kind: FilePreviewKind;
+    safeUrl: SafeResourceUrl;
+    objectUrl: string;
+  } | null>(null);
+
+  isFileActionLoading(key: string): boolean {
+    return this.fileActionKey() === key;
+  }
+
+  viewFile(
+    relativeUrl: string | null | undefined,
+    fileName: string,
+    key: string,
+  ): void {
+    if (!relativeUrl) return;
+    this.fileActionKey.set(key);
+    this.prescreening.getFileBlob(relativeUrl).subscribe({
+      next: (blob) => {
+        this.fileActionKey.set(null);
+        const objectUrl = URL.createObjectURL(blob);
+        this.previewingFile.set({
+          fileName,
+          kind: previewKindFor(fileName),
+          safeUrl: this.sanitizer.bypassSecurityTrustResourceUrl(objectUrl),
+          objectUrl,
+        });
+      },
+      error: (err: Error) => {
+        this.fileActionKey.set(null);
+        this.toast.show(err.message || 'Could not open the document.', 'error');
+      },
+    });
+  }
+
+  downloadFile(
+    relativeUrl: string | null | undefined,
+    fileName: string,
+    key: string,
+  ): void {
+    if (!relativeUrl) return;
+    this.fileActionKey.set(key);
+    this.prescreening.downloadFile(relativeUrl, fileName).subscribe({
+      next: () => this.fileActionKey.set(null),
+      error: (err: Error) => {
+        this.fileActionKey.set(null);
+        this.toast.show(
+          err.message || 'Could not download the document.',
+          'error',
+        );
+      },
+    });
+  }
+
+  closeFilePreview(): void {
+    const pf = this.previewingFile();
+    if (pf) URL.revokeObjectURL(pf.objectUrl);
+    this.previewingFile.set(null);
+  }
+
+  downloadFromPreview(): void {
+    const pf = this.previewingFile();
+    if (!pf) return;
+    const a = document.createElement('a');
+    a.href = pf.objectUrl;
+    a.download = pf.fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 
   selectedFileName(applicationId: number): string {

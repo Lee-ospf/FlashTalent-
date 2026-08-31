@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, ActivatedRoute } from '@angular/router';
@@ -15,7 +15,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { CandidateStateService } from '../../core/services/candidate-state.service';
 import {
   DocumentService, DocumentTypeKey, DOCUMENT_TYPE_LABELS,
-  ALL_DOC_TYPES, FREE_UPLOAD_DOC_TYPES, GLOBAL_MANDATORY, validateFileClient
+  ALL_DOC_TYPES, FREE_UPLOAD_DOC_TYPES, GLOBAL_MANDATORY, validateFileClient,
 } from '../../core/services/document.service';
 import { VacancyService } from '../../core/services/vacancy.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -35,21 +35,23 @@ interface RequiredSlot {
     CommonModule, FormsModule, RouterLink,
     MatCardModule, MatButtonModule, MatSelectModule,
     MatFormFieldModule, MatInputModule, MatIconModule, MatDividerModule,
-    MatProgressSpinnerModule, MatTooltipModule
+    MatProgressSpinnerModule, MatTooltipModule,
   ],
   template: `
-    <div class="page-container">
+    <div [class.page-container]="!embedded" [class.step-body-padded]="embedded">
 
-      <div class="page-header">
-        <div>
-          <h2 class="page-title"><i class="ti ti-files"></i> Supporting Documents</h2>
-          <p class="page-sub">Upload the required documents below, or add anything else using the dropdown</p>
+      @if (!embedded) {
+        <div class="page-header">
+          <div>
+            <h2 class="page-title"><i class="ti ti-files"></i> Supporting Documents</h2>
+            <p class="page-sub">Upload the required documents below, or add anything else using the dropdown</p>
+          </div>
+          <span class="doc-status-badge" [class.doc-ok]="allRequiredOk()" [class.doc-missing]="!allRequiredOk()">
+            <i class="ti" [class.ti-circle-check]="allRequiredOk()" [class.ti-alert-circle]="!allRequiredOk()"></i>
+            {{ allRequiredOk() ? 'Required documents ready' : 'Required documents missing' }}
+          </span>
         </div>
-        <span class="doc-status-badge" [class.doc-ok]="allRequiredOk()" [class.doc-missing]="!allRequiredOk()">
-          <i class="ti" [class.ti-circle-check]="allRequiredOk()" [class.ti-alert-circle]="!allRequiredOk()"></i>
-          {{ allRequiredOk() ? 'Required documents ready' : 'Required documents missing' }}
-        </span>
-      </div>
+      }
 
       @if (!state.profile()) {
         <div class="info-banner warn">
@@ -82,7 +84,6 @@ interface RequiredSlot {
           <span class="progress-label">{{ uploadedRequiredCount() }} / {{ requiredSlots().length }} required uploaded</span>
         </div>
 
-        <!-- ── REQUIRED SLOTS: fixed type, asterisk, no dropdown ── -->
         <div class="doc-slots">
           @for (slot of requiredSlots(); track slot.type) {
             <div class="doc-slot"
@@ -133,7 +134,6 @@ interface RequiredSlot {
           }
         </div>
 
-        <!-- ── OTHER UPLOADED DOCS (already-uploaded items not in the required list) ── -->
         @if (extraUploadedDocs().length) {
           <div class="section-label" style="margin-top:20px">Other uploaded documents</div>
           <div class="doc-slots">
@@ -153,7 +153,6 @@ interface RequiredSlot {
           </div>
         }
 
-        <!-- ── SINGLE DROPDOWN: upload anything else ── -->
         <mat-card class="mat-elevation-z1 additional-card" style="border-radius:12px;margin-top:20px">
           <mat-card-content style="padding:18px 20px">
             <div class="card-header"><i class="ti ti-plus"></i> Upload another document</div>
@@ -210,6 +209,7 @@ interface RequiredSlot {
     </div>
   `,
   styles: [`
+    .step-body-padded { padding: 1.5rem; }
     .vacancy-context-banner {
       background: linear-gradient(135deg, #e3f2fd 0%, #e8f5e9 100%);
       border: 1px solid rgba(26,39,68,0.12); border-radius: 12px; padding: 14px 18px;
@@ -273,9 +273,12 @@ interface RequiredSlot {
 
     .additional-card .card-header { font-size: 14px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
     .additional-card .card-header i { color: var(--navy); font-size: 16px; }
-  `]
+  `],
 })
 export class DocumentsComponent implements OnInit {
+  @Input() embedded = false;
+  @Output() saved = new EventEmitter<void>();
+
   state = inject(CandidateStateService);
   private doc = inject(DocumentService);
   private vac = inject(VacancyService);
@@ -294,7 +297,6 @@ export class DocumentsComponent implements OnInit {
   private pendingRequiredType: DocumentTypeKey | null = null;
   private pendingIsFree = false;
 
-  // ── Required slots: global mandatory + vacancy-mandatory, deduped ──
   requiredSlots = computed<RequiredSlot[]>(() => {
     const uploaded = this.uploadedDocs();
     const vacancy = this.vacancyContext();
@@ -317,14 +319,11 @@ export class DocumentsComponent implements OnInit {
     return slots;
   });
 
-  // Dropdown only offers types NOT already shown as a required slot, and excludes
-  // Qualification/Certification - those are uploaded via the Qualifications page instead.
   dropdownTypes = computed<DocumentTypeKey[]>(() => {
     const requiredTypes = new Set(this.requiredSlots().map(s => s.type));
     return FREE_UPLOAD_DOC_TYPES.filter(t => !requiredTypes.has(t));
   });
 
-  // Uploaded documents whose type isn't one of the required slots (shown as a read-only list)
   extraUploadedDocs = computed<CandidateDocumentResponse[]>(() => {
     const requiredTypes = new Set(this.requiredSlots().map(s => s.type));
     return this.uploadedDocs().filter(d => !requiredTypes.has(d.documentType as DocumentTypeKey));
@@ -349,7 +348,7 @@ export class DocumentsComponent implements OnInit {
     this.loading.set(true);
     this.doc.getAll(this.state.profile()!.candidateId).subscribe({
       next: d => { this.uploadedDocs.set(d); this.loading.set(false); },
-      error: () => this.loading.set(false)
+      error: () => this.loading.set(false),
     });
   }
 
@@ -365,7 +364,7 @@ export class DocumentsComponent implements OnInit {
   docIcon(t: DocumentTypeKey): string {
     const icons: Record<DocumentTypeKey, string> = {
       CV: 'ti-file-cv', MatricCertificate: 'ti-certificate',
-      Qualification: 'ti-school', Certification: 'ti-award', Other: 'ti-file'
+      Qualification: 'ti-school', Certification: 'ti-award', Other: 'ti-file',
     };
     return icons[t];
   }
@@ -380,7 +379,6 @@ export class DocumentsComponent implements OnInit {
     return true;
   }
 
-  // ── Upload triggers ──────────────────────────────────────────────
   triggerRequiredUpload(type: DocumentTypeKey): void {
     this.pendingRequiredType = type;
     this.pendingIsFree = false;
@@ -391,7 +389,7 @@ export class DocumentsComponent implements OnInit {
     if (!this.canFreeUpload()) {
       this.toast.show(
         this.freeUploadType === 'Other' ? 'Describe the document before uploading.' : 'Select a document type first.',
-        'warn'
+        'warn',
       );
       return;
     }
@@ -417,7 +415,7 @@ export class DocumentsComponent implements OnInit {
       if (!this.canFreeUpload()) {
         this.toast.show(
           this.freeUploadType === 'Other' ? 'Describe the document before uploading.' : 'Select a document type first.',
-          'warn'
+          'warn',
         );
         return;
       }
@@ -439,8 +437,6 @@ export class DocumentsComponent implements OnInit {
     const err = validateFileClient(file);
     if (err) { this.toast.show(err, 'error'); return; }
 
-    // If "Other" with a typed description, rename the file so the description
-    // is what gets stored as originalFileName on the backend (no dedicated label field exists).
     let fileToSend = file;
     if (wasFreeUpload && docType === 'Other' && this.otherDescription.trim()) {
       const ext = file.name.substring(file.name.lastIndexOf('.'));
@@ -466,8 +462,12 @@ export class DocumentsComponent implements OnInit {
 
         this.toast.show(`"${uploaded.originalFileName}" saved as ${this.typeLabel(uploaded.documentType as DocumentTypeKey)}.`, 'success');
         this.state.refresh().subscribe();
+
+        // Uploading saves immediately, but no longer auto-advances the wizard —
+        // only the footer's "Save and continue" button should move to the next
+        // step. This just stays on the Documents step so you can keep uploading.
       },
-      error: (e: Error) => { this.uploading.set(null); this.toast.show(e.message, 'error'); }
+      error: (e: Error) => { this.uploading.set(null); this.toast.show(e.message, 'error'); },
     });
   }
 }

@@ -39,12 +39,17 @@ import { DatePickerTriggerDirective } from '../../../shared/directives/date-pick
   ],
   template: `
     <div class="page-container ol-page">
-      <a
-        [routerLink]="['/admin/applications', applicationId]"
-        class="back-link"
-      >
-        <i class="ti ti-arrow-left"></i> Back to application
-      </a>
+      <div class="ol-top-bar">
+        <a [routerLink]="['/admin/applications', applicationId]" class="back-link">
+          <i class="ti ti-arrow-left"></i> Back to application
+        </a>
+        @if (application(); as topApp) {
+          <a class="btn-secondary doc-view-btn ol-top-btn"
+             [routerLink]="['/admin/applications', topApp.applicationId, 'candidate']">
+            <i class="ti ti-user"></i> Candidate details
+          </a>
+        }
+      </div>
 
       @if (loading()) {
         <div class="empty-state"><mat-spinner diameter="32"></mat-spinner></div>
@@ -54,28 +59,25 @@ import { DatePickerTriggerDirective } from '../../../shared/directives/date-pick
         </div>
       } @else {
         @if (application(); as app) {
-          <mat-card class="mat-elevation-z1" style="border-radius:12px">
-            <mat-card-content style="padding:24px">
-              <!-- Header - styled to match the Manage Vacancy detail page -->
-              <div class="vd-header">
+
+        <mat-card class="mat-elevation-z1 ol-card">
+          <mat-card-content style="padding:28px 32px">
+            <!-- Header - styled to match the Manage Vacancy detail page -->
+            <div class="vd-header">
+              <div class="ol-header-info">
+                <div class="ol-avatar">{{ initials(app.candidateName) }}</div>
                 <div>
                   <div class="vd-title">Offer letter</div>
-                  <div class="vd-ref">
-                    {{ app.candidateName }} · {{ app.vacancyTitle }}
-                  </div>
+                  <div class="vd-ref">{{ app.candidateName }} · {{ app.vacancyTitle }}</div>
                 </div>
-                @if (offer(); as o) {
-                  <span
-                    class="pill"
-                    [class.pill-pub]="
-                      o.status === 'Sent' || o.status === 'Accepted'
-                    "
-                    [class.pill-type]="o.status === 'Declined'"
-                  >
-                    {{ o.status }} · v{{ o.versionNumber }}
-                  </span>
-                }
               </div>
+              @if (offer(); as o) {
+                <span class="pill" [class.pill-pub]="o.status === 'Sent' || o.status === 'Accepted'"
+                      [class.pill-type]="o.status === 'Declined'">
+                  {{ o.status }} · v{{ o.versionNumber }}
+                </span>
+              }
+            </div>
 
               <mat-divider style="margin:18px 0"></mat-divider>
 
@@ -308,19 +310,15 @@ import { DatePickerTriggerDirective } from '../../../shared/directives/date-pick
                   </p>
                 }
 
-                <div class="assess-footer">
-                  <button class="btn-secondary" (click)="openPreview()">
-                    <i class="ti ti-eye"></i> View letter
-                  </button>
-                  <button class="btn-secondary" (click)="downloadOffer()">
-                    <i class="ti ti-download"></i> Download letter
-                  </button>
-                </div>
-              }
-            </mat-card-content>
-          </mat-card>
-        }
+              <div class="assess-footer">
+                <button class="btn-secondary doc-view-btn" (click)="openPreview()"><i class="ti ti-eye"></i> View letter</button>
+                <button class="btn-secondary doc-view-btn" (click)="downloadOffer()"><i class="ti ti-download"></i> Download letter</button>
+              </div>
+            }
+          </mat-card-content>
+        </mat-card>
       }
+    }
     </div>
 
     @if (previewOpen()) {
@@ -354,103 +352,38 @@ import { DatePickerTriggerDirective } from '../../../shared/directives/date-pick
     }
 
     <style>
-      .ol-page {
-        max-width: 760px;
-      }
+      .ol-page { max-width: 900px; }
+      .ol-top-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+      .ol-top-btn { text-decoration: none; font-weight: 700; padding: 9px 18px; }
       .back-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--text-muted);
-        text-decoration: none;
-        margin-bottom: 16px;
+        display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500;
+        color: var(--text-muted); text-decoration: none;
       }
-      .back-link:hover {
-        color: var(--navy);
+      .back-link:hover { color: var(--navy); }
+
+      .ol-card { border-radius: 16px !important; }
+      .ol-header-info { display: flex; align-items: center; gap: 16px; }
+      .ol-avatar {
+        width: 52px; height: 52px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%); color: #fff;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 18px; font-weight: 700; letter-spacing: 0.02em; flex-shrink: 0;
+        box-shadow: 0 3px 12px rgba(26,39,68,0.3);
       }
-      .vd-header {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-      }
-      .vd-title {
-        font-size: 18px;
-        font-weight: 700;
-        color: var(--text);
-      }
-      .vd-ref {
-        font-size: 13px;
-        color: var(--text-muted);
-        margin-top: 2px;
-      }
-      .vd-section-label {
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--navy);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-bottom: 6px;
-      }
-      .vd-body {
-        font-size: 13px;
-        color: var(--text-muted);
-        line-height: 1.6;
-      }
-      .kv-grid {
-        display: grid;
-        gap: 14px;
-      }
-      .kv {
-        display: flex;
-        gap: 10px;
-        align-items: flex-start;
-      }
-      .kv-icon {
-        width: 30px;
-        height: 30px;
-        border-radius: 8px;
-        background: var(--surface-2);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--navy);
-        flex-shrink: 0;
-      }
-      .kv-label {
-        display: block;
-        font-size: 10.5px;
-        color: var(--text-muted);
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-      .kv-val {
-        display: block;
-        font-size: 13px;
-        color: var(--text);
-        font-weight: 600;
-        margin-top: 2px;
-      }
-      .pill {
-        font-size: 11px;
-        font-weight: 700;
-        padding: 4px 10px;
-        border-radius: 20px;
-        background: var(--surface-2);
-        color: var(--text-muted);
-        white-space: nowrap;
-      }
-      .pill-pub {
-        background: var(--green-bg, #e8f5e9);
-        color: #1a5c35;
-      }
-      .pill-type {
-        background: #fdecea;
-        color: var(--red, #c62828);
-      }
+
+      .vd-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+      .vd-title { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.2px; }
+      .vd-ref { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+      .vd-section-label { font-size: 11.5px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+      .vd-body { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+      .kv-grid { display: grid; gap: 16px; }
+      .kv { display: flex; gap: 10px; align-items: flex-start; }
+      .kv-icon { width: 32px; height: 32px; border-radius: 9px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; color: var(--navy); flex-shrink: 0; }
+      .kv-label { display: block; font-size: 10.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+      .kv-val { display: block; font-size: 13.5px; color: var(--text); font-weight: 600; margin-top: 2px; }
+      .pill { font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 20px; background: var(--surface-2); color: var(--text-muted); white-space: nowrap; }
+      .pill-pub { background: var(--green-bg, #e8f5e9); color: #1a5c35; }
+      .pill-type { background: #fdecea; color: var(--red, #c62828); }
 
       .tmpl-warning {
         display: flex;
@@ -761,6 +694,15 @@ export class OfferLetterDetailComponent implements OnInit {
   downloadOffer(): void {
     const o = this.offer();
     if (o) this.offerLetter.downloadLetter(o);
+  }
+
+  initials(name: string): string {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    const first = parts[0][0] ?? '';
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
+    return (first + last).toUpperCase();
   }
 
   formatDate(d: string): string {

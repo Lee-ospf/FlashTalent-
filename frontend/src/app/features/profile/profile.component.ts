@@ -1,665 +1,628 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  inject,
+  signal,
+  computed,
+  ViewChild,
+  OnInit,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatDividerModule } from '@angular/material/divider';
-import { AuthService } from '../../core/services/auth.service';
-import { CandidateService } from '../../core/services/candidate.service';
+
 import { CandidateStateService } from '../../core/services/candidate-state.service';
 import { AddressService } from '../../core/services/address.service';
-import { ToastService } from '../../core/services/toast.service';
-import { AddressResponse, AddressType } from '../../core/models';
-import { AddressAutocompleteService } from '../../core/services/address-autocomplete.service';
-import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
-import { Subject, of } from 'rxjs';
-import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-trigger.directive';
+import {
+  DocumentService,
+  GLOBAL_MANDATORY,
+} from '../../core/services/document.service';
+import { CandidateSkillService } from '../../core/services/candidate-skill.service';
+import { CandidateExperienceService } from '../../core/services/candidate-experience.service';
+import { CandidateQualificationService } from '../../core/services/candidate-qualification.service';
 
+import { PersonalInfoStepComponent } from './personal-info-step.component';
+import { AddressStepComponent } from './address-step.component';
+import { DocumentsComponent } from '../documents/documents.component';
+import { CandidateSkillsComponent } from '../skills/candidate-skills.component';
+import { CandidateExperienceComponent } from '../experience/candidate-experience.component';
+import { CandidateQualificationsComponent } from '../qualifications/candidate-qualifications.component';
+
+type StepKey =
+  | 'personal'
+  | 'address'
+  | 'documents'
+  | 'skills'
+  | 'experience'
+  | 'qualifications';
+
+interface StepDef {
+  key: StepKey;
+  label: string;
+  icon: string;
+  title: string;
+}
+
+const STEPS: StepDef[] = [
+  {
+    key: 'personal',
+    label: 'Personal',
+    icon: 'ti-user',
+    title: 'Personal information',
+  },
+  {
+    key: 'address',
+    label: 'Address',
+    icon: 'ti-map-pin',
+    title: 'Home address',
+  },
+  {
+    key: 'documents',
+    label: 'Documents',
+    icon: 'ti-file',
+    title: 'Upload documents',
+  },
+  { key: 'skills', label: 'Skills', icon: 'ti-bulb', title: 'Skills' },
+  {
+    key: 'experience',
+    label: 'Experience',
+    icon: 'ti-briefcase',
+    title: 'Work experience',
+  },
+  {
+    key: 'qualifications',
+    label: 'Qualifications',
+    icon: 'ti-school',
+    title: 'Qualifications',
+  },
+];
 
 @Component({
   selector: 'app-profile',
   standalone: true,
   imports: [
-    CommonModule, ReactiveFormsModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatButtonModule, MatIconModule, MatCardModule,
-    MatProgressSpinnerModule, MatDividerModule,DatePickerTriggerDirective 
+    CommonModule,
+    MatButtonModule,
+    MatProgressSpinnerModule,
+    PersonalInfoStepComponent,
+    AddressStepComponent,
+    DocumentsComponent,
+    CandidateSkillsComponent,
+    CandidateExperienceComponent,
+    CandidateQualificationsComponent,
   ],
   template: `
     <div class="page-container">
-      <div class="page-header">
-        <div>
-          <h2 class="page-title"><i class="ti ti-user-check"></i> Candidate profile</h2>
-          <p class="page-sub">
-            {{ (isEdit || !state.profile()) ? 'Fill in your details to apply for vacancies' : 'Your registered candidate profile' }}
-          </p>
-        </div>
-        @if (state.profile() && !isEdit) {
-          <span class="status-pill s-offer">Active</span>
-        }
-      </div>
-
-      @if (loadError()) {
-        <div class="api-error"><i class="ti ti-alert-circle"></i> {{ loadError() }}</div>
-      }
-
       @if (initialLoading()) {
-        <div class="empty-state"><mat-spinner diameter="32"></mat-spinner><p style="margin-top:12px">Loading profile…</p></div>
+        <div class="empty-state"><mat-spinner diameter="32"></mat-spinner></div>
+      } @else if (!allComplete()) {
+        <!-- SETUP WIZARD -->
+        <div class="wizard-header">
+          <div>
+            <h2 class="page-title">
+              <i class="ti ti-user-check"></i> Complete your profile
+            </h2>
+            <p class="page-sub">Jump to any section, in any order.</p>
+          </div>
+          <span
+            class="pct-badge"
+            [class.pct-low]="pctComplete() < 40"
+            [class.pct-mid]="pctComplete() >= 40 && pctComplete() < 80"
+            [class.pct-high]="pctComplete() >= 80"
+          >
+            {{ pctComplete() }}% complete
+          </span>
+        </div>
 
-      } @else if (state.profile() && !isEdit) {
-        <!-- ── READ VIEW ── -->
-        <mat-card class="mat-elevation-z1" style="border-radius:12px;margin-bottom:16px">
-          <mat-card-content style="padding:18px 20px">
-            <div class="profile-view-header">
-              <div class="pv-avatar">{{ initials() }}</div>
-              <div>
-                <div class="pv-name">{{ state.profile()!.firstName }} {{ state.profile()!.lastName }}</div>
-                <div class="pv-sub">{{ state.profile()!.email }}</div>
-              </div>
-              <button mat-stroked-button (click)="startEdit()" style="margin-left:auto;border-radius:8px">
-                <i class="ti ti-pencil"></i>&nbsp;Edit profile
+        <div class="progress-track">
+          <div
+            class="progress-fill"
+            [style.width.%]="pctComplete()"
+            [class.pct-low]="pctComplete() < 40"
+            [class.pct-mid]="pctComplete() >= 40 && pctComplete() < 80"
+            [class.pct-high]="pctComplete() >= 80"
+          ></div>
+        </div>
+
+        <div class="stepper-row">
+          <div class="stepper-line-track"></div>
+          <div class="stepper-line-fill" [style.width.%]="pctComplete()"></div>
+
+          @for (s of steps; track s.key) {
+            <button
+              type="button"
+              class="step-circle-wrap"
+              (click)="current.set(s.key)"
+            >
+              <span
+                class="step-circle"
+                [class.done]="isComplete(s.key)"
+                [class.active]="current() === s.key && !isComplete(s.key)"
+              >
+                @if (isComplete(s.key)) {
+                  <i class="ti ti-check"></i>
+                } @else {
+                  <i class="ti {{ s.icon }}"></i>
+                }
+              </span>
+              <span class="step-label" [class.active]="current() === s.key">{{
+                s.label
+              }}</span>
+            </button>
+          }
+        </div>
+
+        <div class="step-card">
+          @switch (current()) {
+            @case ('personal') {
+              <app-personal-info-step
+                #personalStep
+                [embedded]="true"
+                [hideSubmit]="true"
+                (saved)="onStepSaved()"
+              />
+            }
+            @case ('address') {
+              <app-address-step
+                #addressStep
+                [embedded]="true"
+                [autoAdvanceOnSave]="false"
+                (saved)="onStepSaved()"
+              />
+            }
+            @case ('documents') {
+              <app-documents [embedded]="true" (saved)="onStepSaved()" />
+            }
+            @case ('skills') {
+              <app-candidate-skills [embedded]="true" (saved)="onStepSaved()" />
+            }
+            @case ('experience') {
+              <app-candidate-experience
+                #experienceStep
+                [embedded]="true"
+                [autoAdvanceOnSave]="false"
+                (saved)="onStepSaved()"
+              />
+            }
+            @case ('qualifications') {
+              <app-candidate-qualifications
+                [embedded]="true"
+                (saved)="onStepSaved()"
+              />
+            }
+          }
+        </div>
+
+        <div class="wizard-footer">
+          <button
+            mat-stroked-button
+            style="border-radius:8px"
+            [disabled]="stepIndex() === 0"
+            (click)="back()"
+          >
+            <i class="ti ti-arrow-left"></i>&nbsp;Back
+          </button>
+          <div style="display:flex;gap:8px">
+            @if (stepIndex() < steps.length - 1) {
+              <button
+                mat-stroked-button
+                style="border-radius:8px"
+                (click)="skip()"
+              >
+                Skip for now
               </button>
-            </div>
-            <div class="pv-grid">
-              <div class="pv-field"><span class="pv-label">Phone</span><span>{{ state.profile()!.phone || '—' }}</span></div>
-              <div class="pv-field"><span class="pv-label">Date of birth</span><span>{{ formatDate(state.profile()!.dateOfBirth) }}</span></div>
-              <div class="pv-field"><span class="pv-label">Gender</span><span>{{ state.profile()!.gender || '—' }}</span></div>
-              <div class="pv-field"><span class="pv-label">Nationality</span><span>{{ state.profile()!.nationality || '—' }}</span></div>
-              <div class="pv-field"><span class="pv-label">Race</span><span>{{ state.profile()!.race || '—' }}</span></div>
-              <div class="pv-field"><span class="pv-label">Candidate ID</span>
-                <span class="ref-chip"><i class="ti ti-hash"></i> {{ state.profile()!.candidateId }}</span>
-              </div>
-            </div>
-
-            @if (!profileComplete()) {
-              <div class="info-banner warn" style="margin-top:14px">
-                <i class="ti ti-alert-circle"></i>
-                <span>Some fields are missing. A complete profile improves your chances when recruiters review your application.</span>
-              </div>
             }
-
-            @if (state.profile()!.uploadedDocumentTypes.length) {
-              <div class="pv-bio">
-                <span class="pv-label">Uploaded documents</span>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">
-                  @for (t of state.profile()!.uploadedDocumentTypes; track t) {
-                    <span class="ref-chip"><i class="ti ti-file-check"></i> {{ t }}</span>
-                  }
-                </div>
-              </div>
-            }
-          </mat-card-content>
-        </mat-card>
-
-        <!-- ── ADDRESSES CARD ── -->
-        <mat-card class="mat-elevation-z1" style="border-radius:12px">
-          <mat-card-content style="padding:18px 20px">
-            <div class="card-header"><i class="ti ti-map-pin"></i> Addresses</div>
-
-            @if (addressLoading()) {
-              <mat-spinner diameter="24"></mat-spinner>
-            } @else if (!addresses().length) {
-              <div class="empty-state" style="padding:1.5rem">
-                <i class="ti ti-map-pin-off"></i>
-                <p>No address on file yet.</p>
-              </div>
-            } @else {
-              <div style="display:flex;flex-direction:column;gap:10px">
-                @for (a of addresses(); track a.addressId) {
-                  <div class="doc-slot uploaded">
-                    <i class="ti ti-map-pin doc-icon icon-ok"></i>
-                    <div class="doc-info">
-                      <div class="doc-name">{{ a.addressType }} address</div>
-                      <div class="doc-meta">
-                        {{ a.line1 }}{{ a.line2 ? ', ' + a.line2 : '' }}, {{ a.city }}, {{ a.province }} {{ a.postalCode }}, {{ a.country }}
-                      </div>
-                    </div>
-                    <div class="doc-actions" style="display:flex;gap:6px">
-                      <button mat-stroked-button style="border-radius:8px;font-size:12px" (click)="startEditAddress(a)">
-                        <i class="ti ti-pencil"></i>&nbsp;Edit
-                      </button>
-                      @if (addresses().length > 1 || a.addressType !== 'Residential') {
-                        <button mat-icon-button color="warn" (click)="deleteAddress(a)">
-                          <i class="ti ti-trash"></i>
-                        </button>
-                      }
-                    </div>
-                  </div>
-                }
-              </div>
-            }
-
-            @if (!addressForm.editing && missingAddressTypes().length) {
-              <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
-                @for (t of missingAddressTypes(); track t) {
-                  <button mat-stroked-button style="border-radius:8px" (click)="startAddAddress(t)">
-                    <i class="ti ti-plus"></i>&nbsp;Add {{ t }} address
-                  </button>
-                }
-              </div>
-            }
-
-            @if (addressForm.editing) {
-              <form [formGroup]="addrForm" (ngSubmit)="submitAddress()" style="margin-top:16px">
-                <mat-divider style="margin-bottom:16px"></mat-divider>
-                <div class="form-section-label">
-                  <i class="ti ti-map-pin"></i> {{ addressForm.mode === 'add' ? 'Add ' + addressForm.type : 'Edit ' + addressForm.type }} address
-                </div>
-
-                <div class="field-grid">
-                  <div style="position:relative;width:100%">
-                    <mat-form-field appearance="outline" style="width:100%">
-                      <mat-label>Address line 1</mat-label>
-                      <input matInput formControlName="line1"
-                        placeholder="Start typing your street address..."
-                        (input)="onAddressInput($any($event.target).value)"
-                        (blur)="hideSuggestionsDelayed()"
-                        autocomplete="off">
-                      @if (addrInvalid('line1')) { <mat-error>Required</mat-error> }
-                    </mat-form-field>
-
-                    @if (showSuggestions() && suggestions().length) {
-                      <div class="suggestions-dropdown">
-                        @for (s of suggestions(); track s.placeId) {
-                          <div class="suggestion-item"
-                            (mousedown)="selectSuggestion(s)">
-                            <i class="ti ti-map-pin" style="color:#1565c0;margin-right:8px"></i>
-                            <div>
-                              <div style="font-size:14px;font-weight:500">
-                                {{ s.placePrediction?.text?.text ?? s.description }}
-                              </div>
-                              @if (s.placePrediction?.structuredFormat?.secondaryText?.text) {
-                                <div style="font-size:12px;color:#888">
-                                  {{ s.placePrediction.structuredFormat.secondaryText.text }}
-                                </div>
-                              }
-                            </div>
-                          </div>
-                        }
-                      </div>
-                    }
-                  </div>
-
-                  <mat-form-field appearance="outline" style="width:100%">
-                    <mat-label>Address line 2</mat-label>
-                    <input matInput formControlName="line2" placeholder="Unit, complex (optional)">
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" style="width:100%">
-                    <mat-label>City</mat-label>
-                    <input matInput formControlName="city">
-                    @if (addrInvalid('city')) { <mat-error>Required</mat-error> }
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" style="width:100%">
-                    <mat-label>Province</mat-label>
-                    <mat-select formControlName="province">
-                      <mat-option value="">Select…</mat-option>
-                      <mat-option value="Gauteng">Gauteng</mat-option>
-                      <mat-option value="Western Cape">Western Cape</mat-option>
-                      <mat-option value="KwaZulu-Natal">KwaZulu-Natal</mat-option>
-                      <mat-option value="Eastern Cape">Eastern Cape</mat-option>
-                      <mat-option value="Free State">Free State</mat-option>
-                      <mat-option value="Limpopo">Limpopo</mat-option>
-                      <mat-option value="Mpumalanga">Mpumalanga</mat-option>
-                      <mat-option value="North West">North West</mat-option>
-                      <mat-option value="Northern Cape">Northern Cape</mat-option>
-                    </mat-select>
-                    @if (addrInvalid('province')) { <mat-error>Required</mat-error> }
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" style="width:100%">
-                    <mat-label>Postal code</mat-label>
-                    <input matInput formControlName="postalCode" maxlength="4" placeholder="e.g. 2196">
-                    @if (addrInvalid('postalCode')) { <mat-error>4-digit SA postal code required</mat-error> }
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" style="width:100%">
-                    <mat-label>Country</mat-label>
-                    <input matInput formControlName="country">
-                  </mat-form-field>
-                </div>
-
-                @if (addressApiError) {
-                  <div class="api-error" style="margin-top:10px"><i class="ti ti-alert-circle"></i> {{ addressApiError }}</div>
-                }
-
-                <div class="form-footer" style="margin-top:12px">
-                  <span></span>
-                  <div style="display:flex;gap:8px">
-                    <button type="button" mat-stroked-button style="border-radius:8px" (click)="cancelAddressEdit()">
-                      <i class="ti ti-x"></i>&nbsp;Cancel
-                    </button>
-                    <button type="submit" mat-raised-button color="primary" style="border-radius:8px"
-                            [disabled]="addressSaving || addrForm.invalid">
-                      @if (addressSaving) {
-                        <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
-                      }
-                      {{ addressSaving ? 'Saving…' : addressForm.mode === 'add' ? 'Add address' : 'Update address' }}
-                    </button>
-                  </div>
-                </div>
-              </form>
-            }
-          </mat-card-content>
-        </mat-card>
-
+            <button
+              mat-raised-button
+              color="primary"
+              style="border-radius:8px"
+              (click)="primaryAction()"
+            >
+              {{
+                stepIndex() === steps.length - 1
+                  ? 'Finish'
+                  : 'Save and continue'
+              }}&nbsp;<i class="ti ti-arrow-right"></i>
+            </button>
+          </div>
+        </div>
       } @else {
-        <!-- ── CANDIDATE FORM VIEW ── -->
-        <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
-          <mat-card class="mat-elevation-z1" style="border-radius:12px">
-            <mat-card-content style="padding:18px 20px">
-              <div class="form-section-label"><i class="ti ti-user"></i> Personal information</div>
+        <!-- COMPLETED PROFILE: SUMMARY + EDIT IN PLACE -->
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">
+              <i class="ti ti-user-check"></i> Candidate profile
+            </h2>
+            <p class="page-sub">Your registered candidate profile</p>
+          </div>
+          <span class="status-pill s-offer">Active</span>
+        </div>
 
-              <div class="field-grid">
-                <mat-form-field appearance="outline" style="width:100%">
-                  <mat-label>Phone number</mat-label>
-                  <input matInput formControlName="phone" type="tel" placeholder="+27 XX XXX XXXX">
-                  @if (isInvalid('phone')) {
-                    <mat-error>Enter a valid phone number, e.g. +27 82 123 4567</mat-error>
-                  }
-                </mat-form-field>
-
-                <mat-form-field appearance="outline" style="width:100%">
-                  <mat-label>Date of birth</mat-label>
-                  <input matInput formControlName="dateOfBirth" type="date" [max]="maxDob">
-                  @if (isInvalid('dateOfBirth')) {
-                    <mat-error>Date of birth can't be in the future</mat-error>
-                  }
-                </mat-form-field>
-
-                <mat-form-field appearance="outline" style="width:100%">
-                  <mat-label>Gender</mat-label>
-                  <mat-select formControlName="gender">
-                    <mat-option value="">Select…</mat-option>
-                    <mat-option value="Male">Male</mat-option>
-                    <mat-option value="Female">Female</mat-option>
-                    <mat-option value="Non-binary">Non-binary</mat-option>
-                    <mat-option value="Prefer not to say">Prefer not to say</mat-option>
-                  </mat-select>
-                </mat-form-field>
-
-                <mat-form-field appearance="outline" style="width:100%">
-                  <mat-label>Nationality</mat-label>
-                  <input matInput formControlName="nationality" placeholder="e.g. South African">
-                </mat-form-field>
-
-                <mat-form-field appearance="outline" style="width:100%">
-                  <mat-label>Race (EE reporting)</mat-label>
-                  <mat-select formControlName="race">
-                    <mat-option value="">Select…</mat-option>
-                    <mat-option value="African">African</mat-option>
-                    <mat-option value="Coloured">Coloured</mat-option>
-                    <mat-option value="Indian/Asian">Indian/Asian</mat-option>
-                    <mat-option value="White">White</mat-option>
-                    <mat-option value="Prefer not to say">Prefer not to say</mat-option>
-                  </mat-select>
-                </mat-form-field>
+        @for (s of steps; track s.key) {
+          <div class="summary-row-card">
+            <div class="summary-row-head">
+              <div class="summary-row-title">
+                <i class="ti {{ s.icon }}"></i> {{ s.title }}
               </div>
-
-              <p class="form-note" style="margin-top:4px">
-                <i class="ti ti-info-circle"></i> You'll be able to add your address once your profile is created.
-              </p>
-
-              @if (apiError) {
-                <div class="api-error" style="margin-top:12px">
-                  <i class="ti ti-alert-circle"></i> {{ apiError }}
-                </div>
+              @if (editingSection() !== s.key) {
+                <button
+                  mat-stroked-button
+                  style="border-radius:8px;font-size:12px"
+                  (click)="editingSection.set(s.key)"
+                >
+                  <i class="ti ti-pencil"></i>&nbsp;Edit
+                </button>
+              } @else {
+                <button
+                  mat-stroked-button
+                  style="border-radius:8px;font-size:12px"
+                  (click)="editingSection.set(null)"
+                >
+                  <i class="ti ti-x"></i>&nbsp;Close
+                </button>
               }
+            </div>
 
-              <div class="form-footer" style="margin-top:14px">
-                <span class="form-note"><i class="ti ti-info-circle"></i> Profile is linked to your registered user account</span>
-                <div style="display:flex;gap:8px">
-                  @if (isEdit) {
-                    <button type="button" mat-stroked-button style="border-radius:8px" (click)="cancelEdit()">
-                      <i class="ti ti-x"></i>&nbsp;Cancel
-                    </button>
-                  }
-                  <button type="submit" mat-raised-button color="primary" style="border-radius:8px"
-                          [disabled]="loading || form.invalid || (isEdit && form.pristine)">
-                    @if (loading) {
-                      <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
-                    }
-                    {{ loading ? 'Saving…' : isEdit ? 'Update profile' : 'Create profile' }}
-                  </button>
-                </div>
-              </div>
-            </mat-card-content>
-          </mat-card>
-        </form>
+            @if (editingSection() === s.key) {
+              @switch (s.key) {
+                @case ('personal') {
+                  <app-personal-info-step
+                    [embedded]="true"
+                    (saved)="onSectionSaved()"
+                  />
+                }
+                @case ('address') {
+                  <app-address-step
+                    [embedded]="true"
+                    (saved)="onSectionSaved()"
+                  />
+                }
+                @case ('documents') {
+                  <app-documents [embedded]="true" (saved)="onSectionSaved()" />
+                }
+                @case ('skills') {
+                  <app-candidate-skills
+                    [embedded]="true"
+                    (saved)="onSectionSaved()"
+                  />
+                }
+                @case ('experience') {
+                  <app-candidate-experience
+                    [embedded]="true"
+                    (saved)="onSectionSaved()"
+                  />
+                }
+                @case ('qualifications') {
+                  <app-candidate-qualifications
+                    [embedded]="true"
+                    (saved)="onSectionSaved()"
+                  />
+                }
+              }
+            }
+          </div>
+        }
       }
     </div>
-    <style>
-      .suggestions-dropdown {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-        z-index: 1000;
-        max-height: 240px;
-        overflow-y: auto;
+  `,
+  styles: [
+    `
+      /* ---- palette used only in this component ---- */
+      :host {
+        --step-border: #e2e8f0;
+        --step-muted: #94a3b8;
+        --step-active: #051e3b;
+        --step-done: #16a673;
+        --card-border: #e5e7eb;
       }
-      .suggestion-item {
+
+      .wizard-header {
         display: flex;
         align-items: center;
-        padding: 10px 14px;
-        cursor: pointer;
-        border-bottom: 1px solid #f5f5f5;
-        transition: background 0.1s;
+        justify-content: space-between;
+        margin-bottom: 16px;
       }
-      .suggestion-item:last-child { border-bottom: none; }
-      .suggestion-item:hover { background: #f0f7ff; }
-    </style>
-  `
+      .pct-badge {
+        font-size: 13px;
+        font-weight: 600;
+        padding: 6px 14px;
+        border-radius: 999px;
+        transition:
+          background-color 0.2s ease,
+          color 0.2s ease;
+      }
+      .pct-badge.pct-low {
+        background: #fdeaea;
+        color: #c0392b;
+      }
+      .pct-badge.pct-mid {
+        background: #fff4d6;
+        color: #b7791f;
+      }
+      .pct-badge.pct-high {
+        background: #e1f5ee;
+        color: #0f6e56;
+      }
+      .progress-track {
+        height: 6px;
+        background: #eef0f3;
+        border-radius: 999px;
+        margin-bottom: 28px;
+        overflow: hidden;
+      }
+      .progress-fill {
+        height: 100%;
+        transition:
+          width 0.3s ease,
+          background-color 0.2s ease;
+      }
+      .progress-fill.pct-low {
+        background: #c0392b;
+      }
+      .progress-fill.pct-mid {
+        background: #d9a441;
+      }
+      .progress-fill.pct-high {
+        background: var(--step-done);
+      }
+
+      /* ---- stepper: neutral resting state, a connecting line, states that mean something ---- */
+      .stepper-row {
+        position: relative;
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 24px;
+      }
+      .stepper-line-track {
+        position: absolute;
+        top: 22px;
+        left: 32px;
+        right: 32px;
+        height: 2px;
+        background: var(--step-border);
+        z-index: 0;
+      }
+      .stepper-line-fill {
+        position: absolute;
+        top: 22px;
+        left: 32px;
+        height: 2px;
+        background: var(--step-done);
+        z-index: 0;
+        transition: width 0.3s ease;
+        max-width: calc(100% - 64px);
+      }
+
+      .step-circle-wrap {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        width: 64px;
+      }
+      .step-circle {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        border: 1.5px solid var(--step-border);
+        color: var(--step-muted);
+        background: #fff;
+        transition: all 0.15s ease;
+      }
+      .step-circle-wrap:hover .step-circle {
+        border-color: var(--step-active);
+      }
+      .step-circle.active {
+        background: var(--step-active);
+        border-color: var(--step-active);
+        color: #fff;
+      }
+      .step-circle.done {
+        background: var(--step-done);
+        color: #fff;
+        border-color: var(--step-done);
+      }
+      .step-label {
+        font-size: 12px;
+        color: var(--step-muted);
+      }
+      .step-label.active {
+        color: var(--step-active);
+        font-weight: 600;
+      }
+
+      .step-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 0;
+        margin-bottom: 20px;
+        border: 1px solid var(--card-border);
+      }
+      .wizard-footer {
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .summary-row-card {
+        background: #fff;
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 10px;
+      }
+      .summary-row-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .summary-row-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #14213d;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+    `,
+  ],
 })
 export class ProfileComponent implements OnInit {
-  private fb = inject(FormBuilder);
-  private auth = inject(AuthService);
-  private candidateService = inject(CandidateService);
+  private state = inject(CandidateStateService);
   private addressService = inject(AddressService);
-  state = inject(CandidateStateService);
-  private toast = inject(ToastService);
-  private autocomplete = inject(AddressAutocompleteService);
+  private documentService = inject(DocumentService);
+  private skillService = inject(CandidateSkillService);
+  private experienceService = inject(CandidateExperienceService);
+  private qualificationService = inject(CandidateQualificationService);
 
-  suggestions = signal<any[]>([]);
-  showSuggestions = signal(false);
-  private searchInput$ = new Subject<string>();
+  @ViewChild('personalStep') personalStepCmp?: PersonalInfoStepComponent;
+  @ViewChild('addressStep') addressStepCmp?: AddressStepComponent;
+  @ViewChild('experienceStep') experienceStepCmp?: CandidateExperienceComponent;
 
-  isEdit = false;
-  loading = false;
-  apiError = '';
-  loadError = signal('');
+  steps = STEPS;
+  current = signal<StepKey>('personal');
+  editingSection = signal<StepKey | null>(null);
   initialLoading = signal(true);
 
-  maxDob = new Date().toISOString().substring(0, 10);
+  addressCount = signal(0);
+  documentTypesUploaded = signal<string[]>([]);
+  skillCount = signal(0);
+  experienceCount = signal(0);
+  qualificationCount = signal(0);
 
-  form = this.fb.group({
-    phone: ['', [Validators.pattern(/^\+?[0-9\s-]{7,15}$/)]],
-    gender: [''],
-    race: [''],
-    nationality: [''],
-    dateOfBirth: ['', [this.notFutureDate]]
-  });
+  stepIndex = computed(() =>
+    this.steps.findIndex((s) => s.key === this.current()),
+  );
 
-  // ── Addresses ──────────────────────────────────────────────────
-  addresses = signal<AddressResponse[]>([]);
-  addressLoading = signal(false);
-  addressSaving = false;
-  addressApiError = '';
-
-  addressForm: { editing: boolean; mode: 'add' | 'edit'; type: AddressType; id?: number } =
-    { editing: false, mode: 'add', type: 'Residential' };
-
-  addrForm = this.fb.group({
-    line1: ['', Validators.required],
-    line2: [''],
-    city: ['', Validators.required],
-    province: ['', Validators.required],
-    postalCode: ['', [Validators.required, Validators.pattern(/^\d{4}$/)]],
-    country: ['South Africa']
-  });
-
-  ALL_ADDRESS_TYPES: AddressType[] = ['Residential', 'Postal'];
-
-  missingAddressTypes(): AddressType[] {
-    const existing = this.addresses().map(a => a.addressType);
-    return this.ALL_ADDRESS_TYPES.filter(t => !existing.includes(t));
+  isComplete(key: StepKey): boolean {
+    const p = this.state.profile();
+    switch (key) {
+      case 'personal':
+        return !!(
+          p?.phone &&
+          p?.dateOfBirth &&
+          p?.gender &&
+          p?.nationality &&
+          p?.race
+        );
+      case 'address':
+        return this.addressCount() > 0;
+      case 'documents':
+        return GLOBAL_MANDATORY.every((t) =>
+          this.documentTypesUploaded().includes(t),
+        );
+      case 'skills':
+        return this.skillCount() > 0;
+      case 'experience':
+        return this.experienceCount() > 0;
+      case 'qualifications':
+        return this.qualificationCount() > 0;
+    }
   }
+
+  allComplete = computed(() => this.steps.every((s) => this.isComplete(s.key)));
+  pctComplete = computed(() =>
+    Math.round(
+      (this.steps.filter((s) => this.isComplete(s.key)).length /
+        this.steps.length) *
+        100,
+    ),
+  );
 
   ngOnInit(): void {
-    if (!this.state.loaded()) {
-      this.state.loadMyProfile().subscribe({
-        next: () => { this.initialLoading.set(false); this.loadAddresses(); },
-        error: (err: Error) => {
-          this.loadError.set(err.message);
-          this.initialLoading.set(false);
-        }
-      });
-    } else {
-      this.initialLoading.set(false);
-      this.loadAddresses();
-    }
-
-    this.searchInput$.pipe(
-      debounceTime(300),
-      distinctUntilChanged(),
-      switchMap(input => input.length >= 3
-        ? this.autocomplete.getSuggestions(input)
-        : of({ suggestions: [] }))
-    ).subscribe(response => {
-      this.suggestions.set(response?.suggestions ?? []);
-      this.showSuggestions.set(this.suggestions().length > 0);
-    });
-  }
-
-  private loadAddresses(): void {
-    const p = this.state.profile();
-    if (!p) return;
-    this.addressLoading.set(true);
-    this.addressService.getAll(p.candidateId).subscribe({
-      next: a => { this.addresses.set(a); this.addressLoading.set(false); },
-      error: () => this.addressLoading.set(false)
-    });
-  }
-
-  startAddAddress(type: AddressType): void {
-    this.addrForm.reset({ line1: '', line2: '', city: '', province: '', postalCode: '', country: 'South Africa' });
-    this.addressForm = { editing: true, mode: 'add', type };
-    this.addressApiError = '';
-  }
-
-  startEditAddress(a: AddressResponse): void {
-    this.addrForm.reset({
-      line1: a.line1, line2: a.line2 ?? '', city: a.city,
-      province: a.province, postalCode: a.postalCode, country: a.country
-    });
-    this.addressForm = { editing: true, mode: 'edit', type: a.addressType as AddressType, id: a.addressId };
-    this.addressApiError = '';
-  }
-
-  cancelAddressEdit(): void {
-    this.addressForm = { editing: false, mode: 'add', type: 'Residential' };
-    this.addressApiError = '';
-  }
-
-  onAddressInput(value: string): void {
-    this.addrForm.patchValue({ line1: value });
-    this.searchInput$.next(value);
-  }
-
-  hideSuggestionsDelayed(): void {
-    // Small delay so mousedown on suggestion fires before blur hides the list
-    setTimeout(() => this.showSuggestions.set(false), 200);
-  }
-
-  selectSuggestion(suggestion: any): void {
-    const text = suggestion.placePrediction?.text?.text
-      ?? suggestion.description
-      ?? '';
-
-    // Extract structured parts if available
-    const structured = suggestion.placePrediction?.structuredFormat;
-    const mainText = structured?.mainText?.text ?? text;
-    const secondaryText = structured?.secondaryText?.text ?? '';
-
-    // Auto-fill line1 from the suggestion's main text (street + number)
-    this.addrForm.patchValue({ line1: mainText });
-
-    // Try to extract city and province from secondary text
-    // Google formats this as "City, Province, South Africa"
-    if (secondaryText) {
-      const parts = secondaryText.split(',').map((p: string) => p.trim());
-      if (parts.length >= 1) this.addrForm.patchValue({ city: parts[0] });
-      if (parts.length >= 2) {
-        // Match against known SA provinces
-        const provinces = ['Gauteng','Western Cape','KwaZulu-Natal','Eastern Cape',
-          'Free State','Limpopo','Mpumalanga','North West','Northern Cape'];
-        const matchedProvince = provinces.find(p =>
-          parts[1].toLowerCase().includes(p.toLowerCase())
-        );
-        if (matchedProvince) this.addrForm.patchValue({ province: matchedProvince });
+    const boot = () => {
+      const p = this.state.profile();
+      if (!p) {
+        this.initialLoading.set(false);
+        return;
       }
-    }
+      const id = p.candidateId;
 
-    this.showSuggestions.set(false);
-    this.suggestions.set([]);
-  }
+      this.addressService
+        .getAll(id)
+        .subscribe((a) => this.addressCount.set(a.length));
+      this.documentService
+        .getAll(id)
+        .subscribe((d) =>
+          this.documentTypesUploaded.set(d.map((x) => x.documentType)),
+        );
+      this.skillService
+        .getAll(id)
+        .subscribe((s) => this.skillCount.set(s.length));
+      this.experienceService
+        .getAll(id)
+        .subscribe((e) => this.experienceCount.set(e.length));
+      this.qualificationService
+        .getAll(id)
+        .subscribe((q) => this.qualificationCount.set(q.length));
 
-  addrInvalid(field: string): boolean {
-    const c = this.addrForm.get(field);
-    return !!c && c.invalid && (c.dirty || c.touched);
-  }
-
-  submitAddress(): void {
-    if (this.addrForm.invalid) { this.addrForm.markAllAsTouched(); return; }
-    const p = this.state.profile();
-    if (!p) return;
-
-    const v = this.addrForm.value;
-    this.addressSaving = true;
-    this.addressApiError = '';
-
-    if (this.addressForm.mode === 'add') {
-      this.addressService.create(p.candidateId, {
-        addressType: this.addressForm.type,
-        line1: v.line1!, line2: v.line2 || undefined, city: v.city!,
-        province: v.province!, postalCode: v.postalCode!, country: v.country || undefined
-      }).subscribe({
-        next: created => {
-          this.addresses.update(list => [...list, created]);
-          this.addressSaving = false;
-          this.cancelAddressEdit();
-          this.toast.show(`${created.addressType} address added.`, 'success');
-        },
-        error: (err: Error) => { this.addressSaving = false; this.addressApiError = err.message; }
-      });
-    } else {
-      this.addressService.update(p.candidateId, this.addressForm.id!, {
-        line1: v.line1!, line2: v.line2 || undefined, city: v.city!,
-        province: v.province!, postalCode: v.postalCode!, country: v.country || undefined
-      }).subscribe({
-        next: updated => {
-          this.addresses.update(list => list.map(a => a.addressId === updated.addressId ? updated : a));
-          this.addressSaving = false;
-          this.cancelAddressEdit();
-          this.toast.show('Address updated.', 'success');
-        },
-        error: (err: Error) => { this.addressSaving = false; this.addressApiError = err.message; }
-      });
-    }
-  }
-
-  deleteAddress(a: AddressResponse): void {
-    const p = this.state.profile();
-    if (!p) return;
-    if (!confirm(`Delete this ${a.addressType} address?`)) return;
-
-    this.addressService.delete(p.candidateId, a.addressId).subscribe({
-      next: () => {
-        this.addresses.update(list => list.filter(x => x.addressId !== a.addressId));
-        this.toast.show('Address removed.', 'success');
-      },
-      error: (err: Error) => this.toast.show(err.message, 'error')
-    });
-  }
-
-  private notFutureDate(control: { value: string }) {
-    if (!control.value) return null;
-    return new Date(control.value) > new Date() ? { futureDate: true } : null;
-  }
-
-  isInvalid(field: string): boolean {
-    const c = this.form.get(field);
-    return !!c && c.invalid && (c.dirty || c.touched);
-  }
-
-  profileComplete(): boolean {
-    const p = this.state.profile();
-    if (!p) return false;
-    return !!(p.phone && p.dateOfBirth && p.gender && p.nationality && p.race) && this.addresses().length > 0;
-  }
-
-  initials(): string {
-    const p = this.state.profile();
-    return p ? (p.firstName[0] + p.lastName[0]).toUpperCase() : '';
-  }
-
-  formatDate(d?: string): string {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' });
-  }
-
-  startEdit(): void {
-    const p = this.state.profile()!;
-    this.form.patchValue({
-      phone: p.phone ?? '',
-      gender: p.gender ?? '',
-      race: p.race ?? '',
-      nationality: p.nationality ?? '',
-      dateOfBirth: p.dateOfBirth ? p.dateOfBirth.substring(0, 10) : ''
-    });
-    this.form.markAsPristine();
-    this.isEdit = true;
-    this.apiError = '';
-  }
-
-  cancelEdit(): void {
-    if (this.form.dirty && !confirm('Discard unsaved changes?')) return;
-    this.isEdit = false;
-    this.apiError = '';
-    this.form.reset();
-  }
-
-  submit(): void {
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      return;
-    }
-
-    this.apiError = '';
-    const v = this.form.value;
-    const payload = {
-      phone: v.phone || undefined,
-      gender: v.gender || undefined,
-      race: v.race || undefined,
-      nationality: v.nationality || undefined,
-      dateOfBirth: v.dateOfBirth ? new Date(v.dateOfBirth).toISOString() : undefined
+      this.current.set(
+        this.steps.find((s) => !this.isComplete(s.key))?.key ?? 'personal',
+      );
+      this.initialLoading.set(false);
     };
 
-    const userId = this.auth.currentUser()!.userId;
-    this.loading = true;
-
-    if (this.isEdit) {
-      this.candidateService.update(this.state.profile()!.candidateId, payload).subscribe({
-        next: updated => {
-          this.state.setProfile(updated);
-          this.loading = false;
-          this.isEdit = false;
-          this.form.reset();
-          this.toast.show('Profile updated.', 'success');
-        },
-        error: (err: Error) => { this.loading = false; this.apiError = err.message; }
-      });
+    if (!this.state.loaded()) {
+      this.state.loadMyProfile().subscribe(() => boot());
     } else {
-      this.candidateService.create({ userId, ...payload }).subscribe({
-        next: created => {
-          this.state.setProfile(created);
-          this.loading = false;
-          this.form.reset();
-          this.loadAddresses();
-          this.toast.show(`Profile created — Candidate #${created.candidateId}`, 'success');
-        },
-        error: (err: Error) => { this.loading = false; this.apiError = err.message; }
-      });
+      boot();
     }
+  }
+
+  onStepSaved(): void {
+    this.continue();
+  }
+
+  onSectionSaved(): void {
+    this.editingSection.set(null);
+  }
+
+  /** Footer's primary button. In every case, the inline "Add"/"Upload"/"Update"
+   *  buttons inside each step only save and stay on that step — advancing to
+   *  the next step is exclusively this button's job.
+   *  - Personal step: its inline submit button is hidden in the wizard, so this
+   *    triggers the form's own submit() directly.
+   *  - Address step: if an add/edit address form is currently open, this submits
+   *    that form first (forceAdvance=true), advancing only once it succeeds.
+   *  - Experience step: if the add-experience form has unsaved input, this
+   *    submits it first (forceAdvance=true) before advancing; if the form is
+   *    untouched, it just advances (nothing new to save).
+   *  - Documents/Skills/Qualifications: uploads/adds already save immediately
+   *    on their own inline controls, so this just advances. */
+  primaryAction(): void {
+    if (this.current() === 'personal') {
+      this.personalStepCmp?.submit();
+    } else if (this.current() === 'address' && this.addressStepCmp?.editing()) {
+      this.addressStepCmp.submitAddress(true);
+    } else if (
+      this.current() === 'experience' &&
+      this.experienceStepCmp?.form.dirty
+    ) {
+      this.experienceStepCmp.add(true);
+    } else {
+      this.continue();
+    }
+  }
+
+  back(): void {
+    const i = this.stepIndex();
+    if (i > 0) this.current.set(this.steps[i - 1].key);
+  }
+
+  skip(): void {
+    const i = this.stepIndex();
+    if (i < this.steps.length - 1) this.current.set(this.steps[i + 1].key);
+  }
+
+  continue(): void {
+    const i = this.stepIndex();
+    if (i < this.steps.length - 1) this.current.set(this.steps[i + 1].key);
   }
 }

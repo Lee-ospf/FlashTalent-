@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -154,6 +154,16 @@ import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-
   `,
 })
 export class CandidateExperienceComponent implements OnInit {
+  @Input() embedded = false;
+  /** Whether adding the very first experience entry from the inline button
+   *  should itself emit `saved`. True by default (used by the edit-in-place
+   *  summary view, where saving should close the section). The setup wizard
+   *  sets this to false so only its footer's "Save and continue" button —
+   *  which calls add(true) — advances the step; the inline "Add experience"
+   *  button there just saves and stays put. */
+  @Input() autoAdvanceOnSave = true;
+  @Output() saved = new EventEmitter<void>();
+
   private fb = inject(FormBuilder);
   private state = inject(CandidateStateService);
   private experienceService = inject(CandidateExperienceService);
@@ -216,11 +226,17 @@ export class CandidateExperienceComponent implements OnInit {
     });
   }
 
-  add(): void {
+  /** @param forceAdvance When true (used by the wizard's footer button),
+   *  emits `saved` on success regardless of `autoAdvanceOnSave` or whether
+   *  this is the first entry. */
+  add(forceAdvance: boolean = false): void {
     const p = this.state.profile();
-    if (!p || this.form.invalid) return;
+    if (!p) return;
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+
     this.apiError = '';
     this.saving.set(true);
+    const wasEmpty = this.experiences().length === 0;
     const v = this.form.value;
     this.experienceService
       .create(p.candidateId, {
