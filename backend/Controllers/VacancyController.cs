@@ -211,6 +211,9 @@ namespace TalentHub.Controllers
             if (dto.Skills is null || !dto.Skills.Any())
                 return BadRequest("At least one required skill must be specified.");
 
+            if (dto.Skills.Select(s => s.SkillId).Distinct().Count() != dto.Skills.Count)
+                return BadRequest("Duplicate skills in request.");
+
             // Snapshot the "before" values so we can build a human-readable diff after applying changes.
             var before = new
             {
@@ -242,7 +245,7 @@ namespace TalentHub.Controllers
             vacancy.RequiredQualifications = dto.RequiredQualifications;
             vacancy.Requirements = dto.Requirements;
 
-            // Replace skills entirely
+            
             var skillIds = dto.Skills.Select(s => s.SkillId).ToList();
 
             var validSkillIds = await Db.Skills
@@ -250,17 +253,39 @@ namespace TalentHub.Controllers
                 .Select(s => s.SkillId)
                 .ToHashSetAsync();
 
-            vacancy.VacancySkills.Clear();
-            vacancy.VacancySkills = dto.Skills
+            var incomingSkills = dto.Skills
                 .Where(s => validSkillIds.Contains(s.SkillId))
-                .Select(s => new VacancySkill
+                .ToDictionary(s => s.SkillId);
+
+            var existingSkills = vacancy.VacancySkills.ToDictionary(vs => vs.SkillId);
+
+            // Remove skills that were dropped from the request
+            foreach (var stale in existingSkills.Values
+                         .Where(vs => !incomingSkills.ContainsKey(vs.SkillId))
+                         .ToList())
+            {
+                vacancy.VacancySkills.Remove(stale);
+            }
+
+            // Add new skills / update flags on ones that already existed
+            foreach (var incoming in incomingSkills.Values)
+            {
+                if (existingSkills.TryGetValue(incoming.SkillId, out var existingSkill))
                 {
-                    VacancyId = vacancy.VacancyId,
-                    SkillId = s.SkillId,
-                    IsRequired = s.IsRequired,
-                    ProficiencyLevel = s.ProficiencyLevel
-                })
-                .ToList();
+                    existingSkill.IsRequired = incoming.IsRequired;
+                    existingSkill.ProficiencyLevel = incoming.ProficiencyLevel;
+                }
+                else
+                {
+                    vacancy.VacancySkills.Add(new VacancySkill
+                    {
+                        VacancyId = vacancy.VacancyId,
+                        SkillId = incoming.SkillId,
+                        IsRequired = incoming.IsRequired,
+                        ProficiencyLevel = incoming.ProficiencyLevel
+                    });
+                }
+            }
 
             // required documents 
             vacancy.RequiredDocuments.Clear();
