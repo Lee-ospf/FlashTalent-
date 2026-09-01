@@ -107,6 +107,7 @@ builder.Services.AddScoped<IApplicationStatusRules, ApplicationStatusRules>();
 builder.Services.AddScoped<ITalentPoolService, TalentPoolService>();
 builder.Services.AddScoped<IInterviewService, InterviewService>();
 builder.Services.AddScoped<IOfferLetterService, OfferLetterService>();
+builder.Services.AddHttpClient<IResumeParsingService, ResumeParsingService>();
 var app = builder.Build();
 
 
