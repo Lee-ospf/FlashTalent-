@@ -1,4 +1,11 @@
-import { Component, inject, Input, Output, EventEmitter, OnInit } from '@angular/core';
+import {
+  Component,
+  inject,
+  Input,
+  Output,
+  EventEmitter,
+  OnInit,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -11,43 +18,68 @@ import { AuthService } from '../../core/services/auth.service';
 import { CandidateService } from '../../core/services/candidate.service';
 import { CandidateStateService } from '../../core/services/candidate-state.service';
 import { ToastService } from '../../core/services/toast.service';
+import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-trigger.directive';
 
 @Component({
   selector: 'app-personal-info-step',
   standalone: true,
-  imports: [ 
-    CommonModule, ReactiveFormsModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatButtonModule, MatCardModule, MatProgressSpinnerModule,
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatButtonModule,
+    MatCardModule,
+    MatProgressSpinnerModule,
+    DatePickerTriggerDirective,
   ],
   template: `
     <div [class.page-container]="!embedded" [class.step-body-padded]="embedded">
       @if (!embedded) {
         <div class="page-header">
           <div>
-            <h2 class="page-title"><i class="ti ti-user"></i> Personal information</h2>
-            <p class="page-sub">Basic details recruiters will see on your profile</p>
+            <h2 class="page-title">
+              <i class="ti ti-user"></i> Personal information
+            </h2>
+            <p class="page-sub">
+              Basic details recruiters will see on your profile
+            </p>
           </div>
         </div>
       }
 
       <mat-card class="mat-elevation-z1" style="border-radius:12px">
         <mat-card-content style="padding:18px 20px">
-          <div class="form-section-label"><i class="ti ti-user"></i> Personal information</div>
+          <div class="form-section-label">
+            <i class="ti ti-user"></i> Personal information
+          </div>
 
           <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
             <div class="field-grid">
               <mat-form-field appearance="outline" style="width:100%">
                 <mat-label>Phone number</mat-label>
-                <input matInput formControlName="phone" type="tel" placeholder="+27 XX XXX XXXX">
+                <input
+                  matInput
+                  formControlName="phone"
+                  type="tel"
+                  placeholder="+27 XX XXX XXXX"
+                />
                 @if (isInvalid('phone')) {
-                  <mat-error>Enter a valid phone number, e.g. +27 82 123 4567</mat-error>
+                  <mat-error
+                    >Enter a valid phone number, e.g. +27 82 123 4567</mat-error
+                  >
                 }
               </mat-form-field>
 
               <mat-form-field appearance="outline" style="width:100%">
                 <mat-label>Date of birth</mat-label>
-                <input matInput formControlName="dateOfBirth" type="date" [max]="maxDob">
+                <input
+                  matInput
+                  formControlName="dateOfBirth"
+                  type="date"
+                  [max]="maxDob"
+                />
                 @if (isInvalid('dateOfBirth')) {
                   <mat-error>Date of birth can't be in the future</mat-error>
                 }
@@ -60,13 +92,19 @@ import { ToastService } from '../../core/services/toast.service';
                   <mat-option value="Male">Male</mat-option>
                   <mat-option value="Female">Female</mat-option>
                   <mat-option value="Non-binary">Non-binary</mat-option>
-                  <mat-option value="Prefer not to say">Prefer not to say</mat-option>
+                  <mat-option value="Prefer not to say"
+                    >Prefer not to say</mat-option
+                  >
                 </mat-select>
               </mat-form-field>
 
               <mat-form-field appearance="outline" style="width:100%">
                 <mat-label>Nationality</mat-label>
-                <input matInput formControlName="nationality" placeholder="e.g. South African">
+                <input
+                  matInput
+                  formControlName="nationality"
+                  placeholder="e.g. South African"
+                />
               </mat-form-field>
 
               <mat-form-field appearance="outline" style="width:100%">
@@ -77,7 +115,9 @@ import { ToastService } from '../../core/services/toast.service';
                   <mat-option value="Coloured">Coloured</mat-option>
                   <mat-option value="Indian/Asian">Indian/Asian</mat-option>
                   <mat-option value="White">White</mat-option>
-                  <mat-option value="Prefer not to say">Prefer not to say</mat-option>
+                  <mat-option value="Prefer not to say"
+                    >Prefer not to say</mat-option
+                  >
                 </mat-select>
               </mat-form-field>
             </div>
@@ -91,12 +131,26 @@ import { ToastService } from '../../core/services/toast.service';
             @if (!hideSubmit) {
               <div class="form-footer" style="margin-top:14px">
                 <span></span>
-                <button type="submit" mat-raised-button color="primary" style="border-radius:8px"
-                        [disabled]="loading || form.invalid">
+                <button
+                  type="submit"
+                  mat-raised-button
+                  color="primary"
+                  style="border-radius:8px"
+                  [disabled]="loading || form.invalid"
+                >
                   @if (loading) {
-                    <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
+                    <mat-spinner
+                      diameter="16"
+                      style="display:inline-block;margin-right:6px"
+                    ></mat-spinner>
                   }
-                  {{ loading ? 'Saving…' : hasProfile() ? 'Save changes' : 'Save and continue' }}
+                  {{
+                    loading
+                      ? 'Saving…'
+                      : hasProfile()
+                        ? 'Save changes'
+                        : 'Save and continue'
+                  }}
                 </button>
               </div>
             }
@@ -105,7 +159,13 @@ import { ToastService } from '../../core/services/toast.service';
       </mat-card>
     </div>
   `,
-  styles: [`.step-body-padded { padding: 1.5rem; }`],
+  styles: [
+    `
+      .step-body-padded {
+        padding: 1.5rem;
+      }
+    `,
+  ],
 })
 export class PersonalInfoStepComponent implements OnInit {
   @Input() embedded = false;
@@ -174,31 +234,44 @@ export class PersonalInfoStepComponent implements OnInit {
       gender: v.gender || undefined,
       race: v.race || undefined,
       nationality: v.nationality || undefined,
-      dateOfBirth: v.dateOfBirth ? new Date(v.dateOfBirth).toISOString() : undefined,
+      dateOfBirth: v.dateOfBirth
+        ? new Date(v.dateOfBirth).toISOString()
+        : undefined,
     };
 
     this.loading = true;
 
     if (this.hasProfile()) {
-      this.candidateService.update(this.state.profile()!.candidateId, payload).subscribe({
-        next: updated => {
-          this.state.setProfile(updated);
-          this.loading = false;
-          this.toast.show('Profile updated.', 'success');
-          this.saved.emit();
-        },
-        error: (err: Error) => { this.loading = false; this.apiError = err.message; },
-      });
+      this.candidateService
+        .update(this.state.profile()!.candidateId, payload)
+        .subscribe({
+          next: (updated) => {
+            this.state.setProfile(updated);
+            this.loading = false;
+            this.toast.show('Profile updated.', 'success');
+            this.saved.emit();
+          },
+          error: (err: Error) => {
+            this.loading = false;
+            this.apiError = err.message;
+          },
+        });
     } else {
       const userId = this.auth.currentUser()!.userId;
       this.candidateService.create({ userId, ...payload }).subscribe({
-        next: created => {
+        next: (created) => {
           this.state.setProfile(created);
           this.loading = false;
-          this.toast.show(`Profile created — Candidate #${created.candidateId}`, 'success');
+          this.toast.show(
+            `Profile created — Candidate #${created.candidateId}`,
+            'success',
+          );
           this.saved.emit();
         },
-        error: (err: Error) => { this.loading = false; this.apiError = err.message; },
+        error: (err: Error) => {
+          this.loading = false;
+          this.apiError = err.message;
+        },
       });
     }
   }
