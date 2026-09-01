@@ -455,3 +455,34 @@ export interface NotificationResponse {
 export interface UnreadCountResponse {
   unreadCount: number;
 }
+
+// ── AI Resume Parsing ────────────────────────────────────────────
+
+
+export interface ParsedSkill {
+  name: string;
+  category?: string;           // 'Technical' | 'SoftSkill' — matches SkillResponse.category directly, no translation needed
+  proficiencyLevel: string;    // 'Beginner' | 'Intermediate' | 'Expert' — matches this app's vocabulary directly
+}
+
+export interface ParsedQualification {
+  qualificationType: string;   // 'Education' | 'Certification'
+  name: string;
+  institution: string;
+  yearCompleted?: string;      // ISO date string, or absent — treat as AI-guessed, not confirmed (see design notes on date reliability)
+}
+
+export interface ParsedExperience {
+  company: string;
+  role: string;
+  startDate?: string;          // ISO date string, or absent if unclear
+  endDate?: string;            // absent = current role
+  projectsAndDuties?: string;
+}
+
+export interface ParsedResumeResponse {
+  phone?: string;
+  skills: ParsedSkill[];
+  qualifications: ParsedQualification[];
+  experiences: ParsedExperience[];
+}

@@ -19,6 +19,9 @@ import {
 } from '../../core/services/document.service';
 import { VacancyService } from '../../core/services/vacancy.service';
 import { ToastService } from '../../core/services/toast.service';
+import { ResumeParsingService } from '../../core/services/resume-parsing.service';
+import { SkillService } from '../../core/services/skill.service';
+import { ResumeAutofillStoreService } from '../../core/services/resume-autofill-store.service';
 import { CandidateDocumentResponse, VacancyResponse } from '../../core/models';
 
 interface RequiredSlot {
@@ -133,6 +136,24 @@ interface RequiredSlot {
             </div>
           }
         </div>
+
+        @if (cvUploaded()) {
+          <div class="autofill-banner">
+            <div class="autofill-left">
+              <i class="ti ti-wand"></i>
+              <div>
+                <div class="autofill-title">Auto-fill the rest of your profile</div>
+                <div class="autofill-sub">We'll read your CV and list suggested skills, qualifications and experience for you to review and add.</div>
+              </div>
+            </div>
+            <button mat-raised-button color="primary" style="border-radius:8px" (click)="autoFillFromCv()" [disabled]="parsingCv()">
+              @if (parsingCv()) {
+                <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
+              }
+              <i class="ti ti-wand"></i> {{ parsingCv() ? 'Reading your CV…' : 'Auto-fill from CV' }}
+            </button>
+          </div>
+        }
 
         @if (extraUploadedDocs().length) {
           <div class="section-label" style="margin-top:20px">Other uploaded documents</div>
@@ -273,6 +294,16 @@ interface RequiredSlot {
 
     .additional-card .card-header { font-size: 14px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
     .additional-card .card-header i { color: var(--navy); font-size: 16px; }
+
+    .autofill-banner {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      background: linear-gradient(135deg, #f3e9ff 0%, #e3f2fd 100%);
+      border: 1px solid rgba(106,27,154,0.15); border-radius: 12px; padding: 16px 18px; margin-top: 20px;
+    }
+    .autofill-left { display: flex; align-items: center; gap: 12px; }
+    .autofill-left > i { font-size: 22px; color: #6a1b9a; flex-shrink: 0; }
+    .autofill-title { font-size: 13px; font-weight: 600; color: var(--text); }
+    .autofill-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
   `],
 })
 export class DocumentsComponent implements OnInit {
@@ -284,12 +315,16 @@ export class DocumentsComponent implements OnInit {
   private vac = inject(VacancyService);
   private toast = inject(ToastService);
   private route = inject(ActivatedRoute);
+  private resumeParsing = inject(ResumeParsingService);
+  private skillService = inject(SkillService);
+  autofillStore = inject(ResumeAutofillStoreService);
 
   uploadedDocs = signal<CandidateDocumentResponse[]>([]);
   vacancyContext = signal<VacancyResponse | null>(null);
   loading = signal(false);
   uploading = signal<string | null>(null);
   dragOverType = signal<string | null>(null);
+  parsingCv = signal(false);
 
   freeUploadType: DocumentTypeKey | '' = '';
   otherDescription = '';
@@ -335,6 +370,10 @@ export class DocumentsComponent implements OnInit {
     const total = this.requiredSlots().length;
     return total ? Math.round((this.uploadedRequiredCount() / total) * 100) : 0;
   });
+
+  // A CV has to already be uploaded before auto-fill can run — the backend
+  // reuses whichever CV file is on record rather than accepting a new one here.
+  cvUploaded = computed(() => this.requiredSlots().some(s => s.type === 'CV' && !!s.uploaded));
 
   ngOnInit(): void {
     if (this.state.profile()) {
@@ -468,6 +507,39 @@ export class DocumentsComponent implements OnInit {
         // step. This just stays on the Documents step so you can keep uploading.
       },
       error: (e: Error) => { this.uploading.set(null); this.toast.show(e.message, 'error'); },
+    });
+  }
+
+  // Reads the candidate's already-uploaded CV via the backend and matches
+  // parsed skills against the current master skill list. Nothing is saved —
+  // results just populate ResumeAutofillStoreService for the Skills,
+  // Qualifications, and Experience steps to render as review cards.
+  autoFillFromCv(): void {
+    const p = this.state.profile();
+    if (!p || this.parsingCv()) return;
+    this.parsingCv.set(true);
+
+    this.resumeParsing.parseCv(p.candidateId).subscribe({
+      next: parsed => {
+        this.skillService.getAll().subscribe({
+          next: masterSkills => {
+            this.autofillStore.load(parsed, masterSkills);
+            this.parsingCv.set(false);
+            const count = this.autofillStore.totalPending();
+            this.toast.show(
+              count > 0
+                ? `Found ${count} item${count === 1 ? '' : 's'} in your CV — review and add them on the Skills, Experience and Qualifications steps.`
+                : "We couldn't find anything usable to auto-fill — no problem, just fill things in manually.",
+              count > 0 ? 'success' : 'warn',
+            );
+          },
+          error: () => {
+            this.parsingCv.set(false);
+            this.toast.show('Parsed your CV, but could not load the skill list to match against — try again.', 'error');
+          },
+        });
+      },
+      error: (e: Error) => { this.parsingCv.set(false); this.toast.show(e.message, 'error'); },
     });
   }
 }

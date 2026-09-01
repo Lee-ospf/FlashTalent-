@@ -11,6 +11,7 @@ import { CandidateStateService } from '../../core/services/candidate-state.servi
 import { CandidateQualificationService } from '../../core/services/candidate-qualification.service';
 import { DocumentService, DocumentTypeKey, validateFileClient } from '../../core/services/document.service';
 import { ToastService } from '../../core/services/toast.service';
+import { ResumeAutofillStoreService, QualificationItem } from '../../core/services/resume-autofill-store.service';
 import { QualificationResponse, CandidateDocumentResponse } from '../../core/models';
 import { environment } from '../../../environments/environment';
 import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-trigger.directive';
@@ -27,6 +28,37 @@ import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-
             <h2 class="page-title"><i class="ti ti-school"></i> Qualifications</h2>
             <p class="page-sub">Education and certifications, visible to recruiters</p>
           </div>
+        </div>
+      }
+
+      @if (autofillStore.qualifications().length) {
+        <div class="autofill-review-block">
+          <div class="autofill-review-header">
+            <i class="ti ti-sparkles"></i> Found {{ autofillStore.qualifications().length }} qualification(s) in your CV — review and add
+          </div>
+          @for (item of autofillStore.qualifications(); track item.id) {
+            <div class="autofill-card autofill-card-stack">
+              <div class="autofill-card-body">
+                <div class="autofill-card-title">{{ item.name }}</div>
+                <div class="autofill-card-sub">{{ item.qualificationType }} · {{ item.institution }}</div>
+                @if (item.yearCompleted) {
+                  <div class="autofill-card-desc">Completed {{ formatYear(item.yearCompleted) }}</div>
+                } @else {
+                  <input type="date" class="ai-mini-date" [max]="maxDate"
+                         [value]="qualYearDraft[item.id] ?? ''"
+                         (change)="qualYearDraft[item.id] = $any($event.target).value">
+                  <span class="autofill-missing-note">AI couldn't find a date — set one to add this.</span>
+                }
+              </div>
+              <div class="autofill-card-actions">
+                <button mat-stroked-button style="border-radius:8px" (click)="addSuggestedQualification(item)"
+                        [disabled]="saving() || (!item.yearCompleted && !qualYearDraft[item.id])">
+                  <i class="ti ti-plus"></i> Add
+                </button>
+                <button type="button" class="chip-dismiss" (click)="autofillStore.removeQualification(item.id)"><i class="ti ti-x"></i></button>
+              </div>
+            </div>
+          }
         </div>
       }
 
@@ -129,6 +161,20 @@ import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-
       }
       .attach-link:hover { text-decoration: underline; }
       .attach-missing { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+      .autofill-review-block { margin-bottom: 20px; }
+      .autofill-review-header { font-size: 12px; font-weight: 600; color: #6a1b9a; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+      .autofill-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #fff; border: 1px solid #ce93d8; border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; }
+      .autofill-card-stack { align-items: flex-start; }
+      .autofill-card-body { flex: 1; min-width: 0; }
+      .autofill-card-title { font-size: 13px; font-weight: 600; color: var(--text); }
+      .autofill-card-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+      .autofill-card-desc { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+      .autofill-missing-note { display: block; font-size: 11px; color: #c0392b; margin-top: 4px; }
+      .autofill-card-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+      .ai-mini-date { border: 1px solid #ddd; border-radius: 8px; padding: 6px 8px; font-size: 12px; margin-top: 6px; }
+      .chip-dismiss { background: none; border: none; cursor: pointer; opacity: 0.5; padding: 4px; }
+      .chip-dismiss:hover { opacity: 1; }
     </style>
   `,
 })
@@ -141,6 +187,7 @@ export class CandidateQualificationsComponent implements OnInit {
   private qualService = inject(CandidateQualificationService);
   private docService = inject(DocumentService);
   private toast = inject(ToastService);
+  autofillStore = inject(ResumeAutofillStoreService);
 
   qualifications = signal<QualificationResponse[]>([]);
   attachments = signal<CandidateDocumentResponse[]>([]);
@@ -149,6 +196,11 @@ export class CandidateQualificationsComponent implements OnInit {
   apiError = '';
   maxDate = new Date().toISOString().substring(0, 10);
   selectedFile = signal<File | null>(null);
+
+  // Draft dates for CV-suggested qualifications missing a year — keyed by
+  // the suggestion's autofill id, plain object since it's only read/written
+  // from template event bindings.
+  qualYearDraft: Record<string, string> = {};
 
   form = this.fb.group({
     qualificationType: ['Education', Validators.required],
@@ -271,6 +323,33 @@ export class CandidateQualificationsComponent implements OnInit {
         this.toast.show('Qualification removed.', 'success');
       },
       error: (err: Error) => this.toast.show(err.message, 'error'),
+    });
+  }
+
+  // Saves a CV-suggested qualification via the real create endpoint — same
+  // path as the manual form. Falls back to the candidate's drafted date if
+  // the AI didn't find one on the CV; the Add button stays disabled until
+  // some date is set.
+  addSuggestedQualification(item: QualificationItem): void {
+    const p = this.state.profile();
+    const year = item.yearCompleted ?? this.qualYearDraft[item.id];
+    if (!p || !year) return;
+
+    this.saving.set(true);
+    this.qualService.create(p.candidateId, {
+      qualificationType: item.qualificationType as any,
+      name: item.name,
+      institution: item.institution,
+      yearCompleted: new Date(year).toISOString(),
+    }).subscribe({
+      next: created => {
+        this.qualifications.update(list => [created, ...list]);
+        this.saving.set(false);
+        this.autofillStore.removeQualification(item.id);
+        this.toast.show(`"${created.name}" added.`, 'success');
+        if (this.qualifications().length === 1) this.saved.emit();
+      },
+      error: (err: Error) => { this.saving.set(false); this.apiError = err.message; },
     });
   }
 }

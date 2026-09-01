@@ -11,6 +11,11 @@ import { CandidateStateService } from '../../core/services/candidate-state.servi
 import { CandidateSkillService } from '../../core/services/candidate-skill.service';
 import { SkillService } from '../../core/services/skill.service';
 import { ToastService } from '../../core/services/toast.service';
+import {
+  ResumeAutofillStoreService,
+  MatchedSkillItem,
+  UnmatchedSkillItem,
+} from '../../core/services/resume-autofill-store.service';
 import { CandidateSkillResponse, SkillResponse } from '../../core/models';
 
 @Component({
@@ -34,6 +39,63 @@ import { CandidateSkillResponse, SkillResponse } from '../../core/models';
       @if (loading()) {
         <div class="empty-state"><mat-spinner diameter="32"></mat-spinner></div>
       } @else {
+
+        @if (autofillStore.matchedSkills().length || autofillStore.unmatchedSkills().length) {
+          <div class="autofill-review-block">
+            <div class="autofill-review-header">
+              <i class="ti ti-sparkles"></i> Found {{ autofillStore.matchedSkills().length + autofillStore.unmatchedSkills().length }} skill(s) in your CV — review and add
+            </div>
+
+            @for (item of autofillStore.matchedSkills(); track item.id) {
+              <div class="autofill-card">
+                <div class="autofill-card-body">
+                  <div class="autofill-card-title">{{ item.skill.name }}</div>
+                  <div class="autofill-card-sub">{{ item.skill.category === 'SoftSkill' ? 'Soft skill' : 'Technical' }}</div>
+                  <select class="ai-level-select" [value]="matchedLevelDraft[item.id] ?? item.proficiencyLevel"
+                          (change)="matchedLevelDraft[item.id] = $any($event.target).value">
+                    <option value="Beginner">Beginner</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Expert">Expert</option>
+                  </select>
+                </div>
+                <div class="autofill-card-actions">
+                  <button mat-stroked-button style="border-radius:8px" (click)="addMatchedSkill(item)" [disabled]="saving()">
+                    <i class="ti ti-plus"></i> Add
+                  </button>
+                  <button type="button" class="chip-dismiss" (click)="autofillStore.removeMatchedSkill(item.id)"><i class="ti ti-x"></i></button>
+                </div>
+              </div>
+            }
+
+            @for (item of autofillStore.unmatchedSkills(); track item.id) {
+              <div class="autofill-card">
+                <div class="autofill-card-body">
+                  <div class="autofill-card-title">"{{ item.parsedName }}" <span class="autofill-unmatched-tag">not in our list</span></div>
+                  <select class="ai-mini-select" [value]="unmatchedPickDraft[item.id] ?? ''"
+                          (change)="unmatchedPickDraft[item.id] = $any($event.target).value">
+                    <option value="" disabled>Pick the closest real skill…</option>
+                    @for (s of skillsForCategory(item.suggestedCategory); track s.skillId) {
+                      <option [value]="s.skillId">{{ s.name }}</option>
+                    }
+                  </select>
+                  <select class="ai-level-select" [value]="unmatchedLevelDraft[item.id] ?? item.proficiencyLevel"
+                          (change)="unmatchedLevelDraft[item.id] = $any($event.target).value">
+                    <option value="Beginner">Beginner</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Expert">Expert</option>
+                  </select>
+                </div>
+                <div class="autofill-card-actions">
+                  <button mat-stroked-button style="border-radius:8px" (click)="addUnmatchedSkill(item)"
+                          [disabled]="saving() || !unmatchedPickDraft[item.id]">
+                    <i class="ti ti-plus"></i> Add
+                  </button>
+                  <button type="button" class="chip-dismiss" (click)="autofillStore.removeUnmatchedSkill(item.id)"><i class="ti ti-x"></i></button>
+                </div>
+              </div>
+            }
+          </div>
+        }
 
         <mat-card class="mat-elevation-z1" style="border-radius:12px;margin-bottom:20px">
           <mat-card-content style="padding:20px">
@@ -176,6 +238,18 @@ import { CandidateSkillResponse, SkillResponse } from '../../core/models';
       .skill-pill { padding:6px 14px; border-radius:20px; border:1px solid #ddd; background:#f5f5f5; cursor:pointer; font-size:13px; transition:background 0.15s; }
       .skill-pill:hover:not(:disabled) { background:#e3f2fd; border-color:#90caf9; }
       .skill-pill--disabled { opacity:0.45; cursor:not-allowed; }
+
+      .autofill-review-block { margin-bottom: 20px; }
+      .autofill-review-header { font-size: 12px; font-weight: 600; color: #6a1b9a; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+      .autofill-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #fff; border: 1px solid #ce93d8; border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; }
+      .autofill-card-body { flex: 1; min-width: 0; }
+      .autofill-card-title { font-size: 13px; font-weight: 600; color: var(--text); }
+      .autofill-card-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+      .autofill-unmatched-tag { font-size: 10px; font-weight: 600; color: #b7791f; background: #fff4d6; border-radius: 20px; padding: 2px 8px; margin-left: 6px; }
+      .autofill-card-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+      .ai-level-select, .ai-mini-select { border: 1px solid #ddd; border-radius: 8px; padding: 6px 8px; font-size: 12px; margin-top: 6px; margin-right: 6px; }
+      .chip-dismiss { background: none; border: none; cursor: pointer; opacity: 0.5; padding: 4px; }
+      .chip-dismiss:hover { opacity: 1; }
     </style>
   `,
 })
@@ -187,6 +261,7 @@ export class CandidateSkillsComponent implements OnInit {
   private skillService = inject(SkillService);
   private candidateSkillService = inject(CandidateSkillService);
   private toast = inject(ToastService);
+  autofillStore = inject(ResumeAutofillStoreService);
 
   technicalSkills = signal<SkillResponse[]>([]);
   softSkills = signal<SkillResponse[]>([]);
@@ -200,6 +275,13 @@ export class CandidateSkillsComponent implements OnInit {
 
   technicalLevel = signal('Intermediate');
   softLevel = signal('Intermediate');
+
+  // Per-card draft state for the autofill review section, keyed by item id.
+  // Plain objects (not signals) are fine here since updates happen inside
+  // Angular event handlers and only affect template reads on the same item.
+  matchedLevelDraft: Record<string, string> = {};
+  unmatchedLevelDraft: Record<string, string> = {};
+  unmatchedPickDraft: Record<string, string> = {};
 
   myTechnicalSkills = computed(() => this.mySkills().filter(s => s.category === 'Technical'));
   mySoftSkills = computed(() => this.mySkills().filter(s => s.category === 'SoftSkill'));
@@ -216,6 +298,10 @@ export class CandidateSkillsComponent implements OnInit {
 
   isAlreadyAdded(skill: SkillResponse): boolean {
     return this.mySkills().some(s => s.skillId === skill.skillId);
+  }
+
+  skillsForCategory(cat: 'Technical' | 'SoftSkill'): SkillResponse[] {
+    return cat === 'SoftSkill' ? this.softSkills() : this.technicalSkills();
   }
 
   ngOnInit(): void {
@@ -265,5 +351,25 @@ export class CandidateSkillsComponent implements OnInit {
       },
       error: (err: Error) => this.toast.show(err.message, 'error'),
     });
+  }
+
+  // Adds a CV-matched skill using its already-known real SkillResponse —
+  // reuses add() directly so there's no duplicate save path to maintain.
+  addMatchedSkill(item: MatchedSkillItem): void {
+    const level = this.matchedLevelDraft[item.id] ?? item.proficiencyLevel;
+    this.add(item.skill, level);
+    this.autofillStore.removeMatchedSkill(item.id);
+  }
+
+  // Adds an unmatched CV skill only once the candidate has picked a real
+  // skill from the dropdown — the "Add" button stays disabled until then.
+  addUnmatchedSkill(item: UnmatchedSkillItem): void {
+    const skillId = Number(this.unmatchedPickDraft[item.id]);
+    if (!skillId) return;
+    const pool = [...this.technicalSkills(), ...this.softSkills()];
+    const skill = pool.find(s => s.skillId === skillId);
+    if (!skill) { this.toast.show('Could not find that skill.', 'error'); return; }
+    this.add(skill, this.unmatchedLevelDraft[item.id] ?? item.proficiencyLevel);
+    this.autofillStore.removeUnmatchedSkill(item.id);
   }
 }
