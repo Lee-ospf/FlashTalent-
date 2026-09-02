@@ -3,6 +3,8 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 
+const PUBLIC_ROUTES = ['/login', '/register'];
+
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const token = localStorage.getItem('rms_token');
   const router = inject(Router);
@@ -16,9 +18,15 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (err.status === 401) {
         localStorage.removeItem('rms_token');
         localStorage.removeItem('rms_auth');
-        router.navigate(['/login']);
+        const currentUrl = router.url;
+        const alreadyOnPublicRoute = PUBLIC_ROUTES.some((p) =>
+          currentUrl.startsWith(p),
+        );
+        if (!alreadyOnPublicRoute) {
+          router.navigate(['/login']);
+        }
       }
       return throwError(() => err);
-    })
+    }),
   );
 };
