@@ -2,7 +2,14 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, tap, catchError, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AuthResponse, LoginRequest, RegisterRequest, CreateRecruiterRequest, ChangePasswordRequest } from '../models';
+import {
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+  CreateRecruiterRequest,
+  ChangePasswordRequest,
+} from '../models';
+import { ResumeAutofillStoreService } from './resume-autofill-store.service';
 
 export interface SessionUser {
   userId: number;
@@ -17,6 +24,7 @@ export interface SessionUser {
 export class AuthService {
   private http = inject(HttpClient);
   private base = `${environment.apiUrl}/auth`;
+  private autofillStore = inject(ResumeAutofillStoreService);
 
   private _session = signal<SessionUser | null>(this.loadSession());
 
@@ -24,30 +32,34 @@ export class AuthService {
   currentUser = computed(() => this._session());
 
   register(req: RegisterRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.base}/register`, req).pipe(
-      catchError(this.handleError)
-    );
+    return this.http
+      .post<AuthResponse>(`${this.base}/register`, req)
+      .pipe(catchError(this.handleError));
   }
 
   // Admin only - creates the User account AND the Recruiter profile together in one call.
-  createRecruiter(req: CreateRecruiterRequest): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.base}/create-recruiter`, req).pipe(
-      catchError(this.handleError)
-    );
+  createRecruiter(
+    req: CreateRecruiterRequest,
+  ): Observable<{ message: string }> {
+    return this.http
+      .post<{ message: string }>(`${this.base}/create-recruiter`, req)
+      .pipe(catchError(this.handleError));
   }
 
   login(req: LoginRequest): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.base}/login`, req).pipe(
-      tap(res => this.persistSession(res)),
-      catchError(this.handleError)
+      tap((res) => this.persistSession(res)),
+      catchError(this.handleError),
     );
   }
 
   changePassword(req: ChangePasswordRequest): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.base}/change-password`, req).pipe(
-      tap(() => this.clearMustChangePasswordFlag()),
-      catchError(this.handleError)
-    );
+    return this.http
+      .post<{ message: string }>(`${this.base}/change-password`, req)
+      .pipe(
+        tap(() => this.clearMustChangePasswordFlag()),
+        catchError(this.handleError),
+      );
   }
 
   // Updates the flag locally after a successful password change, so the reminder
@@ -64,6 +76,8 @@ export class AuthService {
     localStorage.removeItem('rms_token');
     localStorage.removeItem('rms_auth');
     this._session.set(null);
+    sessionStorage.clear();
+    this.autofillStore.clearAll();
   }
 
   private persistSession(res: AuthResponse): void {
@@ -74,7 +88,7 @@ export class AuthService {
       lastName: res.lastName,
       email: res.email,
       role: res.role,
-      mustChangePassword: res.mustChangePassword
+      mustChangePassword: res.mustChangePassword,
     };
     localStorage.setItem('rms_auth', JSON.stringify(session));
     this._session.set(session);
@@ -84,7 +98,9 @@ export class AuthService {
     try {
       const raw = localStorage.getItem('rms_auth');
       return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   private handleError(err: HttpErrorResponse) {
@@ -100,10 +116,14 @@ export class AuthService {
     let message = err.error?.message as string | undefined;
 
     if (!message && err.error?.errors) {
-      const fieldErrors = Object.values(err.error.errors as Record<string, string[]>).flat();
+      const fieldErrors = Object.values(
+        err.error.errors as Record<string, string[]>,
+      ).flat();
       if (fieldErrors.length) message = fieldErrors.join(' ');
     }
 
-    return throwError(() => new Error(message ?? 'An unexpected error occurred.'));
+    return throwError(
+      () => new Error(message ?? 'An unexpected error occurred.'),
+    );
   }
 }

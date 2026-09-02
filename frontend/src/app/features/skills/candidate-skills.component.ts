@@ -255,6 +255,7 @@ import { CandidateSkillResponse, SkillResponse } from '../../core/models';
 })
 export class CandidateSkillsComponent implements OnInit {
   @Input() embedded = false;
+   @Input() autoAdvanceOnSave = true;
   @Output() saved = new EventEmitter<void>();
 
   private state = inject(CandidateStateService);
@@ -332,7 +333,7 @@ export class CandidateSkillsComponent implements OnInit {
         this.mySkills.set(updated);
         this.saving.set(false);
         this.toast.show(`${skill.name} added.`, 'success');
-        if (wasEmpty) this.saved.emit();
+        if (wasEmpty && this.autoAdvanceOnSave) this.saved.emit();
       },
       error: (err: Error) => {
         this.saving.set(false);

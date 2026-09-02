@@ -11,23 +11,19 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { CandidateStateService } from '../../core/services/candidate-state.service';
-import { AddressService } from '../../core/services/address.service';
-import {
-  DocumentService,
-  GLOBAL_MANDATORY,
-} from '../../core/services/document.service';
-import { CandidateSkillService } from '../../core/services/candidate-skill.service';
-import { CandidateExperienceService } from '../../core/services/candidate-experience.service';
-import { CandidateQualificationService } from '../../core/services/candidate-qualification.service';
+import { ProfileCompletionService } from '../../core/services/profile-completion.service';
 
+import { CvUploadStepComponent } from './cv-upload-step.component';
 import { PersonalInfoStepComponent } from './personal-info-step.component';
 import { AddressStepComponent } from './address-step.component';
 import { DocumentsComponent } from '../documents/documents.component';
 import { CandidateSkillsComponent } from '../skills/candidate-skills.component';
 import { CandidateExperienceComponent } from '../experience/candidate-experience.component';
 import { CandidateQualificationsComponent } from '../qualifications/candidate-qualifications.component';
+import { ResumeAutofillStoreService } from '../../core/services/resume-autofill-store.service';
 
 type StepKey =
+  | 'cv'
   | 'personal'
   | 'address'
   | 'documents'
@@ -43,6 +39,7 @@ interface StepDef {
 }
 
 const STEPS: StepDef[] = [
+  { key: 'cv', label: 'CV', icon: 'ti-file-cv', title: 'Upload your CV' },
   {
     key: 'personal',
     label: 'Personal',
@@ -83,6 +80,7 @@ const STEPS: StepDef[] = [
     CommonModule,
     MatButtonModule,
     MatProgressSpinnerModule,
+    CvUploadStepComponent,
     PersonalInfoStepComponent,
     AddressStepComponent,
     DocumentsComponent,
@@ -94,7 +92,7 @@ const STEPS: StepDef[] = [
     <div class="page-container">
       @if (initialLoading()) {
         <div class="empty-state"><mat-spinner diameter="32"></mat-spinner></div>
-      } @else if (!allComplete()) {
+      } @else if (!completion.allComplete()) {
         <!-- SETUP WIZARD -->
         <div class="wizard-header">
           <div>
@@ -105,40 +103,49 @@ const STEPS: StepDef[] = [
           </div>
           <span
             class="pct-badge"
-            [class.pct-low]="pctComplete() < 40"
-            [class.pct-mid]="pctComplete() >= 40 && pctComplete() < 80"
-            [class.pct-high]="pctComplete() >= 80"
+            [class.pct-low]="completion.pctComplete() < 40"
+            [class.pct-mid]="
+              completion.pctComplete() >= 40 && completion.pctComplete() < 80
+            "
+            [class.pct-high]="completion.pctComplete() >= 80"
           >
-            {{ pctComplete() }}% complete
+            {{ completion.pctComplete() }}% complete
           </span>
         </div>
 
         <div class="progress-track">
           <div
             class="progress-fill"
-            [style.width.%]="pctComplete()"
-            [class.pct-low]="pctComplete() < 40"
-            [class.pct-mid]="pctComplete() >= 40 && pctComplete() < 80"
-            [class.pct-high]="pctComplete() >= 80"
+            [style.width.%]="completion.pctComplete()"
+            [class.pct-low]="completion.pctComplete() < 40"
+            [class.pct-mid]="
+              completion.pctComplete() >= 40 && completion.pctComplete() < 80
+            "
+            [class.pct-high]="completion.pctComplete() >= 80"
           ></div>
         </div>
 
         <div class="stepper-row">
           <div class="stepper-line-track"></div>
-          <div class="stepper-line-fill" [style.width.%]="pctComplete()"></div>
+          <div
+            class="stepper-line-fill"
+            [style.width.%]="completion.pctComplete()"
+          ></div>
 
           @for (s of steps; track s.key) {
             <button
               type="button"
               class="step-circle-wrap"
-              (click)="current.set(s.key)"
+              (click)="goTo(s.key)"
             >
               <span
                 class="step-circle"
-                [class.done]="isComplete(s.key)"
-                [class.active]="current() === s.key && !isComplete(s.key)"
+                [class.done]="completion.isComplete(s.key)"
+                [class.active]="
+                  current() === s.key && !completion.isComplete(s.key)
+                "
               >
-                @if (isComplete(s.key)) {
+                @if (completion.isComplete(s.key)) {
                   <i class="ti ti-check"></i>
                 } @else {
                   <i class="ti {{ s.icon }}"></i>
@@ -153,6 +160,9 @@ const STEPS: StepDef[] = [
 
         <div class="step-card">
           @switch (current()) {
+            @case ('cv') {
+              <app-cv-upload-step [embedded]="true" (saved)="onStepSaved()" />
+            }
             @case ('personal') {
               <app-personal-info-step
                 #personalStep
@@ -173,7 +183,11 @@ const STEPS: StepDef[] = [
               <app-documents [embedded]="true" (saved)="onStepSaved()" />
             }
             @case ('skills') {
-              <app-candidate-skills [embedded]="true" (saved)="onStepSaved()" />
+              <app-candidate-skills
+                [embedded]="true"
+                [autoAdvanceOnSave]="false"
+                (saved)="onStepSaved()"
+              />
             }
             @case ('experience') {
               <app-candidate-experience
@@ -186,6 +200,7 @@ const STEPS: StepDef[] = [
             @case ('qualifications') {
               <app-candidate-qualifications
                 [embedded]="true"
+                [autoAdvanceOnSave]="false"
                 (saved)="onStepSaved()"
               />
             }
@@ -264,6 +279,12 @@ const STEPS: StepDef[] = [
 
             @if (editingSection() === s.key) {
               @switch (s.key) {
+                @case ('cv') {
+                  <app-cv-upload-step
+                    [embedded]="true"
+                    (saved)="onSectionSaved()"
+                  />
+                }
                 @case ('personal') {
                   <app-personal-info-step
                     [embedded]="true"
@@ -476,64 +497,20 @@ const STEPS: StepDef[] = [
 })
 export class ProfileComponent implements OnInit {
   private state = inject(CandidateStateService);
-  private addressService = inject(AddressService);
-  private documentService = inject(DocumentService);
-  private skillService = inject(CandidateSkillService);
-  private experienceService = inject(CandidateExperienceService);
-  private qualificationService = inject(CandidateQualificationService);
+  private autofillStore = inject(ResumeAutofillStoreService);
+  completion = inject(ProfileCompletionService);
 
   @ViewChild('personalStep') personalStepCmp?: PersonalInfoStepComponent;
   @ViewChild('addressStep') addressStepCmp?: AddressStepComponent;
   @ViewChild('experienceStep') experienceStepCmp?: CandidateExperienceComponent;
 
   steps = STEPS;
-  current = signal<StepKey>('personal');
+  current = signal<StepKey>('cv');
   editingSection = signal<StepKey | null>(null);
   initialLoading = signal(true);
 
-  addressCount = signal(0);
-  documentTypesUploaded = signal<string[]>([]);
-  skillCount = signal(0);
-  experienceCount = signal(0);
-  qualificationCount = signal(0);
-
   stepIndex = computed(() =>
     this.steps.findIndex((s) => s.key === this.current()),
-  );
-
-  isComplete(key: StepKey): boolean {
-    const p = this.state.profile();
-    switch (key) {
-      case 'personal':
-        return !!(
-          p?.phone &&
-          p?.dateOfBirth &&
-          p?.gender &&
-          p?.nationality &&
-          p?.race
-        );
-      case 'address':
-        return this.addressCount() > 0;
-      case 'documents':
-        return GLOBAL_MANDATORY.every((t) =>
-          this.documentTypesUploaded().includes(t),
-        );
-      case 'skills':
-        return this.skillCount() > 0;
-      case 'experience':
-        return this.experienceCount() > 0;
-      case 'qualifications':
-        return this.qualificationCount() > 0;
-    }
-  }
-
-  allComplete = computed(() => this.steps.every((s) => this.isComplete(s.key)));
-  pctComplete = computed(() =>
-    Math.round(
-      (this.steps.filter((s) => this.isComplete(s.key)).length /
-        this.steps.length) *
-        100,
-    ),
   );
 
   ngOnInit(): void {
@@ -543,50 +520,38 @@ export class ProfileComponent implements OnInit {
         this.initialLoading.set(false);
         return;
       }
-      const id = p.candidateId;
-
-      this.addressService
-        .getAll(id)
-        .subscribe((a) => this.addressCount.set(a.length));
-      this.documentService
-        .getAll(id)
-        .subscribe((d) =>
-          this.documentTypesUploaded.set(d.map((x) => x.documentType)),
+      this.autofillStore.restore(p.candidateId);
+      this.completion.load().subscribe(() => {
+        this.current.set(
+          this.steps.find((s) => !this.completion.isComplete(s.key))?.key ??
+            'cv',
         );
-      this.skillService
-        .getAll(id)
-        .subscribe((s) => this.skillCount.set(s.length));
-      this.experienceService
-        .getAll(id)
-        .subscribe((e) => this.experienceCount.set(e.length));
-      this.qualificationService
-        .getAll(id)
-        .subscribe((q) => this.qualificationCount.set(q.length));
-
-      this.current.set(
-        this.steps.find((s) => !this.isComplete(s.key))?.key ?? 'personal',
-      );
-      this.initialLoading.set(false);
+        this.initialLoading.set(false);
+      });
     };
-
     if (!this.state.loaded()) {
       this.state.loadMyProfile().subscribe(() => boot());
     } else {
       boot();
     }
   }
-
+  goTo(key: StepKey): void {
+    this.completion.load().subscribe(() => this.current.set(key));
+  }
   onStepSaved(): void {
     this.continue();
   }
 
   onSectionSaved(): void {
+    this.completion.load().subscribe();
     this.editingSection.set(null);
   }
 
   /** Footer's primary button. In every case, the inline "Add"/"Upload"/"Update"
    *  buttons inside each step only save and stay on that step — advancing to
    *  the next step is exclusively this button's job.
+   *  - CV step: upload itself is the save action (there's no separate form to
+   *    submit here), so this just advances.
    *  - Personal step: its inline submit button is hidden in the wizard, so this
    *    triggers the form's own submit() directly.
    *  - Address step: if an add/edit address form is currently open, this submits
@@ -613,16 +578,16 @@ export class ProfileComponent implements OnInit {
 
   back(): void {
     const i = this.stepIndex();
-    if (i > 0) this.current.set(this.steps[i - 1].key);
+    if (i > 0) this.goTo(this.steps[i - 1].key);
   }
 
   skip(): void {
     const i = this.stepIndex();
-    if (i < this.steps.length - 1) this.current.set(this.steps[i + 1].key);
+    if (i < this.steps.length - 1) this.goTo(this.steps[i + 1].key);
   }
 
   continue(): void {
     const i = this.stepIndex();
-    if (i < this.steps.length - 1) this.current.set(this.steps[i + 1].key);
+    if (i < this.steps.length - 1) this.goTo(this.steps[i + 1].key);
   }
 }

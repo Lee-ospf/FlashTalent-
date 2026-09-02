@@ -1,4 +1,12 @@
-import { Component, inject, signal, OnInit, Input, Output, EventEmitter } from '@angular/core';
+import {
+  Component,
+  inject,
+  signal,
+  OnInit,
+  Input,
+  Output,
+  EventEmitter,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -9,7 +17,10 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CandidateStateService } from '../../core/services/candidate-state.service';
 import { CandidateExperienceService } from '../../core/services/candidate-experience.service';
 import { ToastService } from '../../core/services/toast.service';
-import { ResumeAutofillStoreService, ExperienceItem } from '../../core/services/resume-autofill-store.service';
+import {
+  ResumeAutofillStoreService,
+  ExperienceItem,
+} from '../../core/services/resume-autofill-store.service';
 import { ExperienceResponse } from '../../core/models';
 import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-trigger.directive';
 
@@ -40,7 +51,9 @@ import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-
       @if (autofillStore.experiences().length) {
         <div class="autofill-review-block">
           <div class="autofill-review-header">
-            <i class="ti ti-sparkles"></i> Found {{ autofillStore.experiences().length }} entry(ies) in your CV — review and add
+            <i class="ti ti-sparkles"></i> Found
+            {{ autofillStore.experiences().length }} entry(ies) in your CV —
+            review and add
           </div>
           @for (item of autofillStore.experiences(); track item.id) {
             <div class="autofill-card autofill-card-stack">
@@ -49,25 +62,48 @@ import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-
                 <div class="autofill-card-sub">
                   {{ item.company }}
                   @if (item.startDate) {
-                    · {{ formatDate(item.startDate) }} – {{ item.endDate ? formatDate(item.endDate) : 'Present' }}
+                    · {{ formatDate(item.startDate) }} –
+                    {{ item.endDate ? formatDate(item.endDate) : 'Present' }}
                   }
                 </div>
                 @if (item.projectsAndDuties) {
-                  <div class="autofill-card-desc">{{ item.projectsAndDuties }}</div>
+                  <div class="autofill-card-desc">
+                    {{ item.projectsAndDuties }}
+                  </div>
                 }
                 @if (!item.startDate) {
-                  <input type="date" class="ai-mini-date" [max]="maxDate"
-                         [value]="expStartDraft[item.id] ?? ''"
-                         (change)="expStartDraft[item.id] = $any($event.target).value">
-                  <span class="autofill-missing-note">AI couldn't find a start date — set one to add this.</span>
+                  <input
+                    type="date"
+                    class="ai-mini-date"
+                    [max]="maxDate"
+                    [value]="expStartDraft[item.id] ?? ''"
+                    (change)="
+                      expStartDraft[item.id] = $any($event.target).value
+                    "
+                  />
+                  <span class="autofill-missing-note"
+                    >AI couldn't find a start date — set one to add this.</span
+                  >
                 }
               </div>
               <div class="autofill-card-actions">
-                <button mat-stroked-button style="border-radius:8px" (click)="addSuggestedExperience(item)"
-                        [disabled]="saving() || (!item.startDate && !expStartDraft[item.id])">
+                <button
+                  mat-stroked-button
+                  style="border-radius:8px"
+                  (click)="addSuggestedExperience(item)"
+                  [disabled]="
+                    saving() || (!item.startDate && !expStartDraft[item.id])
+                  "
+                >
                   <i class="ti ti-plus"></i> Add
                 </button>
-                <button type="button" class="chip-dismiss" (click)="autofillStore.removeExperience(item.id)"><i class="ti ti-x"></i></button>
+                <button
+                  type="button"
+                  class="chip-dismiss"
+                  (click)="autofillStore.removeExperience(item.id)"
+                >
+                  <i class="ti ti-x"></i>
+                </button>
               </div>
             </div>
           }
@@ -190,21 +226,85 @@ import { DatePickerTriggerDirective } from '../../shared/directives/date-picker-
       }
     </div>
   `,
-  styles: [`
-    .autofill-review-block { margin-bottom: 20px; }
-    .autofill-review-header { font-size: 12px; font-weight: 600; color: #6a1b9a; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
-    .autofill-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #fff; border: 1px solid #ce93d8; border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; }
-    .autofill-card-stack { align-items: flex-start; }
-    .autofill-card-body { flex: 1; min-width: 0; }
-    .autofill-card-title { font-size: 13px; font-weight: 600; color: var(--text); }
-    .autofill-card-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-    .autofill-card-desc { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
-    .autofill-missing-note { display: block; font-size: 11px; color: #c0392b; margin-top: 4px; }
-    .autofill-card-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-    .ai-mini-date { border: 1px solid #ddd; border-radius: 8px; padding: 6px 8px; font-size: 12px; margin-top: 6px; }
-    .chip-dismiss { background: none; border: none; cursor: pointer; opacity: 0.5; padding: 4px; }
-    .chip-dismiss:hover { opacity: 1; }
-  `],
+  styles: [
+    `
+      .autofill-review-block {
+        margin-bottom: 20px;
+      }
+      .autofill-review-header {
+        font-size: 12px;
+        font-weight: 600;
+        color: #6a1b9a;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+      .autofill-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: #fff;
+        border: 1px solid #ce93d8;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 8px;
+      }
+      .autofill-card-stack {
+        align-items: flex-start;
+      }
+      .autofill-card-body {
+        flex: 1;
+        min-width: 0;
+      }
+      .autofill-card-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .autofill-card-sub {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+      .autofill-card-desc {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+        line-height: 1.4;
+      }
+      .autofill-missing-note {
+        display: block;
+        font-size: 11px;
+        color: #c0392b;
+        margin-top: 4px;
+      }
+      .autofill-card-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+      .ai-mini-date {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 6px 8px;
+        font-size: 12px;
+        margin-top: 6px;
+      }
+      .chip-dismiss {
+        background: none;
+        border: none;
+        cursor: pointer;
+        opacity: 0.5;
+        padding: 4px;
+      }
+      .chip-dismiss:hover {
+        opacity: 1;
+      }
+    `,
+  ],
 })
 export class CandidateExperienceComponent implements OnInit {
   @Input() embedded = false;
@@ -290,7 +390,10 @@ export class CandidateExperienceComponent implements OnInit {
   add(forceAdvance: boolean = false): void {
     const p = this.state.profile();
     if (!p) return;
-    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
 
     this.apiError = '';
     this.saving.set(true);
@@ -310,6 +413,7 @@ export class CandidateExperienceComponent implements OnInit {
           this.saving.set(false);
           this.form.reset();
           this.toast.show('Experience added.', 'success');
+          if (forceAdvance) this.saved.emit();
         },
         error: (err: Error) => {
           this.saving.set(false);
@@ -346,20 +450,27 @@ export class CandidateExperienceComponent implements OnInit {
     if (!p || !start) return;
 
     this.saving.set(true);
-    this.experienceService.create(p.candidateId, {
-      company: item.company,
-      role: item.role,
-      startDate: new Date(start).toISOString(),
-      endDate: item.endDate ? new Date(item.endDate).toISOString() : undefined,
-      projectsAndDuties: item.projectsAndDuties || undefined,
-    }).subscribe({
-      next: created => {
-        this.experiences.update(list => [created, ...list]);
-        this.saving.set(false);
-        this.autofillStore.removeExperience(item.id);
-        this.toast.show('Experience added.', 'success');
-      },
-      error: (err: Error) => { this.saving.set(false); this.apiError = err.message; },
-    });
+    this.experienceService
+      .create(p.candidateId, {
+        company: item.company,
+        role: item.role,
+        startDate: new Date(start).toISOString(),
+        endDate: item.endDate
+          ? new Date(item.endDate).toISOString()
+          : undefined,
+        projectsAndDuties: item.projectsAndDuties || undefined,
+      })
+      .subscribe({
+        next: (created) => {
+          this.experiences.update((list) => [created, ...list]);
+          this.saving.set(false);
+          this.autofillStore.removeExperience(item.id);
+          this.toast.show('Experience added.', 'success');
+        },
+        error: (err: Error) => {
+          this.saving.set(false);
+          this.apiError = err.message;
+        },
+      });
   }
 }

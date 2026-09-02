@@ -1,4 +1,13 @@
-import { Component, inject, signal, computed, OnInit, Input, Output, EventEmitter } from '@angular/core';
+import {
+  Component,
+  inject,
+  signal,
+  computed,
+  OnInit,
+  Input,
+  Output,
+  EventEmitter,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, ActivatedRoute } from '@angular/router';
@@ -14,13 +23,16 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { CandidateStateService } from '../../core/services/candidate-state.service';
 import {
-  DocumentService, DocumentTypeKey, DOCUMENT_TYPE_LABELS,
-  ALL_DOC_TYPES, FREE_UPLOAD_DOC_TYPES, GLOBAL_MANDATORY, validateFileClient,
+  DocumentService,
+  DocumentTypeKey,
+  DOCUMENT_TYPE_LABELS,
+  ALL_DOC_TYPES,
+  FREE_UPLOAD_DOC_TYPES,
+  GLOBAL_MANDATORY,
+  validateFileClient,
 } from '../../core/services/document.service';
 import { VacancyService } from '../../core/services/vacancy.service';
 import { ToastService } from '../../core/services/toast.service';
-import { ResumeParsingService } from '../../core/services/resume-parsing.service';
-import { SkillService } from '../../core/services/skill.service';
 import { ResumeAutofillStoreService } from '../../core/services/resume-autofill-store.service';
 import { CandidateDocumentResponse, VacancyResponse } from '../../core/models';
 
@@ -35,23 +47,47 @@ interface RequiredSlot {
   selector: 'app-documents',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterLink,
-    MatCardModule, MatButtonModule, MatSelectModule,
-    MatFormFieldModule, MatInputModule, MatIconModule, MatDividerModule,
-    MatProgressSpinnerModule, MatTooltipModule,
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    MatCardModule,
+    MatButtonModule,
+    MatSelectModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatIconModule,
+    MatDividerModule,
+    MatProgressSpinnerModule,
+    MatTooltipModule,
   ],
   template: `
     <div [class.page-container]="!embedded" [class.step-body-padded]="embedded">
-
       @if (!embedded) {
         <div class="page-header">
           <div>
-            <h2 class="page-title"><i class="ti ti-files"></i> Supporting Documents</h2>
-            <p class="page-sub">Upload the required documents below, or add anything else using the dropdown</p>
+            <h2 class="page-title">
+              <i class="ti ti-files"></i> Supporting Documents
+            </h2>
+            <p class="page-sub">
+              Upload the required documents below, or add anything else using
+              the dropdown
+            </p>
           </div>
-          <span class="doc-status-badge" [class.doc-ok]="allRequiredOk()" [class.doc-missing]="!allRequiredOk()">
-            <i class="ti" [class.ti-circle-check]="allRequiredOk()" [class.ti-alert-circle]="!allRequiredOk()"></i>
-            {{ allRequiredOk() ? 'Required documents ready' : 'Required documents missing' }}
+          <span
+            class="doc-status-badge"
+            [class.doc-ok]="allRequiredOk()"
+            [class.doc-missing]="!allRequiredOk()"
+          >
+            <i
+              class="ti"
+              [class.ti-circle-check]="allRequiredOk()"
+              [class.ti-alert-circle]="!allRequiredOk()"
+            ></i>
+            {{
+              allRequiredOk()
+                ? 'Required documents ready'
+                : 'Required documents missing'
+            }}
           </span>
         </div>
       }
@@ -62,19 +98,30 @@ interface RequiredSlot {
           Create your <a routerLink="/profile">candidate profile</a> first.
         </div>
       } @else if (loading()) {
-        <div class="empty-state"><mat-spinner diameter="32"></mat-spinner><p style="margin-top:12px">Loading documents…</p></div>
+        <div class="empty-state">
+          <mat-spinner diameter="32"></mat-spinner>
+          <p style="margin-top:12px">Loading documents…</p>
+        </div>
       } @else {
-
         @if (vacancyContext()) {
           <div class="vacancy-context-banner">
             <div class="vcb-left">
               <i class="ti ti-briefcase"></i>
               <div>
-                <div class="vcb-title">Documents required for: <strong>{{ vacancyContext()!.title }}</strong></div>
-                <div class="vcb-sub">Mandatory items are marked with <span class="req">*</span></div>
+                <div class="vcb-title">
+                  Documents required for:
+                  <strong>{{ vacancyContext()!.title }}</strong>
+                </div>
+                <div class="vcb-sub">
+                  Mandatory items are marked with <span class="req">*</span>
+                </div>
               </div>
             </div>
-            <button mat-stroked-button (click)="clearVacancyContext()" style="font-size:12px;border-radius:8px">
+            <button
+              mat-stroked-button
+              (click)="clearVacancyContext()"
+              style="font-size:12px;border-radius:8px"
+            >
               <i class="ti ti-x"></i> Clear
             </button>
           </div>
@@ -82,28 +129,46 @@ interface RequiredSlot {
 
         <div class="progress-row">
           <div class="progress-wrap" style="flex:1">
-            <div class="progress-fill" [style.width.%]="uploadPct()" [class.ready]="uploadPct() === 100"></div>
+            <div
+              class="progress-fill"
+              [style.width.%]="uploadPct()"
+              [class.ready]="uploadPct() === 100"
+            ></div>
           </div>
-          <span class="progress-label">{{ uploadedRequiredCount() }} / {{ requiredSlots().length }} required uploaded</span>
+          <span class="progress-label"
+            >{{ uploadedRequiredCount() }} /
+            {{ requiredSlots().length }} required uploaded</span
+          >
         </div>
 
         <div class="doc-slots">
           @for (slot of requiredSlots(); track slot.type) {
-            <div class="doc-slot"
-                 [class.slot-uploaded]="slot.uploaded"
-                 [class.slot-dragover]="dragOverType() === slot.type"
-                 (dragover)="onDragOver($event, slot.type)"
-                 (dragleave)="dragOverType.set(null)"
-                 (drop)="onDrop($event, slot.type)">
-
+            <div
+              class="doc-slot"
+              [class.slot-uploaded]="slot.uploaded"
+              [class.slot-dragover]="dragOverType() === slot.type"
+              (dragover)="onDragOver($event, slot.type)"
+              (dragleave)="dragOverType.set(null)"
+              (drop)="onDrop($event, slot.type)"
+            >
               @if (dragOverType() === slot.type) {
-                <div class="drop-overlay"><i class="ti ti-cloud-upload"></i> Drop to upload</div>
+                <div class="drop-overlay">
+                  <i class="ti ti-cloud-upload"></i> Drop to upload
+                </div>
               }
 
-              <div class="slot-type-bar" [class.bar-global]="slot.source === 'global'" [class.bar-vacancy]="slot.source === 'vacancy'"></div>
+              <div
+                class="slot-type-bar"
+                [class.bar-global]="slot.source === 'global'"
+                [class.bar-vacancy]="slot.source === 'vacancy'"
+              ></div>
 
               <div class="slot-body">
-                <div class="slot-icon-wrap" [class.icon-uploaded]="slot.uploaded" [class.icon-missing]="!slot.uploaded">
+                <div
+                  class="slot-icon-wrap"
+                  [class.icon-uploaded]="slot.uploaded"
+                  [class.icon-missing]="!slot.uploaded"
+                >
                   <i class="ti" [class]="docIcon(slot.type)"></i>
                 </div>
 
@@ -111,14 +176,24 @@ interface RequiredSlot {
                   <div class="slot-name">
                     {{ slot.label }} <span class="req">*</span>
                     @if (slot.source === 'vacancy') {
-                      <span class="badge-vacancy-req">Required for this role</span>
+                      <span class="badge-vacancy-req"
+                        >Required for this role</span
+                      >
                     }
                   </div>
                   @if (slot.uploaded) {
-                    <div class="slot-filename"><i class="ti ti-file-check" style="color:#2D7A4F"></i> {{ slot.uploaded.originalFileName }}</div>
-                    <div class="slot-meta">Uploaded {{ formatDate(slot.uploaded.uploadedAt) }}</div>
+                    <div class="slot-filename">
+                      <i class="ti ti-file-check" style="color:#2D7A4F"></i>
+                      {{ slot.uploaded.originalFileName }}
+                    </div>
+                    <div class="slot-meta">
+                      Uploaded {{ formatDate(slot.uploaded.uploadedAt) }}
+                    </div>
                   } @else {
-                    <div class="slot-empty-hint">Click Upload or drag a file here · PDF, DOC, DOCX · max 5 MB</div>
+                    <div class="slot-empty-hint">
+                      Click Upload or drag a file here · PDF, DOC, DOCX · max 5
+                      MB
+                    </div>
                   }
                 </div>
 
@@ -126,8 +201,17 @@ interface RequiredSlot {
                   @if (uploading() === slot.type) {
                     <mat-spinner diameter="24"></mat-spinner>
                   } @else {
-                    <button mat-raised-button color="primary" class="btn-upload-slot" (click)="triggerRequiredUpload(slot.type)">
-                      <i class="ti" [class.ti-upload]="!slot.uploaded" [class.ti-refresh]="slot.uploaded"></i>
+                    <button
+                      mat-raised-button
+                      color="primary"
+                      class="btn-upload-slot"
+                      (click)="triggerRequiredUpload(slot.type)"
+                    >
+                      <i
+                        class="ti"
+                        [class.ti-upload]="!slot.uploaded"
+                        [class.ti-refresh]="slot.uploaded"
+                      ></i>
                       {{ slot.uploaded ? 'Replace' : 'Upload' }}
                     </button>
                   }
@@ -136,37 +220,29 @@ interface RequiredSlot {
             </div>
           }
         </div>
-
-        @if (cvUploaded()) {
-          <div class="autofill-banner">
-            <div class="autofill-left">
-              <i class="ti ti-wand"></i>
-              <div>
-                <div class="autofill-title">Auto-fill the rest of your profile</div>
-                <div class="autofill-sub">We'll read your CV and list suggested skills, qualifications and experience for you to review and add.</div>
-              </div>
-            </div>
-            <button mat-raised-button color="primary" style="border-radius:8px" (click)="autoFillFromCv()" [disabled]="parsingCv()">
-              @if (parsingCv()) {
-                <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner>
-              }
-              <i class="ti ti-wand"></i> {{ parsingCv() ? 'Reading your CV…' : 'Auto-fill from CV' }}
-            </button>
-          </div>
-        }
-
         @if (extraUploadedDocs().length) {
-          <div class="section-label" style="margin-top:20px">Other uploaded documents</div>
+          <div class="section-label" style="margin-top:20px">
+            Other uploaded documents
+          </div>
           <div class="doc-slots">
             @for (d of extraUploadedDocs(); track d.candidateDocumentId) {
               <div class="doc-slot slot-uploaded">
                 <div class="slot-type-bar bar-optional"></div>
                 <div class="slot-body">
-                 <div class="slot-icon-wrap icon-uploaded"><i class="ti" [class]="docIcon(asType(d.documentType))"></i></div>
+                  <div class="slot-icon-wrap icon-uploaded">
+                    <i class="ti" [class]="docIcon(asType(d.documentType))"></i>
+                  </div>
                   <div class="slot-info">
-                    <div class="slot-name">{{ typeLabel(asType(d.documentType)) }}</div>
-                    <div class="slot-filename"><i class="ti ti-file-check" style="color:#2D7A4F"></i> {{ d.originalFileName }}</div>
-                    <div class="slot-meta">Uploaded {{ formatDate(d.uploadedAt) }}</div>
+                    <div class="slot-name">
+                      {{ typeLabel(asType(d.documentType)) }}
+                    </div>
+                    <div class="slot-filename">
+                      <i class="ti ti-file-check" style="color:#2D7A4F"></i>
+                      {{ d.originalFileName }}
+                    </div>
+                    <div class="slot-meta">
+                      Uploaded {{ formatDate(d.uploadedAt) }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -174,19 +250,32 @@ interface RequiredSlot {
           </div>
         }
 
-        <mat-card class="mat-elevation-z1 additional-card" style="border-radius:12px;margin-top:20px">
+        <mat-card
+          class="mat-elevation-z1 additional-card"
+          style="border-radius:12px;margin-top:20px"
+        >
           <mat-card-content style="padding:18px 20px">
-            <div class="card-header"><i class="ti ti-plus"></i> Upload another document</div>
-            <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">
+            <div class="card-header">
+              <i class="ti ti-plus"></i> Upload another document
+            </div>
+            <p
+              style="font-size:12px;color:var(--text-muted);margin-bottom:14px"
+            >
               Select what type of document this is, then choose a file.
               <span style="display:block;margin-top:4px">
-                <i class="ti ti-info-circle"></i> Uploading a qualification certificate or transcript? Add it from the
-                <a routerLink="/qualifications">Qualifications</a> page instead, attached to that specific entry.
+                <i class="ti ti-info-circle"></i> Uploading a qualification
+                certificate or transcript? Add it from the
+                <a routerLink="/qualifications">Qualifications</a> page instead,
+                attached to that specific entry.
               </span>
             </p>
 
             <div class="additional-upload-row">
-              <mat-form-field appearance="outline" style="flex:1" class="compact-select">
+              <mat-form-field
+                appearance="outline"
+                style="flex:1"
+                class="compact-select"
+              >
                 <mat-label>What is this document?</mat-label>
                 <mat-select [(ngModel)]="freeUploadType">
                   @for (t of dropdownTypes(); track t) {
@@ -196,31 +285,56 @@ interface RequiredSlot {
               </mat-form-field>
 
               @if (freeUploadType === 'Other') {
-                <mat-form-field appearance="outline" style="flex:1" class="compact-select">
+                <mat-form-field
+                  appearance="outline"
+                  style="flex:1"
+                  class="compact-select"
+                >
                   <mat-label>Describe this document</mat-label>
-                  <input matInput [(ngModel)]="otherDescription" placeholder="e.g. Reference letter, Police clearance">
+                  <input
+                    matInput
+                    [(ngModel)]="otherDescription"
+                    placeholder="e.g. Reference letter, Police clearance"
+                  />
                 </mat-form-field>
               }
 
-              <button mat-raised-button color="primary"
-                      style="height:56px;border-radius:8px;padding:0 20px;font-weight:600"
-                      (click)="triggerFreeUpload()"
-                      [disabled]="!canFreeUpload() || uploading() === '__free'">
+              <button
+                mat-raised-button
+                color="primary"
+                style="height:56px;border-radius:8px;padding:0 20px;font-weight:600"
+                (click)="triggerFreeUpload()"
+                [disabled]="!canFreeUpload() || uploading() === '__free'"
+              >
                 @if (uploading() === '__free') {
-                  <mat-spinner diameter="18" style="display:inline-block;margin-right:8px"></mat-spinner>
+                  <mat-spinner
+                    diameter="18"
+                    style="display:inline-block;margin-right:8px"
+                  ></mat-spinner>
                 }
                 <i class="ti ti-upload"></i> Upload
               </button>
 
-              <div class="drop-zone-mini" [class.dragover]="dragOverType() === '__free'"
-                   (dragover)="onDragOver($event, '__free')" (dragleave)="dragOverType.set(null)" (drop)="onDrop($event, '__free')">
+              <div
+                class="drop-zone-mini"
+                [class.dragover]="dragOverType() === '__free'"
+                (dragover)="onDragOver($event, '__free')"
+                (dragleave)="dragOverType.set(null)"
+                (drop)="onDrop($event, '__free')"
+              >
                 <i class="ti ti-drag-drop"></i> or drop here
               </div>
             </div>
           </mat-card-content>
         </mat-card>
 
-        <input type="file" id="file-input" accept=".pdf,.doc,.docx" (change)="onFileChange($event)" style="display:none">
+        <input
+          type="file"
+          id="file-input"
+          accept=".pdf,.doc,.docx"
+          (change)="onFileChange($event)"
+          style="display:none"
+        />
 
         <p class="upload-hint">
           <i class="ti ti-info-circle"></i>
@@ -229,82 +343,279 @@ interface RequiredSlot {
       }
     </div>
   `,
-  styles: [`
-    .step-body-padded { padding: 1.5rem; }
-    .vacancy-context-banner {
-      background: linear-gradient(135deg, #e3f2fd 0%, #e8f5e9 100%);
-      border: 1px solid rgba(26,39,68,0.12); border-radius: 12px; padding: 14px 18px;
-      display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px;
-    }
-    .vcb-left { display: flex; align-items: center; gap: 12px; }
-    .vcb-left i { font-size: 22px; color: var(--navy); flex-shrink: 0; }
-    .vcb-title { font-size: 13px; font-weight: 600; color: var(--text); }
-    .vcb-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  styles: [
+    `
+      .step-body-padded {
+        padding: 1.5rem;
+      }
+      .vacancy-context-banner {
+        background: linear-gradient(135deg, #e3f2fd 0%, #e8f5e9 100%);
+        border: 1px solid rgba(26, 39, 68, 0.12);
+        border-radius: 12px;
+        padding: 14px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      .vcb-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .vcb-left i {
+        font-size: 22px;
+        color: var(--navy);
+        flex-shrink: 0;
+      }
+      .vcb-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .vcb-sub {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
 
-    .doc-slots { display: flex; flex-direction: column; gap: 10px; }
-    .doc-slot {
-      background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px;
-      overflow: hidden; position: relative; transition: box-shadow 0.2s, border-color 0.2s; display: flex;
-    }
-    .doc-slot:hover { box-shadow: var(--shadow); }
-    .doc-slot.slot-uploaded { border-color: #2D7A4F; background: linear-gradient(to right, rgba(230,244,236,0.4), #fff); }
-    .doc-slot.slot-dragover { border-color: var(--green) !important; box-shadow: 0 0 0 3px rgba(45,122,79,0.15); }
+      .doc-slots {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .doc-slot {
+        background: var(--surface);
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        position: relative;
+        transition:
+          box-shadow 0.2s,
+          border-color 0.2s;
+        display: flex;
+      }
+      .doc-slot:hover {
+        box-shadow: var(--shadow);
+      }
+      .doc-slot.slot-uploaded {
+        border-color: #2d7a4f;
+        background: linear-gradient(to right, rgba(230, 244, 236, 0.4), #fff);
+      }
+      .doc-slot.slot-dragover {
+        border-color: var(--green) !important;
+        box-shadow: 0 0 0 3px rgba(45, 122, 79, 0.15);
+      }
 
-    .slot-type-bar { width: 5px; flex-shrink: 0; }
-    .bar-global { background: var(--navy); }
-    .bar-vacancy { background: var(--green); }
-    .bar-optional { background: #e0e0e0; }
+      .slot-type-bar {
+        width: 5px;
+        flex-shrink: 0;
+      }
+      .bar-global {
+        background: var(--navy);
+      }
+      .bar-vacancy {
+        background: var(--green);
+      }
+      .bar-optional {
+        background: #e0e0e0;
+      }
 
-    .slot-body { display: flex; align-items: center; gap: 14px; padding: 14px 16px; flex: 1; min-width: 0; }
+      .slot-body {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 16px;
+        flex: 1;
+        min-width: 0;
+      }
 
-    .slot-icon-wrap { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
-    .icon-uploaded { background: var(--green-bg); color: var(--green); }
-    .icon-missing { background: var(--surface-2); color: var(--text-muted); }
+      .slot-icon-wrap {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        flex-shrink: 0;
+      }
+      .icon-uploaded {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .icon-missing {
+        background: var(--surface-2);
+        color: var(--text-muted);
+      }
 
-    .slot-info { flex: 1; min-width: 0; }
-    .slot-name { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .slot-filename { font-size: 12px; color: #1a5c35; font-weight: 500; margin-top: 3px; display: flex; align-items: center; gap: 5px; }
-    .slot-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-    .slot-empty-hint { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+      .slot-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .slot-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .slot-filename {
+        font-size: 12px;
+        color: #1a5c35;
+        font-weight: 500;
+        margin-top: 3px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .slot-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+      .slot-empty-hint {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 3px;
+      }
 
-    .badge-vacancy-req { font-size: 10px; font-weight: 700; background: var(--green-bg); color: #1a5c35; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--green-mid); }
+      .badge-vacancy-req {
+        font-size: 10px;
+        font-weight: 700;
+        background: var(--green-bg);
+        color: #1a5c35;
+        padding: 2px 8px;
+        border-radius: 20px;
+        border: 1px solid var(--green-mid);
+      }
 
-    .slot-actions { flex-shrink: 0; padding-right: 16px; }
-    .btn-upload-slot { height: 40px; font-size: 12px; font-weight: 600; border-radius: 8px !important; white-space: nowrap; background-color: var(--navy) !important; color: #fff !important; }
+      .slot-actions {
+        flex-shrink: 0;
+        padding-right: 16px;
+      }
+      .btn-upload-slot {
+        height: 40px;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 8px !important;
+        white-space: nowrap;
+        background-color: var(--navy) !important;
+        color: #fff !important;
+      }
 
-    .compact-select .mat-mdc-form-field-infix { padding: 8px 0 !important; min-height: 40px !important; }
-    .compact-select .mat-mdc-text-field-wrapper { border-radius: 8px !important; }
+      .compact-select .mat-mdc-form-field-infix {
+        padding: 8px 0 !important;
+        min-height: 40px !important;
+      }
+      .compact-select .mat-mdc-text-field-wrapper {
+        border-radius: 8px !important;
+      }
 
-    .drop-overlay {
-      position: absolute; inset: 0; z-index: 10; background: rgba(45,122,79,0.12);
-      border: 2px dashed var(--green); border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      gap: 8px; font-size: 14px; font-weight: 600; color: #1a5c35; pointer-events: none;
-    }
+      .drop-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        background: rgba(45, 122, 79, 0.12);
+        border: 2px dashed var(--green);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #1a5c35;
+        pointer-events: none;
+      }
 
-    .additional-upload-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
-    .drop-zone-mini {
-      height: 56px; min-width: 100px; border: 1.5px dashed var(--border); border-radius: 8px;
-      display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; color: var(--text-muted);
-      cursor: pointer; transition: all 0.15s; padding: 0 12px; white-space: nowrap;
-    }
-    .drop-zone-mini.dragover { border-color: var(--green); background: var(--green-bg); color: #1a5c35; }
+      .additional-upload-row {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+      .drop-zone-mini {
+        height: 56px;
+        min-width: 100px;
+        border: 1.5px dashed var(--border);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.15s;
+        padding: 0 12px;
+        white-space: nowrap;
+      }
+      .drop-zone-mini.dragover {
+        border-color: var(--green);
+        background: var(--green-bg);
+        color: #1a5c35;
+      }
 
-    .upload-hint { margin-top: 16px; font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
+      .upload-hint {
+        margin-top: 16px;
+        font-size: 12px;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
 
-    .additional-card .card-header { font-size: 14px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
-    .additional-card .card-header i { color: var(--navy); font-size: 16px; }
+      .additional-card .card-header {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 8px;
+      }
+      .additional-card .card-header i {
+        color: var(--navy);
+        font-size: 16px;
+      }
 
-    .autofill-banner {
-      display: flex; align-items: center; justify-content: space-between; gap: 16px;
-      background: linear-gradient(135deg, #f3e9ff 0%, #e3f2fd 100%);
-      border: 1px solid rgba(106,27,154,0.15); border-radius: 12px; padding: 16px 18px; margin-top: 20px;
-    }
-    .autofill-left { display: flex; align-items: center; gap: 12px; }
-    .autofill-left > i { font-size: 22px; color: #6a1b9a; flex-shrink: 0; }
-    .autofill-title { font-size: 13px; font-weight: 600; color: var(--text); }
-    .autofill-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-  `],
+      .autofill-banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        background: linear-gradient(135deg, #f3e9ff 0%, #e3f2fd 100%);
+        border: 1px solid rgba(106, 27, 154, 0.15);
+        border-radius: 12px;
+        padding: 16px 18px;
+        margin-top: 20px;
+      }
+      .autofill-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .autofill-left > i {
+        font-size: 22px;
+        color: #6a1b9a;
+        flex-shrink: 0;
+      }
+      .autofill-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .autofill-sub {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+    `,
+  ],
 })
 export class DocumentsComponent implements OnInit {
   @Input() embedded = false;
@@ -315,8 +626,6 @@ export class DocumentsComponent implements OnInit {
   private vac = inject(VacancyService);
   private toast = inject(ToastService);
   private route = inject(ActivatedRoute);
-  private resumeParsing = inject(ResumeParsingService);
-  private skillService = inject(SkillService);
   autofillStore = inject(ResumeAutofillStoreService);
 
   uploadedDocs = signal<CandidateDocumentResponse[]>([]);
@@ -324,7 +633,6 @@ export class DocumentsComponent implements OnInit {
   loading = signal(false);
   uploading = signal<string | null>(null);
   dragOverType = signal<string | null>(null);
-  parsingCv = signal(false);
 
   freeUploadType: DocumentTypeKey | '' = '';
   otherDescription = '';
@@ -336,44 +644,57 @@ export class DocumentsComponent implements OnInit {
     const uploaded = this.uploadedDocs();
     const vacancy = this.vacancyContext();
     const vacMandatoryTypes = (vacancy?.requiredDocuments ?? [])
-      .filter(r => r.isMandatory)
-      .map(r => r.documentType as DocumentTypeKey);
+      .filter((r) => r.isMandatory)
+      .map((r) => r.documentType as DocumentTypeKey);
 
     const seen = new Set<DocumentTypeKey>();
     const slots: RequiredSlot[] = [];
 
     for (const t of GLOBAL_MANDATORY) {
       seen.add(t);
-      slots.push({ type: t, label: DOCUMENT_TYPE_LABELS[t], source: 'global', uploaded: uploaded.find(d => d.documentType === t) });
+      slots.push({
+        type: t,
+        label: DOCUMENT_TYPE_LABELS[t],
+        source: 'global',
+        uploaded: uploaded.find((d) => d.documentType === t),
+      });
     }
     for (const t of vacMandatoryTypes) {
       if (seen.has(t)) continue;
       seen.add(t);
-      slots.push({ type: t, label: DOCUMENT_TYPE_LABELS[t], source: 'vacancy', uploaded: uploaded.find(d => d.documentType === t) });
+      slots.push({
+        type: t,
+        label: DOCUMENT_TYPE_LABELS[t],
+        source: 'vacancy',
+        uploaded: uploaded.find((d) => d.documentType === t),
+      });
     }
     return slots;
   });
 
   dropdownTypes = computed<DocumentTypeKey[]>(() => {
-    const requiredTypes = new Set(this.requiredSlots().map(s => s.type));
-    return FREE_UPLOAD_DOC_TYPES.filter(t => !requiredTypes.has(t));
+    const requiredTypes = new Set(this.requiredSlots().map((s) => s.type));
+    return FREE_UPLOAD_DOC_TYPES.filter((t) => !requiredTypes.has(t));
   });
 
   extraUploadedDocs = computed<CandidateDocumentResponse[]>(() => {
-    const requiredTypes = new Set(this.requiredSlots().map(s => s.type));
-    return this.uploadedDocs().filter(d => !requiredTypes.has(d.documentType as DocumentTypeKey));
+    const requiredTypes = new Set(this.requiredSlots().map((s) => s.type));
+    return this.uploadedDocs().filter(
+      (d) => !requiredTypes.has(d.documentType as DocumentTypeKey),
+    );
   });
 
-  allRequiredOk = computed(() => this.requiredSlots().every(s => !!s.uploaded));
-  uploadedRequiredCount = computed(() => this.requiredSlots().filter(s => !!s.uploaded).length);
+  allRequiredOk = computed(() =>
+    this.requiredSlots().every((s) => !!s.uploaded),
+  );
+  uploadedRequiredCount = computed(
+    () => this.requiredSlots().filter((s) => !!s.uploaded).length,
+  );
   uploadPct = computed(() => {
     const total = this.requiredSlots().length;
     return total ? Math.round((this.uploadedRequiredCount() / total) * 100) : 0;
   });
 
-  // A CV has to already be uploaded before auto-fill can run — the backend
-  // reuses whichever CV file is on record rather than accepting a new one here.
-  cvUploaded = computed(() => this.requiredSlots().some(s => s.type === 'CV' && !!s.uploaded));
 
   ngOnInit(): void {
     if (this.state.profile()) {
@@ -386,35 +707,54 @@ export class DocumentsComponent implements OnInit {
   private loadDocs(): void {
     this.loading.set(true);
     this.doc.getAll(this.state.profile()!.candidateId).subscribe({
-      next: d => { this.uploadedDocs.set(d); this.loading.set(false); },
+      next: (d) => {
+        this.uploadedDocs.set(d);
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false),
     });
   }
 
   private loadVacancyContext(vacancyId: number): void {
-    this.vac.getById(vacancyId).subscribe({ next: v => this.vacancyContext.set(v), error: () => {} });
+    this.vac
+      .getById(vacancyId)
+      .subscribe({ next: (v) => this.vacancyContext.set(v), error: () => {} });
   }
 
-  clearVacancyContext(): void { this.vacancyContext.set(null); }
+  clearVacancyContext(): void {
+    this.vacancyContext.set(null);
+  }
 
-  typeLabel(t: DocumentTypeKey): string { return DOCUMENT_TYPE_LABELS[t]; }
-  asType(t: string): DocumentTypeKey { return t as DocumentTypeKey; }
+  typeLabel(t: DocumentTypeKey): string {
+    return DOCUMENT_TYPE_LABELS[t];
+  }
+  asType(t: string): DocumentTypeKey {
+    return t as DocumentTypeKey;
+  }
 
   docIcon(t: DocumentTypeKey): string {
     const icons: Record<DocumentTypeKey, string> = {
-      CV: 'ti-file-cv', MatricCertificate: 'ti-certificate',
-      Qualification: 'ti-school', Certification: 'ti-award', Other: 'ti-file',
+      CV: 'ti-file-cv',
+      MatricCertificate: 'ti-certificate',
+      Qualification: 'ti-school',
+      Certification: 'ti-award',
+      Other: 'ti-file',
     };
     return icons[t];
   }
 
   formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(iso).toLocaleDateString('en-ZA', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
   }
 
   canFreeUpload(): boolean {
     if (!this.freeUploadType) return false;
-    if (this.freeUploadType === 'Other' && !this.otherDescription.trim()) return false;
+    if (this.freeUploadType === 'Other' && !this.otherDescription.trim())
+      return false;
     return true;
   }
 
@@ -427,7 +767,9 @@ export class DocumentsComponent implements OnInit {
   triggerFreeUpload(): void {
     if (!this.canFreeUpload()) {
       this.toast.show(
-        this.freeUploadType === 'Other' ? 'Describe the document before uploading.' : 'Select a document type first.',
+        this.freeUploadType === 'Other'
+          ? 'Describe the document before uploading.'
+          : 'Select a document type first.',
         'warn',
       );
       return;
@@ -443,17 +785,23 @@ export class DocumentsComponent implements OnInit {
     (e.target as HTMLInputElement).value = '';
   }
 
-  onDragOver(e: DragEvent, type: string): void { e.preventDefault(); this.dragOverType.set(type); }
+  onDragOver(e: DragEvent, type: string): void {
+    e.preventDefault();
+    this.dragOverType.set(type);
+  }
 
   onDrop(e: DragEvent, type: string): void {
-    e.preventDefault(); this.dragOverType.set(null);
+    e.preventDefault();
+    this.dragOverType.set(null);
     const file = e.dataTransfer?.files[0];
     if (!file) return;
 
     if (type === '__free') {
       if (!this.canFreeUpload()) {
         this.toast.show(
-          this.freeUploadType === 'Other' ? 'Describe the document before uploading.' : 'Select a document type first.',
+          this.freeUploadType === 'Other'
+            ? 'Describe the document before uploading.'
+            : 'Select a document type first.',
           'warn',
         );
         return;
@@ -469,27 +817,40 @@ export class DocumentsComponent implements OnInit {
 
   handleFile(file: File): void {
     const wasFreeUpload = this.pendingIsFree;
-    const docType: DocumentTypeKey | '' = wasFreeUpload ? this.freeUploadType : (this.pendingRequiredType ?? '');
+    const docType: DocumentTypeKey | '' = wasFreeUpload
+      ? this.freeUploadType
+      : (this.pendingRequiredType ?? '');
 
-    if (!docType) { this.toast.show('Select a document type before uploading.', 'warn'); return; }
+    if (!docType) {
+      this.toast.show('Select a document type before uploading.', 'warn');
+      return;
+    }
 
     const err = validateFileClient(file);
-    if (err) { this.toast.show(err, 'error'); return; }
+    if (err) {
+      this.toast.show(err, 'error');
+      return;
+    }
 
     let fileToSend = file;
     if (wasFreeUpload && docType === 'Other' && this.otherDescription.trim()) {
       const ext = file.name.substring(file.name.lastIndexOf('.'));
-      const safeName = this.otherDescription.trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 100);
+      const safeName = this.otherDescription
+        .trim()
+        .replace(/[\\/:*?"<>|]/g, '')
+        .slice(0, 100);
       fileToSend = new File([file], `${safeName}${ext}`, { type: file.type });
     }
 
-    const uploadKey = wasFreeUpload ? '__free' : (this.pendingRequiredType ?? '__free');
+    const uploadKey = wasFreeUpload
+      ? '__free'
+      : (this.pendingRequiredType ?? '__free');
     this.uploading.set(uploadKey);
     const cid = this.state.profile()!.candidateId;
 
     this.doc.upload(cid, docType as DocumentTypeKey, fileToSend).subscribe({
-      next: uploaded => {
-        this.uploadedDocs.update(list => [...list, uploaded]);
+      next: (uploaded) => {
+        this.uploadedDocs.update((list) => [...list, uploaded]);
         this.uploading.set(null);
         this.pendingRequiredType = null;
         this.pendingIsFree = false;
@@ -499,47 +860,20 @@ export class DocumentsComponent implements OnInit {
           this.otherDescription = '';
         }
 
-        this.toast.show(`"${uploaded.originalFileName}" saved as ${this.typeLabel(uploaded.documentType as DocumentTypeKey)}.`, 'success');
+        this.toast.show(
+          `"${uploaded.originalFileName}" saved as ${this.typeLabel(uploaded.documentType as DocumentTypeKey)}.`,
+          'success',
+        );
         this.state.refresh().subscribe();
 
         // Uploading saves immediately, but no longer auto-advances the wizard —
         // only the footer's "Save and continue" button should move to the next
         // step. This just stays on the Documents step so you can keep uploading.
       },
-      error: (e: Error) => { this.uploading.set(null); this.toast.show(e.message, 'error'); },
-    });
-  }
-
-  // Reads the candidate's already-uploaded CV via the backend and matches
-  // parsed skills against the current master skill list. Nothing is saved —
-  // results just populate ResumeAutofillStoreService for the Skills,
-  // Qualifications, and Experience steps to render as review cards.
-  autoFillFromCv(): void {
-    const p = this.state.profile();
-    if (!p || this.parsingCv()) return;
-    this.parsingCv.set(true);
-
-    this.resumeParsing.parseCv(p.candidateId).subscribe({
-      next: parsed => {
-        this.skillService.getAll().subscribe({
-          next: masterSkills => {
-            this.autofillStore.load(parsed, masterSkills);
-            this.parsingCv.set(false);
-            const count = this.autofillStore.totalPending();
-            this.toast.show(
-              count > 0
-                ? `Found ${count} item${count === 1 ? '' : 's'} in your CV — review and add them on the Skills, Experience and Qualifications steps.`
-                : "We couldn't find anything usable to auto-fill — no problem, just fill things in manually.",
-              count > 0 ? 'success' : 'warn',
-            );
-          },
-          error: () => {
-            this.parsingCv.set(false);
-            this.toast.show('Parsed your CV, but could not load the skill list to match against — try again.', 'error');
-          },
-        });
+      error: (e: Error) => {
+        this.uploading.set(null);
+        this.toast.show(e.message, 'error');
       },
-      error: (e: Error) => { this.parsingCv.set(false); this.toast.show(e.message, 'error'); },
     });
   }
 }

@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
+import { profileNudgeGuard } from './core/guards/profile-nudge.guard';
 
 export const routes: Routes = [
   // ---------- Recruiter + Admin (shared pool, but Admin gets read-only views via gate components) ----------
@@ -199,7 +200,7 @@ export const routes: Routes = [
   },
   {
     path: 'dashboard',
-    canActivate: [authGuard],
+    canActivate: [authGuard, profileNudgeGuard],
     loadComponent: () =>
       import('./features/dashboard/dashboard-gate.component').then(
         (m) => m.DashboardGateComponent,
