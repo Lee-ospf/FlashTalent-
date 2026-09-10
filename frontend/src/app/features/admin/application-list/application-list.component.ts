@@ -33,7 +33,7 @@ import {
 } from '../../../core/utils/application-status';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { OfferLetterService } from '../../../core/services/offer-letter.service';
-
+import { RouterLink } from '@angular/router';
 // Must stay in sync with backend InterviewService.MaxRounds
 const MAX_INTERVIEW_ROUNDS = 5;
 
@@ -56,6 +56,7 @@ type QuickFilterKey =
   imports: [
     CommonModule,
     FormsModule,
+    RouterLink,
     MatCardModule,
     MatSelectModule,
     MatFormFieldModule,
@@ -217,6 +218,16 @@ type QuickFilterKey =
                       >
                     }
                   </div>
+                  <button
+                    class="btn-stroked vp-open-btn"
+                    matTooltip="Open vacancy applications view"
+                    (click)="
+                      $event.stopPropagation();
+                      goToVacancyApplications(group.vacancyId)
+                    "
+                  >
+                    <i class="ti ti-external-link"></i>
+                  </button>
                   <i
                     class="ti ti-chevron-down vgroup-chevron"
                     [class.open]="isExpanded(group.vacancyId)"
@@ -244,7 +255,17 @@ type QuickFilterKey =
                           <i class="ti ti-user"></i>
                         </div>
                         <div class="app-row-main">
-                          <div class="app-title">{{ a.candidateName }}</div>
+                          <a
+                            class="app-title app-title-link"
+                            [routerLink]="[
+                              '/admin/applications',
+                              a.applicationId,
+                              'candidate',
+                            ]"
+                            (click)="$event.stopPropagation()"
+                          >
+                            {{ a.candidateName }}
+                          </a>
                           <div class="app-sub">
                             Applied {{ formatDate(a.appliedAt)
                             }}{{ i === 0 ? ' · First to apply' : '' }}
@@ -473,6 +494,15 @@ type QuickFilterKey =
         text-transform: uppercase;
         letter-spacing: 0.05em;
       }
+      .app-title-link {
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+      }
+      .app-title-link:hover {
+        text-decoration: underline;
+        color: var(--navy);
+      }
     </style>
   `,
 })
@@ -586,7 +616,9 @@ export class ApplicationListComponent implements OnInit {
       0,
     ),
   );
-
+  goToVacancyApplications(vacancyId: number): void {
+    this.router.navigate(['/admin/vacancies', vacancyId, 'applications']);
+  }
   vacancyOptions = computed(() =>
     this.rawGroups()
       .filter((g) => g.applications.length > 0)
@@ -926,14 +958,18 @@ export class ApplicationListComponent implements OnInit {
   openOfferLetter(a: ApplicationResponse): void {
     this.router.navigate(['/admin/applications', a.applicationId, 'offer']);
   }
-  scheduleInterview(a: ApplicationResponse, vacancyId: number, interviewId?: number): void {
-     const queryParams: any = { vacancyId };
-  if (interviewId) {
-    queryParams.interviewId = interviewId;  // Add when rescheduling
-  }
+  scheduleInterview(
+    a: ApplicationResponse,
+    vacancyId: number,
+    interviewId?: number,
+  ): void {
+    const queryParams: any = { vacancyId };
+    if (interviewId) {
+      queryParams.interviewId = interviewId; // Add when rescheduling
+    }
     this.router.navigate(
       ['/applications', a.applicationId, 'schedule-interview'],
-       { queryParams },
+      { queryParams },
     );
   }
 }

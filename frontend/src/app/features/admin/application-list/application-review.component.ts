@@ -1,5 +1,5 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -488,7 +488,7 @@ import { CandidateDocumentResponse } from '../../../core/models';
         color: var(--text);
         text-align: left;
       }
-      
+
       .topbar-meta {
         font-size: 12px;
         color: var(--text-muted);
@@ -806,6 +806,7 @@ export class ApplicationReviewComponent implements OnInit {
   private toast = inject(ToastService);
   private documentService = inject(DocumentService);
   private rawDocuments = signal<CandidateDocumentResponse[]>([]);
+  private location = inject(Location);
   data = signal<ApplicationReviewResponse | null>(null);
   loading = signal(true);
   actioning = signal(false);
@@ -983,6 +984,6 @@ export class ApplicationReviewComponent implements OnInit {
     return `${environment.apiUrl.replace('/api', '')}${doc.fileUrl}`;
   }
   goBack(): void {
-    this.router.navigate(['/admin/applications']);
+    this.location.back();
   }
 }

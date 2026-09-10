@@ -6,7 +6,7 @@ import {
   OnInit,
   OnDestroy,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -25,6 +25,7 @@ import {
   InterviewResponse,
   InterviewType,
   InterviewCategory,
+  InterviewRescheduleResponse,
 } from '../../../core/models';
 
 type ViewMode = 'schedule' | 'view' | 'reschedule' | 'outcome' | 'decision';
@@ -110,7 +111,7 @@ const MAX_INTERVIEW_ROUNDS = 5;
 
             <div class="field-grid">
               <mat-form-field appearance="outline" style="width:100%">
-                <mat-label>Category</mat-label>
+                <mat-label>Interview category</mat-label>
                 <input
                   matInput
                   [value]="
@@ -124,15 +125,6 @@ const MAX_INTERVIEW_ROUNDS = 5;
                 <input
                   matInput
                   [value]="typeLabel(existingInterview()!.interviewType)"
-                  disabled
-                />
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" style="width:100%">
-                <mat-label>Scheduled for</mat-label>
-                <input
-                  matInput
-                  [value]="formatDateTime(existingInterview()!.scheduledAt)"
                   disabled
                 />
               </mat-form-field>
@@ -157,6 +149,20 @@ const MAX_INTERVIEW_ROUNDS = 5;
                   disabled
                 />
               </mat-form-field>
+            }
+            @if (lastReschedule()) {
+              <mat-divider style="margin:8px 0 20px"></mat-divider>
+              <div class="form-note" style="align-items:flex-start;gap:8px">
+                <i class="ti ti-history" style="margin-top:2px"></i>
+                <span>
+                  Last rescheduled from
+                  {{ formatDateTime(lastReschedule()!.oldScheduledAt) }} to
+                  {{ formatDateTime(lastReschedule()!.newScheduledAt) }}
+                  by {{ lastReschedule()!.changedByName }} — "{{
+                    lastReschedule()!.reason
+                  }}"
+                </span>
+              </div>
             }
           </mat-card-content>
         </mat-card>
@@ -235,15 +241,13 @@ const MAX_INTERVIEW_ROUNDS = 5;
               <div class="field-grid">
                 <mat-form-field appearance="outline" style="width:100%">
                   <mat-label>Interview category</mat-label>
-                  <mat-select formControlName="interviewCategory">
-                    <mat-option value="Technical">Technical</mat-option>
-                    <mat-option value="Behavioral">Behavioral</mat-option>
-                    <mat-option value="Panel">Panel</mat-option>
-                    <mat-option value="Managerial">Managerial</mat-option>
-                  </mat-select>
-                  @if (rescheduleInvalid('interviewCategory')) {
-                    <mat-error>Interview category is required</mat-error>
-                  }
+                  <input
+                    matInput
+                    [value]="
+                      categoryLabel(existingInterview()!.interviewCategory)
+                    "
+                    disabled
+                  />
                 </mat-form-field>
                 <mat-form-field appearance="outline" style="width:100%">
                   <mat-label>Interview type</mat-label>
@@ -336,6 +340,19 @@ const MAX_INTERVIEW_ROUNDS = 5;
                   must be in the future
                 </p>
               }
+
+              <mat-form-field appearance="outline" style="width:100%">
+                <mat-label>Reason for rescheduling</mat-label>
+                <textarea
+                  matInput
+                  formControlName="rescheduleReason"
+                  rows="3"
+                  placeholder="e.g. Candidate requested a later time due to a conflict"
+                ></textarea>
+                @if (rescheduleInvalid('rescheduleReason')) {
+                  <mat-error>A reason is required when rescheduling</mat-error>
+                }
+              </mat-form-field>
             </mat-card-content>
           </mat-card>
 
@@ -581,6 +598,20 @@ const MAX_INTERVIEW_ROUNDS = 5;
                   }
                 </mat-form-field>
               }
+              @if (lastReschedule()) {
+                <mat-divider style="margin:8px 0 20px"></mat-divider>
+                <div class="form-note" style="align-items:flex-start;gap:8px">
+                  <i class="ti ti-history" style="margin-top:2px"></i>
+                  <span>
+                    Last rescheduled from
+                    {{ formatDateTime(lastReschedule()!.oldScheduledAt) }} to
+                    {{ formatDateTime(lastReschedule()!.newScheduledAt) }}
+                    by {{ lastReschedule()!.changedByName }} — "{{
+                      lastReschedule()!.reason
+                    }}"
+                  </span>
+                </div>
+              }
 
               <div class="field-grid">
                 <mat-form-field appearance="outline" style="width:100%">
@@ -685,6 +716,7 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private now = signal(Date.now());
   private clockHandle?: ReturnType<typeof setInterval>;
+  private location = inject(Location);
 
   applicationId!: number;
   application = signal<ApplicationResponse | null>(null);
@@ -696,7 +728,7 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
   cancelling = signal(false);
   apiError = '';
   maxRounds = MAX_INTERVIEW_ROUNDS;
-
+  lastReschedule = signal<InterviewRescheduleResponse | null>(null);
   minDate = new Date().toISOString().substring(0, 10);
 
   form = this.fb.group(
@@ -714,11 +746,11 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
   rescheduleForm = this.fb.group(
     {
       interviewType: ['InPerson' as InterviewType, Validators.required],
-      interviewCategory: ['' as InterviewCategory | '', Validators.required],
       scheduledDate: ['', Validators.required],
       scheduledTime: ['', Validators.required],
       location: [''],
       meetingLink: [''],
+      rescheduleReason: ['', [Validators.required, Validators.minLength(5)]],
     },
     { validators: this.futureDateTime },
   );
@@ -742,7 +774,19 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
       ? { pastDateTime: true }
       : null;
   }
-
+  private loadRescheduleHistory(interviewId: number): void {
+    this.interviewService.getRescheduleHistory(interviewId).subscribe({
+      next: (history) => {
+        this.lastReschedule.set(
+          history.length ? history[history.length - 1] : null,
+        );
+      },
+      error: () => {
+        // Non-critical — don't surface an apiError banner for this, just leave the note absent
+        this.lastReschedule.set(null);
+      },
+    });
+  }
   openPicker(input: HTMLInputElement): void {
     if (typeof (input as any).showPicker === 'function') {
       (input as any).showPicker();
@@ -830,6 +874,7 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
         if (active) {
           this.existingInterview.set(active);
           this.mode.set('view');
+          this.loadRescheduleHistory(active.interviewId);
         }
         this.loading.set(false);
       },
@@ -899,11 +944,11 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
 
     this.rescheduleForm.reset({
       interviewType: interview.interviewType as InterviewType,
-      interviewCategory: interview.interviewCategory as InterviewCategory,
       scheduledDate: date,
       scheduledTime: time,
       location: interview.location ?? '',
       meetingLink: interview.meetingLink ?? '',
+      rescheduleReason: '',
     });
     this.apiError = '';
     this.mode.set('reschedule');
@@ -919,8 +964,7 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
     if (!interview) return;
 
     const type = this.rescheduleForm.value.interviewType as InterviewType;
-    const category = this.rescheduleForm.value
-      .interviewCategory as InterviewCategory;
+
     if (type === 'InPerson' && !this.rescheduleForm.value.location) {
       this.rescheduleForm.get('location')?.markAsTouched();
       return;
@@ -944,17 +988,14 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
     this.interviewService
       .reschedule(interview.interviewId, {
         scheduledAt,
-        // Only send interviewType if it actually changed — backend keeps
-        // the current type when this is omitted.
         interviewType: type !== interview.interviewType ? type : undefined,
-        interviewCategory:
-          category !== interview.interviewCategory ? category : undefined,
         location:
           type === 'InPerson' ? this.rescheduleForm.value.location! : undefined,
         meetingLink:
           type === 'Virtual'
             ? this.rescheduleForm.value.meetingLink!
             : undefined,
+        rescheduleReason: this.rescheduleForm.value.rescheduleReason!,
       })
       .subscribe({
         next: (updated) => {
@@ -962,6 +1003,7 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
           this.existingInterview.set(updated);
           this.mode.set('view');
           this.toast.show('Interview rescheduled.', 'success');
+          this.loadRescheduleHistory(updated.interviewId);
         },
         error: (err: Error) => {
           this.saving.set(false);
@@ -969,7 +1011,6 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
         },
       });
   }
-
   startOutcome(): void {
     this.outcomeForm.reset({ outcome: '', recruiterNotes: '' });
     this.apiError = '';
@@ -1082,6 +1123,6 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
   }
 
   goBack(): void {
-    this.router.navigate(['/admin/applications']);
+    this.location.back();
   }
 }

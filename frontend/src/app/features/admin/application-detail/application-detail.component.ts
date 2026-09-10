@@ -1,5 +1,5 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule,Location } from '@angular/common';
 import { RouterLink, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl, SafeHtml } from '@angular/platform-browser';
@@ -50,9 +50,9 @@ const STATUS_CLASS: Record<string, string> = {
   template: `
     <div class="page-container ad-page">
       <div class="ad-top-bar">
-        <a routerLink="/admin/applications" class="back-link">
-          <i class="ti ti-arrow-left"></i> Back to applications
-        </a>
+       <a (click)="goBack()" class="back-link" style="cursor:pointer">
+        <i class="ti ti-arrow-left"></i> Back
+      </a>
         @if (application(); as topApp) {
           <a class="btn-secondary ad-top-btn"
              [routerLink]="['/admin/applications', topApp.applicationId, 'candidate']">
@@ -485,6 +485,8 @@ export class ApplicationDetailComponent implements OnInit {
   private offerLetter = inject(OfferLetterService);
   private toast = inject(ToastService);
   private sanitizer = inject(DomSanitizer);
+  private location = inject(Location);
+
   auth = inject(AuthService);
 
   loading = signal(true);
@@ -771,5 +773,9 @@ export class ApplicationDetailComponent implements OnInit {
       },
       error: (err: Error) => { this.savingAssessment.set(false); this.toast.show(err.message, 'error'); }
     });
+  }
+
+    goBack(): void {
+    this.location.back();
   }
 }

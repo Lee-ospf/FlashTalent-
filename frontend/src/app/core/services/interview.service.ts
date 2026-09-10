@@ -7,6 +7,7 @@ import {
   ScheduleInterviewRequest,
   RescheduleInterviewRequest,
   SetInterviewOutcomeRequest,
+  InterviewRescheduleResponse
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -60,7 +61,11 @@ export class InterviewService {
       >(`${environment.apiUrl}/applications/${applicationId}/interviews`)
       .pipe(catchError(this.handleError));
   }
-
+getRescheduleHistory(interviewId: number): Observable<InterviewRescheduleResponse[]> {
+  return this.http
+    .get<InterviewRescheduleResponse[]>(`${this.base}/${interviewId}/reschedules`)
+    .pipe(catchError(this.handleError));
+}
   private handleError(err: HttpErrorResponse) {
     const msg = err.error?.message ?? 'An error occurred.';
     return throwError(() => new Error(msg));

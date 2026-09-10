@@ -154,8 +154,9 @@ export interface VacancyResponse {
   status: string; // 'Draft' | 'Published' | 'Closed'
   createdByRecruiterId: number;
   createdAt: string;
+  publishedAt?: string;
   skills: VacancySkillDto[];
-  requiredDocuments: RequiredDocumentDto[]; // ← NEW: recruiter-defined docs for this specific vacancy
+  requiredDocuments: RequiredDocumentDto[];
 }
 
 // ── Applications ──────────────────────────────────────────────────
@@ -241,15 +242,13 @@ export interface UpdateApplicationStatusRequest {
   // else still references it, but it's safe to omit when calling updateStatus().
   changedByUserId?: number;
 }
-
-export interface ApplicationStatusHistoryResponse {
-  applicationStatusHistoryId: number;
-  oldStatus: string;
-  newStatus: string;
-  changedByName: string;
-  changedAt: string;
+export interface ApplicationActivityEntry {
+  eventType: string;
+  title: string;
+  detail?: string;
+  occurredAt: string;
+  actorName?: string;
 }
-
 // ── API Error shape ───────────────────────────────────────────────
 export interface ApiError {
   message: string;
@@ -394,16 +393,22 @@ export interface ScheduleInterviewRequest {
 export interface RescheduleInterviewRequest {
   scheduledAt: string;
   interviewType?: InterviewType;
-  interviewCategory?: InterviewCategory;
   location?: string;
   meetingLink?: string;
+  rescheduleReason: string;
 }
 
 export interface SetInterviewOutcomeRequest {
   outcome: 'Passed' | 'Failed';
   recruiterNotes?: string;
 }
-
+export interface InterviewRescheduleResponse {
+  oldScheduledAt: string;
+  newScheduledAt: string;
+  reason: string;
+  changedByName: string;
+  changedAt: string;
+}
 export interface InterviewResponse {
   interviewId: number;
   applicationId: number;
@@ -458,25 +463,24 @@ export interface UnreadCountResponse {
 
 // ── AI Resume Parsing ────────────────────────────────────────────
 
-
 export interface ParsedSkill {
   name: string;
-  category?: string;           // 'Technical' | 'SoftSkill' — matches SkillResponse.category directly, no translation needed
-  proficiencyLevel: string;    // 'Beginner' | 'Intermediate' | 'Expert' — matches this app's vocabulary directly
+  category?: string; // 'Technical' | 'SoftSkill' — matches SkillResponse.category directly, no translation needed
+  proficiencyLevel: string; // 'Beginner' | 'Intermediate' | 'Expert' — matches this app's vocabulary directly
 }
 
 export interface ParsedQualification {
-  qualificationType: string;   // 'Education' | 'Certification'
+  qualificationType: string; // 'Education' | 'Certification'
   name: string;
   institution: string;
-  yearCompleted?: string;      // ISO date string, or absent — treat as AI-guessed, not confirmed (see design notes on date reliability)
+  yearCompleted?: string; // ISO date string, or absent — treat as AI-guessed, not confirmed (see design notes on date reliability)
 }
 
 export interface ParsedExperience {
   company: string;
   role: string;
-  startDate?: string;          // ISO date string, or absent if unclear
-  endDate?: string;            // absent = current role
+  startDate?: string; // ISO date string, or absent if unclear
+  endDate?: string; // absent = current role
   projectsAndDuties?: string;
 }
 

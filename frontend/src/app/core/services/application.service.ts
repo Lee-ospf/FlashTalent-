@@ -4,7 +4,7 @@ import { Observable, catchError, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   ApplicationResponse,
-  ApplicationStatusHistoryResponse,
+  ApplicationActivityEntry,
   CreateApplicationRequest,
   ApplicationReviewResponse,
   UpdateApplicationStatusRequest,
@@ -37,21 +37,16 @@ export class ApplicationService {
       .get<ApplicationResponse[]>(`${this.base}/vacancy/${vacancyId}`)
       .pipe(catchError(this.handleError));
   }
-  getHistory(
-    applicationId: number,
-  ): Observable<ApplicationStatusHistoryResponse[]> {
-    return this.http
-      .get<
-        ApplicationStatusHistoryResponse[]
-      >(`${this.base}/${applicationId}/history`)
-      .pipe(catchError(this.handleError));
-  }
   getReview(applicationId: number): Observable<ApplicationReviewResponse> {
     return this.http
       .get<ApplicationReviewResponse>(`${this.base}/${applicationId}/review`)
       .pipe(catchError(this.handleError));
   }
-
+  getActivity(applicationId: number): Observable<ApplicationActivityEntry[]> {
+    return this.http
+      .get<ApplicationActivityEntry[]>(`${this.base}/${applicationId}/activity`)
+      .pipe(catchError(this.handleError));
+  }
   updateStatus(
     applicationId: number,
     req: UpdateApplicationStatusRequest,

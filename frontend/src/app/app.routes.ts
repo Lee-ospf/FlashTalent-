@@ -38,6 +38,22 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'admin/vacancies/:id/applications',
+    canActivate: [roleGuard(['Recruiter', 'Admin'])],
+    loadComponent: () =>
+      import('./features/admin/application-list/vacancy-applications.component').then(
+        (m) => m.VacancyApplicationsComponent,
+      ),
+  },
+  {
+    path: 'admin/applications/:id/history',
+    canActivate: [roleGuard(['Recruiter', 'Admin'])],
+    loadComponent: () =>
+      import('./features/admin/application-list/application-history.component').then(
+        (m) => m.ApplicationHistoryComponent,
+      ),
+  },
+  {
     path: 'admin/applications',
     canActivate: [roleGuard(['Recruiter', 'Admin'])],
     loadComponent: () =>
