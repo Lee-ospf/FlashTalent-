@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TalentHub.Data;
 
@@ -11,9 +12,11 @@ using TalentHub.Data;
 namespace TalentHub.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260908073322_addedrescheduleinterviewhistorytable")]
+    partial class addedrescheduleinterviewhistorytable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -561,7 +564,7 @@ namespace TalentHub.Migrations
 
                     b.HasIndex("InterviewId");
 
-                    b.ToTable("InterviewRescheduleHistory", (string)null);
+                    b.ToTable("InterviewRescheduleHistory");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Notification", b =>
@@ -1241,7 +1244,7 @@ namespace TalentHub.Migrations
                     b.HasOne("TalentHub.Models.User", "ChangedByUser")
                         .WithMany()
                         .HasForeignKey("ChangedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("TalentHub.Models.Interview", "Interview")
