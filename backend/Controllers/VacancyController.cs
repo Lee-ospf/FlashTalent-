@@ -442,8 +442,9 @@ namespace TalentHub.Controllers
         }
 
         // GET: api/Vacancy/5
-        // Any authenticated role - but Candidates only get to see Published vacancies this way.
-        // Prevents a candidate from viewing a Draft/Closed vacancy's details by guessing an ID.
+        // Any authenticated role - Admin/Recruiter see anything. Candidates see
+        // Published vacancies normally, plus TalentPoolOnly vacancies ONLY if
+        // they've been invited to this specific one. Draft stays fully hidden.
         [HttpGet("{id}")]
         public async Task<ActionResult<VacancyResponse>> GetVacancyById(int id)
         {
@@ -456,10 +457,31 @@ namespace TalentHub.Controllers
                 return NotFound($"Vacancy with ID {id} not found.");
 
             var isPrivileged = User.IsInRole("Admin") || User.IsInRole("Recruiter");
-            if (!isPrivileged && vacancy.Status != VacancyStatus.Published)
-                return NotFound($"Vacancy with ID {id} not found.");
+            if (isPrivileged)
+                return Ok(MapToResponse(vacancy));
 
-            return Ok(MapToResponse(vacancy));
+            if (vacancy.Status == VacancyStatus.Published)
+                return Ok(MapToResponse(vacancy));
+
+            if (vacancy.Status == VacancyStatus.TalentPoolOnly)
+            {
+                var candidate = await Db.Candidates.FirstOrDefaultAsync(c => c.UserId == CurrentUserId);
+                if (candidate != null)
+                {
+                    var hasInvite = await Db.TalentPoolMatches.AnyAsync(m =>
+                        m.VacancyId == id &&
+                        m.CandidateId == candidate.CandidateId &&
+                        m.Stage == TalentPoolMatchStage.DraftSuggestion &&
+                        m.InvitedAt != null);
+
+                    if (hasInvite)
+                        return Ok(MapToResponse(vacancy));
+                }
+            }
+
+            // Draft, or TalentPoolOnly without an invite - identical response to
+            // "doesn't exist," so a candidate can't tell the two apart by probing IDs.
+            return NotFound($"Vacancy with ID {id} not found.");
         }
 
         // DELETE: api/Vacancy/5

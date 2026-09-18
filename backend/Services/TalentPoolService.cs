@@ -10,6 +10,9 @@ namespace TalentHub.Services
         Task AddOrUpdateAsync(int candidateId, int vacancyId);
         Task<List<TalentPoolMatchResponse>> GetMatchesForVacancyAsync(int vacancyId);
         Task<List<TalentPoolEntryResponse>> GetAllAsync();
+
+       
+        Task<List<Candidate>> GetEligibleCandidatesForAiMatchingAsync(int vacancyId, int recencyDays);
     }
 
     public class TalentPoolService : ITalentPoolService
@@ -48,6 +51,29 @@ namespace TalentHub.Services
             await _db.SaveChangesAsync();
         }
 
+        // Candidates who already have ANY application record against THIS
+        // vacancy, OR who are anywhere in an ACTIVE pipeline (any status other
+        // than NotSelected) for a DIFFERENT vacancy - shared by both the
+        // deterministic matcher and the AI eligibility query below, so the two
+        // never drift out of sync on what "eligible" means.
+        private async Task<HashSet<int>> GetExcludedCandidateIdsAsync(int vacancyId)
+        {
+            var alreadyInThisVacancyPipeline = await _db.Applications
+                .Where(a => a.VacancyId == vacancyId)
+                .Select(a => a.CandidateId)
+                .ToListAsync();
+
+            var ineligibleElsewhere = await _db.Applications
+                .Where(a => a.Status != ApplicationStatus.NotSelected)
+                .Select(a => a.CandidateId)
+                .ToListAsync();
+
+            return alreadyInThisVacancyPipeline
+                .Concat(ineligibleElsewhere)
+                .Distinct()
+                .ToHashSet();
+        }
+
         public async Task<List<TalentPoolMatchResponse>> GetMatchesForVacancyAsync(int vacancyId)
         {
             var vacancy = await _db.Vacancies.FindAsync(vacancyId);
@@ -66,25 +92,13 @@ namespace TalentHub.Services
                 return new List<TalentPoolMatchResponse>();
             }
 
-            // Candidates who already applied to THIS vacancy shouldn't be
-            // suggested again - they're already in that pipeline.
-            var alreadyAppliedCandidateIds = await _db.Applications
-                .Where(a => a.VacancyId == vacancyId)
-                .Select(a => a.CandidateId)
-                .ToListAsync();
-
-            // Candidates already hired (anywhere) shouldn't be suggested either.
-            var hiredCandidateIds = await _db.Applications
-                .Where(a => a.Status == ApplicationStatus.Hired)
-                .Select(a => a.CandidateId)
-                .ToListAsync();
+            var excludedCandidateIds = await GetExcludedCandidateIdsAsync(vacancyId);
 
             var poolEntries = await _db.TalentPoolEntries
                 .Include(t => t.Candidate).ThenInclude(c => c!.User)
                 .Include(t => t.Candidate).ThenInclude(c => c!.CandidateSkills).ThenInclude(cs => cs.Skill)
                 .Include(t => t.LastVacancy)
-                .Where(t => !alreadyAppliedCandidateIds.Contains(t.CandidateId)
-                         && !hiredCandidateIds.Contains(t.CandidateId))
+                .Where(t => !excludedCandidateIds.Contains(t.CandidateId))
                 .ToListAsync();
 
             var results = new List<TalentPoolMatchResponse>();
@@ -145,6 +159,45 @@ namespace TalentHub.Services
                     UpdatedAt = t.UpdatedAt
                 })
                 .ToList();
+        }
+
+        public async Task<List<Candidate>> GetEligibleCandidatesForAiMatchingAsync(int vacancyId, int recencyDays)
+        {
+            var excludedCandidateIds = await GetExcludedCandidateIdsAsync(vacancyId);
+            var cutoff = DateTime.UtcNow.AddDays(-recencyDays);
+
+            // Anyone already invited for THIS vacancy shouldn't be re-suggested on
+            // a later pull - they've already been reached out to, and re-showing
+            // them (even after Invite is no longer clickable, since InvitedAt is
+            // set) would just be noise.
+            var alreadyInvitedForThisVacancy = await _db.TalentPoolMatches
+                .Where(m => m.VacancyId == vacancyId
+                         && m.Stage == TalentPoolMatchStage.DraftSuggestion
+                         && m.InvitedAt != null)
+                .Select(m => m.CandidateId)
+                .ToListAsync();
+
+            var poolCandidateIds = await _db.TalentPoolEntries
+                .Select(t => t.CandidateId)
+                .ToListAsync();
+
+            var eligibleIds = poolCandidateIds
+                .Except(excludedCandidateIds)
+                .Except(alreadyInvitedForThisVacancy)
+                .ToHashSet();
+
+            if (eligibleIds.Count == 0)
+            {
+                return new List<Candidate>();
+            }
+
+            return await _db.Candidates
+                .Include(c => c.User)
+                .Include(c => c.CandidateSkills).ThenInclude(cs => cs.Skill)
+                .Include(c => c.Qualifications)
+                .Include(c => c.Experiences)
+                .Where(c => eligibleIds.Contains(c.CandidateId) && c.LastProfileUpdateAt >= cutoff)
+                .ToListAsync();
         }
     }
 }

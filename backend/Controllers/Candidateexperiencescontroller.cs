@@ -41,8 +41,8 @@ namespace TalentHub.Controllers
         [HttpPost]
         public async Task<ActionResult<ExperienceResponse>> Create(int candidateId, CreateExperienceRequest request)
         {
-            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
-            if (!candidateExists)
+            var candidate = await Db.Candidates.FindAsync(candidateId);
+            if (candidate == null)
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
@@ -66,6 +66,11 @@ namespace TalentHub.Controllers
             };
 
             Db.CandidateExperiences.Add(experience);
+
+            // Adding an experience entry is a profile-affecting change for
+            // talent-pool matching recency purposes - see Candidate.LastProfileUpdateAt.
+            candidate.LastProfileUpdateAt = DateTime.UtcNow;
+
             await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(experience));
@@ -86,6 +91,15 @@ namespace TalentHub.Controllers
             }
 
             Db.CandidateExperiences.Remove(experience);
+
+            // Best-effort touch, doesn't block removal if the candidate row
+            // is somehow already gone.
+            var candidate = await Db.Candidates.FindAsync(candidateId);
+            if (candidate != null)
+            {
+                candidate.LastProfileUpdateAt = DateTime.UtcNow;
+            }
+
             await Db.SaveChangesAsync();
 
             return NoContent();

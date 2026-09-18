@@ -52,8 +52,8 @@ namespace TalentHub.Controllers
         [HttpPost]
         public async Task<ActionResult<QualificationResponse>> Create(int candidateId, CreateQualificationRequest request)
         {
-            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
-            if (!candidateExists)
+            var candidate = await Db.Candidates.FindAsync(candidateId);
+            if (candidate == null)
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
@@ -76,6 +76,11 @@ namespace TalentHub.Controllers
             };
 
             Db.CandidateQualifications.Add(qualification);
+
+            // Adding a qualification is a profile-affecting change for
+            // talent-pool matching recency purposes - see Candidate.LastProfileUpdateAt.
+            candidate.LastProfileUpdateAt = DateTime.UtcNow;
+
             await Db.SaveChangesAsync();
 
             return Ok(MapToResponse(qualification));
@@ -103,6 +108,16 @@ namespace TalentHub.Controllers
             Db.CandidateDocuments.RemoveRange(attachedDocs);
 
             Db.CandidateQualifications.Remove(qualification);
+
+            // Removing a qualification is also a profile-affecting change -
+            // best-effort touch, doesn't block removal if the candidate row
+            // is somehow already gone.
+            var candidate = await Db.Candidates.FindAsync(candidateId);
+            if (candidate != null)
+            {
+                candidate.LastProfileUpdateAt = DateTime.UtcNow;
+            }
+
             await Db.SaveChangesAsync();
 
             return NoContent();

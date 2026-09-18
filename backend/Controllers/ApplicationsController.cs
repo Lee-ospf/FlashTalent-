@@ -55,7 +55,18 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No vacancy found with VacancyId {request.VacancyId}." });
             }
             //validation for vacancy that is not puplished or closed 
-            if (vacancy.Status != VacancyStatus.Published)
+            var canApplyToStatus = vacancy.Status == VacancyStatus.Published;
+
+            if (!canApplyToStatus && vacancy.Status == VacancyStatus.TalentPoolOnly)
+            {
+                canApplyToStatus = await Db.TalentPoolMatches.AnyAsync(m =>
+                    m.VacancyId == request.VacancyId &&
+                    m.CandidateId == request.CandidateId &&
+                    m.Stage == TalentPoolMatchStage.DraftSuggestion &&
+                    m.InvitedAt != null);
+            }
+
+            if (!canApplyToStatus)
             {
                 return BadRequest(new { message = "Cannot apply to a vacancy that has not been published." });
             }

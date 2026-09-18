@@ -53,8 +53,8 @@ namespace TalentHub.Controllers
         [HttpPost]
         public async Task<ActionResult<List<CandidateSkillResponse>>> AssignSkills(int candidateId, AssignSkillsRequest request)
         {
-            var candidateExists = await Db.Candidates.AnyAsync(c => c.CandidateId == candidateId);
-            if (!candidateExists)
+            var candidate = await Db.Candidates.FindAsync(candidateId);
+            if (candidate == null)
             {
                 return NotFound(new { message = $"No candidate found with CandidateId {candidateId}." });
             }
@@ -103,6 +103,10 @@ namespace TalentHub.Controllers
                 }
             }
 
+            // Assigning/updating skills is a profile-affecting change for
+            // talent-pool matching recency purposes - see Candidate.LastProfileUpdateAt.
+            candidate.LastProfileUpdateAt = DateTime.UtcNow;
+
             await Db.SaveChangesAsync();
 
             return await GetAll(candidateId);
@@ -120,6 +124,15 @@ namespace TalentHub.Controllers
             if (link == null)
             {
                 return NotFound(new { message = "This candidate does not have that skill assigned." });
+            }
+
+            // Best-effort touch - the link's own existence already implies the
+            // candidate exists via FK, so this shouldn't come back null in
+            // practice, but removal isn't blocked on it either way.
+            var candidate = await Db.Candidates.FindAsync(candidateId);
+            if (candidate != null)
+            {
+                candidate.LastProfileUpdateAt = DateTime.UtcNow;
             }
 
             Db.CandidateSkills.Remove(link);

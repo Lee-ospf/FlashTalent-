@@ -12,6 +12,7 @@ namespace TalentHub.Models
     public enum VacancyStatus
     {
         Draft,
+        TalentPoolOnly,
         Published,
         Closed
     }
@@ -70,6 +71,10 @@ namespace TalentHub.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? PublishedAt { get; set; }
+
+        public DateTime? LastPoolPulledAt { get; set; }
+        public DateTime? LastApplicantRankedAt { get; set; }
+
 
         // Navigation
         public ICollection<Application> Applications { get; set; } = new List<Application>();

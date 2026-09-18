@@ -27,6 +27,7 @@ namespace TalentHub.Controllers
                     NotificationType = n.NotificationType.ToString(),
                     Subject = n.Subject,
                     Body = n.Body,
+                    ActionUrl = n.ActionUrl,
                     IsRead = n.IsRead,
                     SentAt = n.SentAt
                 })

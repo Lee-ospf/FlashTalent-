@@ -7,7 +7,7 @@ namespace TalentHub.Data
     public class AppDbContext : DbContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
-        {}
+        { }
 
         public DbSet<User> Users => Set<User>();
         public DbSet<Candidate> Candidates => Set<Candidate>();
@@ -18,6 +18,7 @@ namespace TalentHub.Data
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<Employee> Employees => Set<Employee>();
         public DbSet<TalentPool> TalentPoolEntries => Set<TalentPool>();
+        public DbSet<TalentPoolMatch> TalentPoolMatches => Set<TalentPoolMatch>();
         public DbSet<Recruiter> Recruiters => Set<Recruiter>();
 
         public DbSet<Vacancy> Vacancies => Set<Vacancy>();
@@ -141,7 +142,7 @@ namespace TalentHub.Data
                   .HasOne(d => d.Qualification)
                   .WithMany()
                   .HasForeignKey(d => d.QualificationId)
-                   .OnDelete(DeleteBehavior.Restrict); 
+                   .OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<Application>()
                 .HasOne(a => a.Candidate)
                 .WithMany(c => c.Applications)
@@ -228,6 +229,29 @@ namespace TalentHub.Data
                 .WithMany()
                 .HasForeignKey(t => t.LastVacancyId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+
+            // ---------- TalentPoolMatch: AI-scored rows for both matching phases ----------
+            modelBuilder.Entity<TalentPoolMatch>()
+                .HasOne(m => m.Vacancy)
+                .WithMany()
+                .HasForeignKey(m => m.VacancyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TalentPoolMatch>()
+                .HasOne(m => m.Candidate)
+                .WithMany()
+                .HasForeignKey(m => m.CandidateId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TalentPoolMatch>()
+                .Property(m => m.Stage)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            // Every read this feature does is "give me this vacancy's rows for
+            // this stage" - Phase 1's pull results or Phase 2's ranked list.
+            modelBuilder.Entity<TalentPoolMatch>()
+                .HasIndex(m => new { m.VacancyId, m.Stage });
 
             modelBuilder.Entity<Interview>()
                 .HasOne(i => i.Application)

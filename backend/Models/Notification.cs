@@ -6,14 +6,15 @@ namespace TalentHub.Models
     public enum NotificationType
     {
         InterviewScheduled,
-        InterviewRescheduled,  
+        InterviewRescheduled,
         InterviewCancelled,
         StatusChanged,
         DocumentMissing,
         PrescreeningSent,
         PrescreeningSubmitted,
-        OfferSent,       
+        OfferSent,
         OfferResponded,
+        TalentPoolInvite,
         General
     }
 
@@ -36,6 +37,8 @@ namespace TalentHub.Models
 
         [Required]
         public string Body { get; set; } = string.Empty;
+        [MaxLength(300)]
+        public string? ActionUrl { get; set; }
 
         public bool IsRead { get; set; } = false;
 

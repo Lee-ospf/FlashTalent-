@@ -6,6 +6,7 @@
         public string NotificationType { get; set; } = string.Empty;
         public string Subject { get; set; } = string.Empty;
         public string Body { get; set; } = string.Empty;
+        public string? ActionUrl { get; set; }
         public bool IsRead { get; set; }
         public DateTime SentAt { get; set; }
     }

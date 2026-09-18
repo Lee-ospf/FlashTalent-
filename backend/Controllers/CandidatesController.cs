@@ -47,6 +47,8 @@ namespace TalentHub.Controllers
             {
                 return BadRequest(new { message = "Candidates must be at least 18 years old to register." });
             }
+
+            var now = DateTime.UtcNow;
             var candidate = new Candidate
             {
                 UserId = userId,
@@ -57,7 +59,8 @@ namespace TalentHub.Controllers
 
                 DateOfBirth = request.DateOfBirth,
 
-                RegisteredAt = DateTime.UtcNow
+                RegisteredAt = now,
+                LastProfileUpdateAt = now
             };
 
             Db.Candidates.Add(candidate);
@@ -164,6 +167,8 @@ namespace TalentHub.Controllers
 
             candidate.DateOfBirth = request.DateOfBirth;
 
+            
+            candidate.LastProfileUpdateAt = DateTime.UtcNow;
 
             await Db.SaveChangesAsync();
 

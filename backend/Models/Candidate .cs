@@ -35,6 +35,7 @@ namespace TalentHub.Models
 
 
         public DateTime RegisteredAt { get; set; } = DateTime.UtcNow;
+        public DateTime LastProfileUpdateAt { get; set; } = DateTime.UtcNow;
 
         // Navigation properties
         public ICollection<CandidateDocument> Documents { get; set; } = new List<CandidateDocument>();
