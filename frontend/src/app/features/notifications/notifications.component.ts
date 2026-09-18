@@ -1,5 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
@@ -17,6 +18,7 @@ const TYPE_ICON: Record<string, string> = {
   PrescreeningSubmitted: 'ti-clipboard-check',
   OfferSent: 'ti-mail',
   OfferResponded: 'ti-mail-opened',
+  TalentPoolInvite: 'ti-sparkles',
   General: 'ti-bell',
 };
 
@@ -79,7 +81,9 @@ const TYPE_ICON: Record<string, string> = {
             <mat-card
               class="mat-elevation-z1"
               style="border-radius:12px"
+              [class.notif-clickable]="!!n.actionUrl"
               [style.borderLeft]="n.isRead ? 'none' : '4px solid var(--navy)'"
+              (click)="n.actionUrl ? openAction(n) : null"
             >
               <mat-card-content
                 style="padding:16px 20px;display:flex;gap:14px;align-items:flex-start"
@@ -115,16 +119,27 @@ const TYPE_ICON: Record<string, string> = {
                   >
                     {{ n.body }}
                   </div>
-                  @if (!n.isRead) {
-                    <button
-                      mat-button
-                      style="margin-top:8px;font-size:11px;padding:0;min-width:0;color:var(--navy)"
-                      (click)="markAsRead(n)"
-                    >
-                      <i class="ti ti-check" style="margin-right:4px"></i> Mark
-                      as read
-                    </button>
-                  }
+                  <div style="display:flex;align-items:center;gap:14px;margin-top:8px">
+                    @if (n.actionUrl) {
+                      <button
+                        mat-button
+                        style="font-size:11px;padding:0;min-width:0;color:var(--navy)"
+                        (click)="openAction(n); $event.stopPropagation()"
+                      >
+                        <i class="ti ti-arrow-right" style="margin-right:4px"></i> View vacancy
+                      </button>
+                    }
+                    @if (!n.isRead) {
+                      <button
+                        mat-button
+                        style="font-size:11px;padding:0;min-width:0;color:var(--text-muted)"
+                        (click)="markAsRead(n); $event.stopPropagation()"
+                      >
+                        <i class="ti ti-check" style="margin-right:4px"></i> Mark
+                        as read
+                      </button>
+                    }
+                  </div>
                 </div>
               </mat-card-content>
             </mat-card>
@@ -132,10 +147,16 @@ const TYPE_ICON: Record<string, string> = {
         </div>
       }
     </div>
+
+    <style>
+      .notif-clickable { cursor: pointer; transition: box-shadow 0.15s; }
+      .notif-clickable:hover { box-shadow: var(--shadow); }
+    </style>
   `,
 })
 export class NotificationsComponent implements OnInit {
   private notificationService = inject(NotificationService);
+  private router = inject(Router);
 
   notifications = signal<NotificationResponse[]>([]);
   loading = signal(true);
@@ -203,5 +224,23 @@ export class NotificationsComponent implements OnInit {
         this.apiError = err.message;
       },
     });
+  }
+
+  // Marks the notification read (if it isn't already) then navigates to its
+  // linked destination. Read-marking is fire-and-forget here - navigation
+  // proceeds immediately rather than waiting on that request, since a failed
+  // read-mark shouldn't block the person from reaching the page they clicked for.
+  openAction(n: NotificationResponse): void {
+    if (!n.actionUrl) return;
+    if (!n.isRead) {
+      this.notificationService.markAsRead(n.notificationId).subscribe({
+        next: () => {
+          this.notifications.update((list) =>
+            list.map((x) => x.notificationId === n.notificationId ? { ...x, isRead: true } : x));
+        },
+        error: () => {}, // non-blocking - navigation already proceeded below
+      });
+    }
+    this.router.navigateByUrl(n.actionUrl);
   }
 }

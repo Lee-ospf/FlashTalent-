@@ -10,6 +10,7 @@ import { ToastService } from '../../../core/services/toast.service';
 import { VacancyResponse } from '../../../core/models';
 
 type SortMode = 'closingSoon' | 'newest';
+type StatusFilter = 'all' | 'Draft' | 'TalentPoolOnly' | 'Published' | 'Closed';
 
 @Component({
   selector: 'app-admin-vacancy-list',
@@ -38,7 +39,7 @@ type SortMode = 'closingSoon' | 'newest';
       <div class="filter-chips">
         @for (f of statusFilters; track f) {
           <button class="filter-chip" [class.on]="activeFilter() === f" (click)="setFilter(f)">
-            {{ f === 'all' ? 'All' : f }}
+            {{ f === 'all' ? 'All' : statusLabel(f) }}
           </button>
         }
       </div>
@@ -57,8 +58,12 @@ type SortMode = 'closingSoon' | 'newest';
                     <div class="vc-title">{{ v.title }}</div>
                     <div class="vc-ref">JDF-VAC-{{ v.vacancyId }} · {{ v.location }} · {{ v.employmentType }}</div>
                   </a>
-                  <span class="pill" [class.pill-pub]="v.status==='Published'" [class.pill-dept]="v.status==='Draft'" [class.pill-type]="v.status==='Closed'">
-                    {{ v.status }}
+                  <span class="pill"
+                        [class.pill-pub]="v.status==='Published'"
+                        [class.pill-dept]="v.status==='Draft'"
+                        [class.pill-tpo]="v.status==='TalentPoolOnly'"
+                        [class.pill-type]="v.status==='Closed'">
+                    {{ statusLabel(v.status) }}
                   </span>
                 </div>
 
@@ -81,6 +86,7 @@ type SortMode = 'closingSoon' | 'newest';
       .filters-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 12px; }
       .vc-title-link { text-decoration: none; color: inherit; display: block; }
       .vc-title-link:hover .vc-title { color: var(--navy); text-decoration: underline; }
+      .pill-tpo { background: #f3e9ff; color: #6a1b9a; border: 1px solid #ce93d8; }
     </style>
   `
 })
@@ -90,8 +96,8 @@ export class AdminVacancyListComponent implements OnInit {
 
   vacancies = signal<VacancyResponse[]>([]);
   loading = signal(false);
-  activeFilter = signal<'all' | 'Draft' | 'Published' | 'Closed'>('all');
-  statusFilters: ('all' | 'Draft' | 'Published' | 'Closed')[] = ['all', 'Draft', 'Published', 'Closed'];
+  activeFilter = signal<StatusFilter>('all');
+  statusFilters: StatusFilter[] = ['all', 'Draft', 'TalentPoolOnly', 'Published', 'Closed'];
 
   searchQ = signal('');
   sortMode = signal<SortMode>('closingSoon');
@@ -125,7 +131,11 @@ export class AdminVacancyListComponent implements OnInit {
     });
   }
 
-  setFilter(f: 'all' | 'Draft' | 'Published' | 'Closed'): void { this.activeFilter.set(f); }
+  setFilter(f: StatusFilter): void { this.activeFilter.set(f); }
+
+  statusLabel(status: string): string {
+    return status === 'TalentPoolOnly' ? 'Talent Pool Only' : status;
+  }
 
   formatDate(d?: string): string {
     return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
