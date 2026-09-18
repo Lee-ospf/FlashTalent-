@@ -162,16 +162,29 @@ namespace TalentHub.Controllers
             {
                 return BadRequest(new { message = "MeetingLink is required for a Virtual interview." });
             }
+            if (string.IsNullOrWhiteSpace(request.RescheduleReason))
+            {
+                return BadRequest(new { message = "A reason is required when rescheduling an interview." });
+            }
+            
+            var oldScheduledAt = interview.ScheduledAt;   // capture before overwrite
 
+            //set new date and type
             interview.ScheduledAt = request.ScheduledAt;
             interview.InterviewType = effectiveType;
-
             // Clear whichever field no longer applies when the type changes, so a
-            // stale address doesn't linger on an interview that's now virtual (or
-            // vice versa).
             interview.Location = effectiveType == InterviewType.InPerson ? request.Location : null;
             interview.MeetingLink = effectiveType == InterviewType.Virtual ? request.MeetingLink : null;
-
+           
+            Db.InterviewRescheduleHistories.Add(new InterviewRescheduleHistory
+            {
+                InterviewId = interview.InterviewId,
+                OldScheduledAt = oldScheduledAt,
+                NewScheduledAt = request.ScheduledAt,
+                Reason = request.RescheduleReason,
+                ChangedByUserId = CurrentUserId,
+                ChangedAt = DateTime.UtcNow
+            });
             var notification = _interviewService.BuildRescheduledNotification(interview.Application, interview);
             Db.Notifications.Add(notification);
 
@@ -179,7 +192,38 @@ namespace TalentHub.Controllers
 
             return Ok(_interviewService.MapToResponse(interview, interview.Application));
         }
+        //Get reschedules for a specific interview
+        // GET api/interviews/{interviewId}/reschedules
+        [HttpGet("interviews/{interviewId}/reschedules")]
+        public async Task<ActionResult<List<InterviewRescheduleResponse>>> GetRescheduleHistory(int interviewId)
+        {
+            var interview = await Db.Interviews
+                .Include(i => i.Application).ThenInclude(a => a!.Candidate)
+                .FirstOrDefaultAsync(i => i.InterviewId == interviewId);
 
+            if (interview == null || interview.Application?.Candidate == null)
+                return NotFound(new { message = $"No interview found with id {interviewId}." });
+
+            var isPrivileged = User.IsInRole("Admin") || User.IsInRole("Recruiter");
+            if (!isPrivileged && interview.Application.Candidate.UserId != CurrentUserId)
+                return Forbid();
+
+            var history = await Db.InterviewRescheduleHistories
+                .Include(h => h.ChangedByUser)
+                .Where(h => h.InterviewId == interviewId)
+                .OrderBy(h => h.ChangedAt)
+                .Select(h => new InterviewRescheduleResponse
+                {
+                    OldScheduledAt = h.OldScheduledAt,
+                    NewScheduledAt = h.NewScheduledAt,
+                    Reason = h.Reason,
+                    ChangedByName = h.ChangedByUser != null ? $"{h.ChangedByUser.FirstName} {h.ChangedByUser.LastName}" : "Unknown",
+                    ChangedAt = h.ChangedAt
+                })
+                .ToListAsync();
+
+            return Ok(history);
+        }
         // PUT api/interviews/{interviewId}/cancel
         [Authorize(Roles = "Recruiter,Admin")]
         [HttpPut("interviews/{interviewId}/cancel")]

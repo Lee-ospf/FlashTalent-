@@ -23,6 +23,7 @@ namespace TalentHub.Data
 
         public DbSet<Vacancy> Vacancies => Set<Vacancy>();
         public DbSet<Interview> Interviews => Set<Interview>();
+        public DbSet<InterviewRescheduleHistory> InterviewRescheduleHistories => Set<InterviewRescheduleHistory>();
         public DbSet<Skill> Skills => Set<Skill>();
         public DbSet<CandidateSkill> CandidateSkills => Set<CandidateSkill>();
         public DbSet<CandidateQualification> CandidateQualifications => Set<CandidateQualification>();
@@ -312,6 +313,20 @@ namespace TalentHub.Data
             modelBuilder.Entity<ApplicationStatusHistory>().Property(h => h.NewStatus).HasConversion<string>().HasMaxLength(20);
             modelBuilder.Entity<Prescreening>().Property(p => p.Outcome).HasConversion<string>().HasMaxLength(20);
             modelBuilder.Entity<Notification>().Property(n => n.NotificationType).HasConversion<string>().HasMaxLength(30);
+            modelBuilder.Entity<InterviewRescheduleHistory>()
+     .ToTable("InterviewRescheduleHistory");
+
+            modelBuilder.Entity<InterviewRescheduleHistory>()
+        .HasOne(h => h.ChangedByUser)
+        .WithMany()
+        .HasForeignKey(h => h.ChangedByUserId)
+        .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<InterviewRescheduleHistory>()
+                .HasOne(h => h.Interview)
+                .WithMany(i => i.RescheduleHistory)
+                .HasForeignKey(h => h.InterviewId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

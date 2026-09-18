@@ -35,4 +35,12 @@
         public string ChangedByName { get; set; } = string.Empty;
         public DateTime ChangedAt { get; set; }
     }
+    public class ApplicationActivityEntry
+    {
+        public string EventType { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string? Detail { get; set; }
+        public DateTime OccurredAt { get; set; }
+        public string? ActorName { get; set; }
+    }
 }

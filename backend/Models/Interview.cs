@@ -10,8 +10,7 @@ namespace TalentHub.Models
     }
 
     public enum InterviewCategory
-    {
-       
+    { 
         Technical,
         Behavioral,
         Panel,
@@ -75,5 +74,6 @@ namespace TalentHub.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? CompletedAt { get; set; }
+        public ICollection<InterviewRescheduleHistory> RescheduleHistory { get; set; } = new List<InterviewRescheduleHistory>();
     }
 }

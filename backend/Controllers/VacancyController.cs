@@ -564,8 +564,7 @@ namespace TalentHub.Controllers
                 .ToListAsync();
 
             return Ok(history);
-        }
-        private static VacancyResponse MapToResponse(Vacancy v)
+        }private static VacancyResponse MapToResponse(Vacancy v)
         {
             return new VacancyResponse
             {

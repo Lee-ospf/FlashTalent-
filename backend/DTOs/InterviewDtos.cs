@@ -9,22 +9,28 @@
         public string? MeetingLink { get; set; }
     }
 
-    public class RescheduleInterviewRequest
-    {
-        public DateTime ScheduledAt { get; set; }
-        // Optional - if omitted, the interview keeps its current InterviewType.
-        // Provide this when the recruiter is switching between InPerson/Virtual/Phone.
-        public string? InterviewType { get; set; }
-        public string? Location { get; set; }
-        public string? MeetingLink { get; set; }
-    }
 
     public class SetInterviewOutcomeRequest
     {
         public string Outcome { get; set; } = string.Empty; // Passed/Failed
         public string? RecruiterNotes { get; set; }
     }
-
+    public class RescheduleInterviewRequest
+    {
+        public DateTime ScheduledAt { get; set; }
+        public string? InterviewType { get; set; }
+        public string? Location { get; set; }
+        public string? MeetingLink { get; set; }
+        public string RescheduleReason { get; set; } = string.Empty;
+    }
+    public class InterviewRescheduleResponse
+    {
+        public DateTime OldScheduledAt { get; set; }
+        public DateTime NewScheduledAt { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public string ChangedByName { get; set; } = string.Empty;
+        public DateTime ChangedAt { get; set; }
+    }
     public class InterviewResponse
     {
         public int InterviewId { get; set; }

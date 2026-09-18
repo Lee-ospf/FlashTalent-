@@ -422,6 +422,125 @@ namespace TalentHub.Controllers
 
             return Ok(response);
         }
+
+        // GET api/applications/{id}/activity
+        [HttpGet("{id}/activity")]
+        public async Task<ActionResult<List<ApplicationActivityEntry>>> GetActivity(int id)
+        {
+            var application = await Db.Applications
+                .Include(a => a.Candidate)
+                .FirstOrDefaultAsync(a => a.ApplicationId == id);
+
+            if (application == null || application.Candidate == null)
+                return NotFound(new { message = $"No application found with ApplicationId {id}." });
+
+            var isPrivileged = User.IsInRole("Admin") || User.IsInRole("Recruiter");
+            if (!isPrivileged && application.Candidate.UserId != CurrentUserId)
+                return Forbid();
+
+            var entries = new List<ApplicationActivityEntry>();
+
+            var statusHistory = await Db.ApplicationStatusHistories
+                .Include(h => h.ChangedByUser)
+                .Where(h => h.ApplicationId == id)
+                .ToListAsync();
+            foreach (var h in statusHistory)
+            {
+                entries.Add(new ApplicationActivityEntry
+                {
+                    EventType = "StatusChange",
+                    Title = h.OldStatus == h.NewStatus
+                        ? $"Application submitted ({h.NewStatus})"
+                        : $"Status changed: {h.OldStatus} \u2192 {h.NewStatus}",
+                    OccurredAt = h.ChangedAt,
+                    ActorName = h.ChangedByUser != null ? $"{h.ChangedByUser.FirstName} {h.ChangedByUser.LastName}" : "Unknown"
+                });
+            }
+
+            var prescreening = await Db.Prescreenings.FirstOrDefaultAsync(p => p.ApplicationId == id);
+            if (prescreening != null)
+            {
+                entries.Add(new ApplicationActivityEntry
+                {
+                    EventType = "PrescreeningSent",
+                    Title = "Pre-screening form sent",
+                    OccurredAt = prescreening.SentAt
+                });
+                if (prescreening.SubmittedAt.HasValue)
+                    entries.Add(new ApplicationActivityEntry
+                    {
+                        EventType = "PrescreeningSubmitted",
+                        Title = "Pre-screening form submitted",
+                        OccurredAt = prescreening.SubmittedAt.Value
+                    });
+                if (prescreening.ReviewedAt.HasValue)
+                    entries.Add(new ApplicationActivityEntry
+                    {
+                        EventType = "PrescreeningOutcome",
+                        Title = $"Pre-screening outcome: {prescreening.Outcome}",
+                        Detail = prescreening.RecruiterNotes,
+                        OccurredAt = prescreening.ReviewedAt.Value
+                    });
+            }
+
+            var interviews = await Db.Interviews
+                .Include(i => i.ScheduledByUser)
+                .Where(i => i.ApplicationId == id)
+                .ToListAsync();
+            foreach (var iv in interviews)
+            {
+                entries.Add(new ApplicationActivityEntry
+                {
+                    EventType = "InterviewScheduled",
+                    Title = $"Interview round {iv.RoundNumber} scheduled for {iv.ScheduledAt:g}",
+                    OccurredAt = iv.CreatedAt,
+                    ActorName = iv.ScheduledByUser != null ? $"{iv.ScheduledByUser.FirstName} {iv.ScheduledByUser.LastName}" : "Unknown"
+                });
+
+                var reschedules = await Db.InterviewRescheduleHistories
+                    .Include(r => r.ChangedByUser)
+                    .Where(r => r.InterviewId == iv.InterviewId)
+                    .ToListAsync();
+                foreach (var r in reschedules)
+                    entries.Add(new ApplicationActivityEntry
+                    {
+                        EventType = "InterviewRescheduled",
+                        Title = $"Round {iv.RoundNumber} rescheduled: {r.OldScheduledAt:g} \u2192 {r.NewScheduledAt:g}",
+                        Detail = r.Reason,
+                        OccurredAt = r.ChangedAt,
+                        ActorName = r.ChangedByUser != null ? $"{r.ChangedByUser.FirstName} {r.ChangedByUser.LastName}" : "Unknown"
+                    });
+
+                if (iv.Status == InterviewStatus.Completed && iv.CompletedAt.HasValue)
+                    entries.Add(new ApplicationActivityEntry
+                    {
+                        EventType = "InterviewOutcome",
+                        Title = $"Round {iv.RoundNumber} outcome: {iv.Outcome}",
+                        Detail = iv.RecruiterNotes,
+                        OccurredAt = iv.CompletedAt.Value
+                    });
+            }
+
+            var offers = await Db.OfferLetters.Where(o => o.ApplicationId == id).ToListAsync();
+            foreach (var o in offers)
+            {
+                entries.Add(new ApplicationActivityEntry
+                {
+                    EventType = "OfferSent",
+                    Title = $"Offer letter sent (v{o.VersionNumber})",
+                    OccurredAt = o.SentAt
+                });
+                if (o.RespondedAt.HasValue)
+                    entries.Add(new ApplicationActivityEntry
+                    {
+                        EventType = "OfferResponse",
+                        Title = $"Offer v{o.VersionNumber} {o.Status}",
+                        OccurredAt = o.RespondedAt.Value
+                    });
+            }
+
+            return Ok(entries.OrderBy(e => e.OccurredAt).ToList());
+        }
         private static ApplicationResponse MapToResponse(Application a, Candidate c, Vacancy v)
         {
             return new ApplicationResponse
