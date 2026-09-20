@@ -47,11 +47,11 @@ namespace TalentHub.Services
         private static readonly ApplicationStatus[] ActiveApplicationStatuses =
         {
         ApplicationStatus.Applied,
-        ApplicationStatus.UnderReview,
-        ApplicationStatus.Shortlisted,
-        ApplicationStatus.PrescreeningStage,
-        ApplicationStatus.InterviewStage,
-        ApplicationStatus.OfferExtended
+        //ApplicationStatus.UnderReview,
+        //ApplicationStatus.Shortlisted,
+        //ApplicationStatus.PrescreeningStage,
+        //ApplicationStatus.InterviewStage,
+       // ApplicationStatus.OfferExtended
     };
 
         public TalentPoolMatchingService(
@@ -237,14 +237,17 @@ namespace TalentHub.Services
             if (requiredSkills.Count == 0)
                 throw new InvalidOperationException("This vacancy has no required skills to rank applicants against.");
 
-            var applicants = await _db.Applications
-                .Where(a => a.VacancyId == vacancyId && ActiveApplicationStatuses.Contains(a.Status))
-                .Select(a => a.Candidate)
-                .Where(c => c != null)
-                .Include(c => c!.User)
-                .Include(c => c!.CandidateSkills).ThenInclude(cs => cs.Skill)
-                .Include(c => c!.Qualifications)
-                .Include(c => c!.Experiences)
+            var applicantCandidateIds = await _db.Applications
+     .Where(a => a.VacancyId == vacancyId && ActiveApplicationStatuses.Contains(a.Status))
+     .Select(a => a.CandidateId)
+     .ToListAsync(ct);
+
+            var applicants = await _db.Candidates
+                .Include(c => c.User)
+                .Include(c => c.CandidateSkills).ThenInclude(cs => cs.Skill)
+                .Include(c => c.Qualifications)
+                .Include(c => c.Experiences)
+                .Where(c => applicantCandidateIds.Contains(c.CandidateId))
                 .ToListAsync(ct);
 
             var previousRankingRows = await _db.TalentPoolMatches
@@ -269,11 +272,11 @@ namespace TalentHub.Services
             var vacancyProfile = BuildVacancyProfile(vacancy);
 
             var scored = await CallGeminiForScoringAsync(vacancyProfile, candidateProfiles, ct);
-            var validScored = FilterToValidCandidateIds(scored, applicants.Select(c => c!.CandidateId), vacancyId);
+            var validScored = FilterToValidCandidateIds(scored, applicants.Select(c => c.CandidateId), vacancyId);
 
             var ordered = validScored.OrderByDescending(s => s.Score).ToList();
 
-            var candidateById = applicants.ToDictionary(c => c!.CandidateId, c => c!);
+            var candidateById = applicants.ToDictionary(c => c.CandidateId, c => c);
             var now = DateTime.UtcNow;
 
             var newRows = ordered.Select(m => new TalentPoolMatch
