@@ -58,11 +58,23 @@ const STATUS_LABEL: Record<string, string> = {
                 <div class="vd-ref">JDF-VAC-{{ v.vacancyId }}</div>
               </div>
               <div class="vc-pills">
-                <span class="pill pill-pub"><i class="ti ti-circle" style="font-size:7px"></i> Published</span>
+                <span class="pill"
+                      [class.pill-pub]="v.status === 'Published'"
+                      [class.pill-tpo]="v.status === 'TalentPoolOnly'">
+                  <i class="ti ti-circle" style="font-size:7px"></i>
+                  {{ v.status === 'TalentPoolOnly' ? 'Invite Only' : 'Published' }}
+                </span>
                 <span class="pill pill-type">{{ v.employmentType }}</span>
                 @if (v.vacancyType) { <span class="pill pill-dept">{{ v.vacancyType }}</span> }
               </div>
             </div>
+
+            @if (v.status === 'TalentPoolOnly') {
+              <div class="tpo-banner">
+                <i class="ti ti-sparkles"></i>
+                You've been personally invited to apply for this role — it isn't open to the public yet.
+              </div>
+            }
 
             <div class="vc-meta" style="margin-top:14px">
               @if (v.location) { <span><i class="ti ti-map-pin"></i> {{ v.location }}</span> }
@@ -173,6 +185,12 @@ const STATUS_LABEL: Record<string, string> = {
       .skill-chip--technical { background:#e8f4fd; color:#1565c0; border:1px solid #90caf9; }
       .skill-chip--soft { background:#f3e5f5; color:#6a1b9a; border:1px solid #ce93d8; }
       .chip-level { font-size:11px; opacity:0.75; font-weight:400; }
+
+      .pill-tpo { background: #f3e9ff; color: #6a1b9a; border: 1px solid #ce93d8; }
+      .tpo-banner {
+        display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #6a1b9a;
+        background: #f3e9ff; border: 1px solid #ce93d8; border-radius: 8px; padding: 10px 14px; margin-top: 12px;
+      }
     </style>
   `
 })

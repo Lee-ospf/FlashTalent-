@@ -453,6 +453,7 @@ export interface NotificationResponse {
   notificationType: string;
   subject: string;
   body: string;
+  actionUrl?: string; 
   isRead: boolean;
   sentAt: string;
 }
@@ -489,4 +490,45 @@ export interface ParsedResumeResponse {
   skills: ParsedSkill[];
   qualifications: ParsedQualification[];
   experiences: ParsedExperience[];
+}
+
+// ── AI Talent Pool Matching ────────────────────────────────────────
+export interface AiTalentPoolMatchResponse {
+  talentPoolMatchId: number;
+  candidateId: number;
+  candidateName: string;
+  candidateEmail?: string;
+  score: number;
+  reasoning: string;
+  invitedAt?: string;
+  computedAt: string;
+}
+
+export interface TalentPoolPullResponse {
+  vacancyId: number;
+  pulledAt: string;
+  vacancyStatus: string;
+  matches: AiTalentPoolMatchResponse[];
+}
+
+export interface ApplicantRankingResponse {
+  vacancyId: number;
+  rankedAt: string;
+  matches: AiTalentPoolMatchResponse[];
+}
+
+export interface InvitedCandidateRow {
+  candidateId: number;
+  candidateName: string;
+  score: number;
+  invitedAt: string;
+  hasApplied: boolean;
+  appliedAt?: string;
+}
+
+export interface TalentPoolInviteSummaryResponse {
+  vacancyId: number;
+  totalInvited: number;
+  totalApplied: number;
+  invitees: InvitedCandidateRow[];
 }

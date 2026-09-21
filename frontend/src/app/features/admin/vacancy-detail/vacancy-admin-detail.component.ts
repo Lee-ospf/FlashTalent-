@@ -10,8 +10,10 @@ import { ApplicationService } from '../../../core/services/application.service';
 import { SkillService } from '../../../core/services/skill.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { PrescreeningService, PrescreeningResponse } from '../../../core/services/prescreening.service';
-import { VacancyResponse, ApplicationResponse, SkillResponse } from '../../../core/models';
+import { TalentPoolMatchingService } from '../../../core/services/talent-pool-matching.service';
+import { VacancyResponse, ApplicationResponse, SkillResponse, AiTalentPoolMatchResponse } from '../../../core/models';
 import { STATUS_LABELS } from '../../../core/utils/application-status';
+import { TalentPoolInviteSummaryResponse } from '../../../core/models';
 
 const STATUS_CLASS: Record<string, string> = {
   Applied: 'applied', UnderReview: 'shortlisted', Shortlisted: 'prescreen',
@@ -51,8 +53,12 @@ const STATUS_CLASS: Record<string, string> = {
                 <div class="vd-title">{{ v.title }}</div>
                 <div class="vd-ref">JDF-VAC-{{ v.vacancyId }}</div>
               </div>
-              <span class="pill" [class.pill-pub]="v.status==='Published'" [class.pill-dept]="v.status==='Draft'" [class.pill-type]="v.status==='Closed'">
-                {{ v.status }}
+              <span class="pill"
+                    [class.pill-pub]="v.status==='Published'"
+                    [class.pill-dept]="v.status==='Draft'"
+                    [class.pill-tpo]="v.status==='TalentPoolOnly'"
+                    [class.pill-type]="v.status==='Closed'">
+                {{ statusLabel(v.status) }}
               </span>
             </div>
 
@@ -99,7 +105,7 @@ const STATUS_CLASS: Record<string, string> = {
 
             <!-- Actions -->
             <mat-divider style="margin:18px 0"></mat-divider>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
               @if (v.status === 'Draft') {
                 <a [routerLink]="['/admin/vacancies', v.vacancyId, 'edit']" class="btn-secondary" style="text-decoration:none">
                   <i class="ti ti-pencil"></i> Edit
@@ -110,6 +116,13 @@ const STATUS_CLASS: Record<string, string> = {
                 <button class="btn-remove" (click)="remove(v)" [disabled]="busy()">
                   <i class="ti ti-trash"></i> Delete draft
                 </button>
+              } @else if (v.status === 'TalentPoolOnly') {
+                <button class="btn-primary" (click)="publish(v)" [disabled]="busy()">
+                  <i class="ti ti-send"></i> Publish to everyone
+                </button>
+                <span class="form-note">
+                  <i class="ti ti-lock"></i> Open to invited talent pool candidates only — editing is disabled at this stage.
+                </span>
               } @else if (v.status === 'Published') {
                 <button class="btn-secondary" (click)="close(v)" [disabled]="busy()">
                   <i class="ti ti-lock"></i> Close vacancy
@@ -120,6 +133,111 @@ const STATUS_CLASS: Record<string, string> = {
             </div>
           </mat-card-content>
         </mat-card>
+
+        <!-- AI Talent Pool suggestions - Draft or TalentPoolOnly (Phase 1) -->
+        @if (v.status === 'Draft' || v.status === 'TalentPoolOnly') {
+          <mat-card class="mat-elevation-z1 tp-card" style="border-radius:12px;margin-bottom:16px">
+            <mat-card-content style="padding:18px 20px">
+              <div class="tp-header">
+                <div class="card-header" style="margin-bottom:0">
+                  <i class="ti ti-sparkles"></i> AI Talent Pool Suggestions
+                </div>
+                <button class="btn-primary" (click)="pullTalentPool(v)" [disabled]="pullingTalentPool() || !v.skills.length">
+                  @if (pullingTalentPool()) {
+                    <mat-spinner diameter="14" style="display:inline-block;margin-right:6px"></mat-spinner> Pulling…
+                  } @else {
+                    <i class="ti ti-refresh"></i> Pull talent pool candidates
+                  }
+                </button>
+              </div>
+
+              @if (!v.skills.length) {
+                <p class="form-note" style="margin-top:10px">
+                  <i class="ti ti-info-circle"></i> Add at least one required skill before pulling talent pool suggestions.
+                </p>
+              } @else if (v.status === 'Draft') {
+                <p class="form-note" style="margin-top:10px">
+                  <i class="ti ti-info-circle"></i> Pulling for the first time will open this vacancy to invited talent pool candidates only, and lock further editing.
+                </p>
+              } @else if (talentPoolLoaded() && !talentPoolMatches().length) {
+                <div class="empty-state" style="padding:1.25rem 0">
+                  <i class="ti ti-users-off"></i>
+                  <p>No talent pool candidates cleared the match bar yet — try again once more candidates have refreshed their profiles, or once this vacancy's skills are broadened.</p>
+                </div>
+              } @else if (talentPoolMatches().length) {
+                <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+                  @for (m of talentPoolMatches(); track m.talentPoolMatchId) {
+                    <div class="tp-match-row">
+                      <div class="tp-score-badge">{{ m.score }}</div>
+                      <div class="tp-match-body">
+                        <div class="tp-match-name">{{ m.candidateName }}</div>
+                        <div class="tp-match-reasoning">{{ m.reasoning }}</div>
+                      </div>
+                      @if (m.invitedAt) {
+                        <span class="form-note" style="white-space:nowrap">
+                          <i class="ti ti-circle-check"></i> Invited {{ formatDate(m.invitedAt) }}
+                        </span>
+                      } @else {
+                        <button class="btn-secondary" style="white-space:nowrap"
+                                (click)="inviteCandidate(m)" [disabled]="invitingId() === m.talentPoolMatchId">
+                          @if (invitingId() === m.talentPoolMatchId) {
+                            <mat-spinner diameter="14" style="display:inline-block;margin-right:6px"></mat-spinner>
+                          } @else {
+                            <i class="ti ti-send-2"></i>
+                          }
+                          Invite to apply
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+
+        <!-- Invite tracking - once anyone's been invited for this vacancy -->
+        @if (inviteSummary(); as summary) {
+          @if (summary.totalInvited > 0) {
+            <mat-card class="mat-elevation-z1 tp-card" style="border-radius:12px;margin-bottom:16px">
+              <mat-card-content style="padding:18px 20px">
+                <div class="card-header" style="margin-bottom:12px">
+                  <i class="ti ti-user-check"></i> Talent Pool Invites
+                </div>
+
+                <div class="tp-tracking-stats">
+                  <div class="tp-stat">
+                    <div class="tp-stat-val">{{ summary.totalInvited }}</div>
+                    <div class="tp-stat-label">Invited</div>
+                  </div>
+                  <div class="tp-stat">
+                    <div class="tp-stat-val">{{ summary.totalApplied }}</div>
+                    <div class="tp-stat-label">Applied so far</div>
+                  </div>
+                  <div class="tp-stat">
+                    <div class="tp-stat-val">{{ summary.totalInvited > 0 ? ((summary.totalApplied / summary.totalInvited) * 100 | number:'1.0-0') : 0 }}%</div>
+                    <div class="tp-stat-label">Response rate</div>
+                  </div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:6px;margin-top:14px">
+                  @for (i of summary.invitees; track i.candidateId) {
+                    <div class="tp-invitee-row">
+                      <span class="tp-invitee-name">{{ i.candidateName }}</span>
+                      <span class="tp-invitee-score">{{ i.score }} fit</span>
+                      <span class="tp-invitee-date">Invited {{ formatDate(i.invitedAt) }}</span>
+                      @if (i.hasApplied) {
+                        <span class="tp-applied-badge"><i class="ti ti-circle-check"></i> Applied {{ formatDate(i.appliedAt) }}</span>
+                      } @else {
+                        <span class="tp-pending-badge"><i class="ti ti-clock"></i> No application yet</span>
+                      }
+                    </div>
+                  }
+                </div>
+              </mat-card-content>
+            </mat-card>
+          }
+        }
 
         <!-- Change history -->
         <mat-card class="mat-elevation-z1" style="border-radius:12px;margin-bottom:16px">
@@ -269,6 +387,37 @@ const STATUS_CLASS: Record<string, string> = {
       }
       .pa-q { font-size: 12px; font-weight: 700; color: var(--navy); }
       .pa-a { font-size: 13px; color: var(--text); margin-top: 2px; white-space: pre-line; }
+
+      .pill-tpo { background: #f3e9ff; color: #6a1b9a; border: 1px solid #ce93d8; }
+
+      .tp-card { border: 1px solid #ce93d8 !important; }
+      .tp-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+      .tp-match-row {
+        display: flex; align-items: center; gap: 14px; padding: 12px 14px;
+        border: 1px solid var(--border); border-radius: 10px; background: #fff;
+      }
+      .tp-score-badge {
+        width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+        background: #f3e9ff; color: #6a1b9a; font-size: 14px; font-weight: 700;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .tp-match-body { flex: 1; min-width: 0; }
+      .tp-match-name { font-size: 13px; font-weight: 700; color: var(--text); }
+      .tp-match-reasoning { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
+
+      .tp-tracking-stats { display: flex; gap: 24px; }
+      .tp-stat { text-align: center; }
+      .tp-stat-val { font-size: 22px; font-weight: 700; color: #6a1b9a; }
+      .tp-stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 2px; }
+      .tp-invitee-row {
+        display: flex; align-items: center; gap: 12px; padding: 8px 10px;
+        border: 1px solid var(--border); border-radius: 8px; font-size: 12px; flex-wrap: wrap;
+      }
+      .tp-invitee-name { font-weight: 600; color: var(--text); flex: 1; min-width: 120px; }
+      .tp-invitee-score { color: #6a1b9a; font-weight: 600; }
+      .tp-invitee-date { color: var(--text-muted); }
+      .tp-applied-badge { color: #1a5c35; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+      .tp-pending-badge { color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
     </style>
   `
 })
@@ -280,6 +429,7 @@ export class VacancyAdminDetailComponent implements OnInit {
   private skillService = inject(SkillService);
   private toast = inject(ToastService);
   private prescreening = inject(PrescreeningService);
+  private matchingService = inject(TalentPoolMatchingService);
 
   vacancy   = signal<VacancyResponse | null>(null);
   loading   = signal(true);
@@ -294,6 +444,12 @@ export class VacancyAdminDetailComponent implements OnInit {
 
   allSkills = signal<SkillResponse[]>([]);
 
+  talentPoolMatches = signal<AiTalentPoolMatchResponse[]>([]);
+  talentPoolLoaded  = signal(false);
+  pullingTalentPool = signal(false);
+  invitingId        = signal<number | null>(null);
+  inviteSummary = signal<TalentPoolInviteSummaryResponse | null>(null);
+
   private vacancyId = 0;
 
   ngOnInit(): void {
@@ -304,7 +460,13 @@ export class VacancyAdminDetailComponent implements OnInit {
     this.vacancyService.getHistory(this.vacancyId).subscribe({ next: h => this.history.set(h) });
 
     this.vacancyService.getById(this.vacancyId).subscribe({
-      next: v => { this.vacancy.set(v); this.loading.set(false); this.loadApplications(); },
+      next: v => {
+        this.vacancy.set(v);
+        this.loading.set(false);
+        this.loadApplications();
+        if (v.status === 'Draft' || v.status === 'TalentPoolOnly') this.loadExistingTalentPoolMatches();
+        if (v.status === 'TalentPoolOnly' || v.status === 'Published') this.loadInviteSummary();
+      },
       error: (err: Error) => { this.loadError.set(err.message); this.loading.set(false); }
     });
   }
@@ -316,11 +478,80 @@ export class VacancyAdminDetailComponent implements OnInit {
         const sorted = [...apps].sort((a, b) => new Date(a.appliedAt).getTime() - new Date(b.appliedAt).getTime());
         this.applications.set(sorted);
         this.appsLoading.set(false);
-        // Preload pre-screening records for every application so the assessment
-        // panel and status pill can read them synchronously in the template.
         this.prescreening.preload(sorted.map(a => a.applicationId)).subscribe();
       },
       error: () => this.appsLoading.set(false)
+    });
+  }
+
+  private loadExistingTalentPoolMatches(): void {
+    this.matchingService.getMatches(this.vacancyId, 'DraftSuggestion').subscribe({
+      next: matches => { this.talentPoolMatches.set(matches); this.talentPoolLoaded.set(true); },
+      error: () => this.talentPoolLoaded.set(true),
+    });
+  }
+
+  // Tracking card data - who's been invited for this vacancy, and who of
+  // them went on to apply. Non-critical: if this fails, the card just
+  // doesn't render, nothing else on the page depends on it.
+  private loadInviteSummary(): void {
+    this.matchingService.getInviteSummary(this.vacancyId).subscribe({
+      next: summary => this.inviteSummary.set(summary),
+      error: () => {},
+    });
+  }
+
+  pullTalentPool(v: VacancyResponse): void {
+    if (this.pullingTalentPool()) return;
+
+    if (v.status === 'Draft') {
+      const confirmed = confirm(
+        'This will open the vacancy to invited talent pool candidates only, and lock further editing. Continue?'
+      );
+      if (!confirmed) return;
+    }
+
+    this.pullingTalentPool.set(true);
+    this.matchingService.pullDraftSuggestions(this.vacancyId).subscribe({
+      next: result => {
+        this.talentPoolMatches.set(result.matches);
+        this.talentPoolLoaded.set(true);
+        this.pullingTalentPool.set(false);
+
+        const current = this.vacancy();
+        const justTransitioned = !!(current && result.vacancyStatus && current.status !== result.vacancyStatus);
+        if (current && justTransitioned) {
+          this.vacancy.set({ ...current, status: result.vacancyStatus });
+        }
+
+        if (justTransitioned) {
+          this.toast.show('This vacancy is now Talent Pool Only — invited candidates can view and apply to it.', 'success');
+        }
+
+        this.loadInviteSummary(); // refresh tracking card in case anything changed
+
+        this.toast.show(
+          result.matches.length
+            ? `Found ${result.matches.length} talent pool match${result.matches.length === 1 ? '' : 'es'}.`
+            : 'No talent pool candidates cleared the match bar this time.',
+          result.matches.length ? 'success' : 'warn',
+        );
+      },
+      error: (err: Error) => { this.pullingTalentPool.set(false); this.toast.show(err.message, 'error'); },
+    });
+  }
+
+  inviteCandidate(match: AiTalentPoolMatchResponse): void {
+    this.invitingId.set(match.talentPoolMatchId);
+    this.matchingService.invite(this.vacancyId, match.talentPoolMatchId).subscribe({
+      next: updated => {
+        this.talentPoolMatches.update(list =>
+          list.map(m => m.talentPoolMatchId === updated.talentPoolMatchId ? updated : m));
+        this.invitingId.set(null);
+        this.toast.show(`Invite sent to ${updated.candidateName}.`, 'success');
+        this.loadInviteSummary();
+      },
+      error: (err: Error) => { this.invitingId.set(null); this.toast.show(err.message, 'error'); },
     });
   }
 
@@ -330,6 +561,10 @@ export class VacancyAdminDetailComponent implements OnInit {
 
   label(s: string): string { return (STATUS_LABELS as Record<string, string>)[s] ?? s; }
   statusClass(s: string): string { return STATUS_CLASS[s] ?? 'applied'; }
+
+  statusLabel(vacancyStatus: string): string {
+    return vacancyStatus === 'TalentPoolOnly' ? 'Talent Pool Only' : vacancyStatus;
+  }
 
   formatDate(d?: string): string {
     return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';

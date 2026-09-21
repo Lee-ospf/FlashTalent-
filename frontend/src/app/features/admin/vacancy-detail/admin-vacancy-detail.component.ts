@@ -43,8 +43,12 @@ const STATUS_CLASS: Record<string, string> = {
                 <div class="vd-title">{{ v.title }}</div>
                 <div class="vd-ref">JDF-VAC-{{ v.vacancyId }}</div>
               </div>
-              <span class="pill" [class.pill-pub]="v.status==='Published'" [class.pill-dept]="v.status==='Draft'" [class.pill-type]="v.status==='Closed'">
-                {{ v.status }}
+              <span class="pill"
+                    [class.pill-pub]="v.status==='Published'"
+                    [class.pill-dept]="v.status==='Draft'"
+                    [class.pill-tpo]="v.status==='TalentPoolOnly'"
+                    [class.pill-type]="v.status==='Closed'">
+                {{ statusLabel(v.status) }}
               </span>
             </div>
 
@@ -169,6 +173,7 @@ const STATUS_CLASS: Record<string, string> = {
       .app-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
       .app-row:last-child { border-bottom: none; }
       .app-rank { width: 26px; height: 26px; border-radius: 50%; background: var(--navy); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+      .pill-tpo { background: #f3e9ff; color: #6a1b9a; border: 1px solid #ce93d8; }
     </style>
   `
 })
@@ -222,6 +227,10 @@ export class AdminVacancyDetailComponent implements OnInit {
 
   label(s: string): string { return (STATUS_LABELS as Record<string, string>)[s] ?? s; }
   statusClass(s: string): string { return STATUS_CLASS[s] ?? 'applied'; }
+
+  statusLabel(vacancyStatus: string): string {
+    return vacancyStatus === 'TalentPoolOnly' ? 'Talent Pool Only' : vacancyStatus;
+  }
 
   formatDate(d?: string): string {
     return d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';

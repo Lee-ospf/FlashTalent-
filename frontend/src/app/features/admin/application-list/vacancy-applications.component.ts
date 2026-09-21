@@ -12,10 +12,12 @@ import { PrescreeningService } from '../../../core/services/prescreening.service
 import { InterviewService } from '../../../core/services/interview.service';
 import { OfferLetterService } from '../../../core/services/offer-letter.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { TalentPoolMatchingService } from '../../../core/services/talent-pool-matching.service';
 import {
   ApplicationResponse,
   VacancyResponse,
   InterviewResponse,
+  AiTalentPoolMatchResponse,
 } from '../../../core/models';
 import {
   statusLabel as sharedStatusLabel,
@@ -57,14 +59,31 @@ interface InterviewSubState {
               &middot; {{ vacancy()!.status }}
             </div>
           </div>
-          <span
-            class="status-pill s-{{
-              vacancy()!.status === 'Published' ? 'offer' : 'applied'
-            }}"
-          >
-            {{ vacancy()!.status }}
-          </span>
+          <div style="display:flex;align-items:center;gap:10px">
+            @if (vacancy()!.status === 'Published') {
+              <button class="btn-primary" (click)="rankCandidates()" [disabled]="ranking() || !appliedCount()">
+                @if (ranking()) {
+                  <mat-spinner diameter="14" style="display:inline-block;margin-right:6px"></mat-spinner> Ranking…
+                } @else {
+                  <i class="ti ti-sparkles"></i> Rank new applicants
+                }
+              </button>
+            }
+            <span
+              class="status-pill s-{{
+                vacancy()!.status === 'Published' ? 'offer' : 'applied'
+              }}"
+            >
+              {{ vacancy()!.status }}
+            </span>
+          </div>
         </div>
+
+        @if (rankedMatches().size > 0) {
+          <p class="form-note" style="margin-bottom:12px">
+            <i class="ti ti-sparkles"></i> Applied candidates sorted by AI fit score{{ lastRankedAt() ? ' — ranked ' + formatDateTime(lastRankedAt()!) : '' }}.
+          </p>
+        }
 
         <div class="vp-filters">
           <div class="search-wrap" style="flex:1;min-width:220px">
@@ -100,6 +119,9 @@ interface InterviewSubState {
               <thead>
                 <tr>
                   <th>Candidate</th>
+                  @if (rankedMatches().size > 0) {
+                    <th>AI Fit</th>
+                  }
                   <th>Applied</th>
                   <th>Status</th>
                   <th>Action</th>
@@ -109,6 +131,15 @@ interface InterviewSubState {
                 @for (a of filteredApplications(); track a.applicationId) {
                   <tr class="vp-row" (click)="openHistory(a)">
                     <td class="vp-name">{{ a.candidateName }}</td>
+                    @if (rankedMatches().size > 0) {
+                      <td (click)="$event.stopPropagation()">
+                        @if (rankedMatches().get(a.candidateId); as m) {
+                          <span class="vp-fit-badge" [title]="m.reasoning">{{ m.score }}</span>
+                        } @else {
+                          <span class="vp-muted">—</span>
+                        }
+                      </td>
+                    }
                     <td class="vp-muted">{{ formatDate(a.appliedAt) }}</td>
                     <td>
                       <span class="status-pill s-{{ statusClass(a.status) }}">{{
@@ -223,6 +254,8 @@ interface InterviewSubState {
         align-items: flex-start;
         justify-content: space-between;
         margin-bottom: 18px;
+        gap: 12px;
+        flex-wrap: wrap;
       }
       .vp-title {
         font-size: 20px;
@@ -310,6 +343,19 @@ interface InterviewSubState {
         padding: 7px 14px;
         font-size: 12px;
       }
+      .vp-fit-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        padding: 4px 8px;
+        border-radius: 20px;
+        background: #f3e9ff;
+        color: #6a1b9a;
+        font-weight: 700;
+        font-size: 12px;
+        cursor: help;
+      }
     </style>
   `,
 })
@@ -323,6 +369,7 @@ export class VacancyApplicationsComponent implements OnInit {
   private offerLetterService = inject(OfferLetterService);
   private toast = inject(ToastService);
   private location = inject(Location);
+  private matchingService = inject(TalentPoolMatchingService);
 
   vacancyId!: number;
   vacancy = signal<VacancyResponse | null>(null);
@@ -338,6 +385,13 @@ export class VacancyApplicationsComponent implements OnInit {
   interviewSubState = signal<Map<number, InterviewSubState>>(new Map());
   offerStatusByApp = signal<Map<number, string>>(new Map());
 
+  // ── AI applicant ranking (Phase 2) - Applied candidates only ─────
+  ranking = signal(false);
+  rankedMatches = signal<Map<number, AiTalentPoolMatchResponse>>(new Map()); // keyed by candidateId
+  lastRankedAt = signal<string | null>(null);
+
+  appliedCount = computed(() => this.applications().filter(a => a.status === 'Applied').length);
+
   ngOnInit(): void {
     this.vacancyId = Number(this.route.snapshot.paramMap.get('id'));
     this.load();
@@ -347,7 +401,10 @@ export class VacancyApplicationsComponent implements OnInit {
     this.loading.set(true);
 
     this.vacancyService.getById(this.vacancyId).subscribe({
-      next: (v) => this.vacancy.set(v),
+      next: (v) => {
+        this.vacancy.set(v);
+        if (v.status === 'Published') this.loadExistingRanking();
+      },
       error: (err: Error) => this.toast.show(err.message, 'error'),
     });
 
@@ -367,6 +424,56 @@ export class VacancyApplicationsComponent implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  // Loads any previous ranking without re-running AI, so navigating back to
+  // this page later still shows the last ranked batch and re-sorts by it.
+  private loadExistingRanking(): void {
+    this.matchingService.getMatches(this.vacancyId, 'FullRanking').subscribe({
+      next: matches => {
+        if (!matches.length) return;
+        const map = new Map(matches.map(m => [m.candidateId, m]));
+        this.rankedMatches.set(map);
+        this.lastRankedAt.set(matches[0]?.computedAt ?? null);
+        this.resortByRanking();
+      },
+      error: () => {}, // no ranking yet is a normal state
+    });
+  }
+
+  rankCandidates(): void {
+    if (this.ranking()) return;
+    this.ranking.set(true);
+    this.matchingService.rankApplicants(this.vacancyId).subscribe({
+      next: result => {
+        const map = new Map(result.matches.map(m => [m.candidateId, m]));
+        this.rankedMatches.set(map);
+        this.lastRankedAt.set(result.rankedAt);
+        this.resortByRanking();
+        this.ranking.set(false);
+        this.toast.show(
+          result.matches.length
+            ? `Ranked ${result.matches.length} new applicant${result.matches.length === 1 ? '' : 's'} by AI fit.`
+            : 'No newly-applied candidates to rank for this vacancy.',
+          result.matches.length ? 'success' : 'warn',
+        );
+      },
+      error: (err: Error) => { this.ranking.set(false); this.toast.show(err.message, 'error'); },
+    });
+  }
+
+  // Re-sorts by AI score (highest first) once a ranking exists; candidates
+  // with no score (anyone past "Applied", since only fresh applicants are
+  // ranked) sink to the bottom rather than being hidden.
+  private resortByRanking(): void {
+    const map = this.rankedMatches();
+    this.applications.update(list =>
+      [...list].sort((a, b) => {
+        const scoreA = map.get(a.candidateId)?.score ?? -1;
+        const scoreB = map.get(b.candidateId)?.score ?? -1;
+        return scoreB - scoreA;
+      }),
+    );
   }
 
   private enrich(apps: ApplicationResponse[]): void {
