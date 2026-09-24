@@ -41,6 +41,8 @@ namespace TalentHub.Models
         // Recruiter review
         public PrescreeningOutcome Outcome { get; set; } = PrescreeningOutcome.Pending;
         public string? RecruiterNotes { get; set; }
+        
+        public DateTime? ReminderSentAt { get; set; }
         public DateTime? ReviewedAt { get; set; }
     }
 }

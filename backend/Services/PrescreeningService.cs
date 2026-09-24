@@ -7,8 +7,6 @@ namespace TalentHub.Services
 {
     public interface IPrescreeningService
     {
-        Task<Notification> BuildSentNotification(Application application);
-        Task<Notification> BuildSubmittedNotification(Application application);
         PrescreeningResponse MapToResponse(Prescreening p, Application a);
     }
 
@@ -20,51 +18,6 @@ namespace TalentHub.Services
         {
             _db = db;
         }
-
-        public async Task<Notification> BuildSentNotification(Application application)
-        {
-            var candidate = await _db.Candidates
-                .Include(c => c.User)
-                .FirstOrDefaultAsync(c => c.CandidateId == application.CandidateId);
-
-            var vacancyTitle = application.Vacancy?.Title ?? "the vacancy";
-
-            return new Notification
-            {
-                UserId = candidate!.UserId,
-                NotificationType = NotificationType.PrescreeningSent,
-                Subject = "Pre-screening form sent",
-                Body = $"A pre-screening form has been sent for your application to {vacancyTitle}. Please download, complete, and upload it.",
-                SentAt = DateTime.UtcNow
-            };
-        }
-
-        public async Task<Notification> BuildSubmittedNotification(Application application)
-        {
-            var vacancy = await _db.Vacancies
-                .Include(v => v.Recruiter)
-                .FirstOrDefaultAsync(v => v.VacancyId == application.VacancyId);
-
-            var candidate = await _db.Candidates
-                .Include(c => c.User)
-                .FirstOrDefaultAsync(c => c.CandidateId == application.CandidateId);
-
-            var candidateName = candidate?.User != null
-                ? $"{candidate.User.FirstName} {candidate.User.LastName}"
-                : "A candidate";
-
-            var vacancyTitle = vacancy?.Title ?? "the vacancy";
-
-            return new Notification
-            {
-                UserId = vacancy!.Recruiter!.UserId,
-                NotificationType = NotificationType.PrescreeningSubmitted,
-                Subject = "Pre-screening form submitted",
-                Body = $"{candidateName} submitted their pre-screening form for {vacancyTitle}.",
-                SentAt = DateTime.UtcNow
-            };
-        }
-
         public PrescreeningResponse MapToResponse(Prescreening p, Application a)
         {
             return new PrescreeningResponse

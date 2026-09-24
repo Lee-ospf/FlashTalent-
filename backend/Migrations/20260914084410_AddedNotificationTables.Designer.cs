@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TalentHub.Data;
 
@@ -11,9 +12,11 @@ using TalentHub.Data;
 namespace TalentHub.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260914084410_AddedNotificationTables")]
+    partial class AddedNotificationTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -162,9 +165,6 @@ namespace TalentHub.Migrations
                     b.Property<string>("Gender")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
-
-                    b.Property<DateTime>("LastProfileUpdateAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("Nationality")
                         .HasMaxLength(50)
@@ -508,9 +508,6 @@ namespace TalentHub.Migrations
                     b.Property<string>("RecruiterNotes")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("ReminderSentAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<int>("RoundNumber")
                         .HasColumnType("int");
 
@@ -577,10 +574,6 @@ namespace TalentHub.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("NotificationId"));
-
-                    b.Property<string>("ActionUrl")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
 
                     b.Property<int>("AttemptCount")
                         .HasColumnType("int");
@@ -669,188 +662,6 @@ namespace TalentHub.Migrations
                         .IsUnique();
 
                     b.ToTable("NotificationTemplates");
-
-                    b.HasData(
-                        new
-                        {
-                            NotificationTemplateId = 1,
-                            BodyTemplate = "An interview (Round {{RoundNumber}}) has been scheduled for {{ScheduledAt}} regarding your application to {{VacancyTitle}}.",
-                            Channel = "Email",
-                            IsActive = true,
-                            NotificationType = "InterviewScheduled",
-                            Subject = "Interview scheduled"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 2,
-                            BodyTemplate = "Your interview for {{VacancyTitle}} has been rescheduled to {{ScheduledAt}}.",
-                            Channel = "Email",
-                            IsActive = true,
-                            NotificationType = "InterviewRescheduled",
-                            Subject = "Interview rescheduled"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 3,
-                            BodyTemplate = "Your interview (Round {{RoundNumber}}) for {{VacancyTitle}} has been cancelled.",
-                            Channel = "Email",
-                            IsActive = true,
-                            NotificationType = "InterviewCancelled",
-                            Subject = "Interview cancelled"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 4,
-                            BodyTemplate = "An offer letter for {{JobTitle}} has been sent. Please review and respond by {{ClosingDate}}.",
-                            Channel = "Email",
-                            IsActive = true,
-                            NotificationType = "OfferSent",
-                            Subject = "Offer letter sent"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 5,
-                            BodyTemplate = "{{CandidateName}} has {{Status}} the offer for {{JobTitle}}.",
-                            Channel = "Email",
-                            IsActive = true,
-                            NotificationType = "OfferResponded",
-                            Subject = "Offer letter response"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 6,
-                            BodyTemplate = "A pre-screening form has been sent for your application to {{VacancyTitle}}. Please download, complete, and upload it.",
-                            Channel = "Email",
-                            IsActive = true,
-                            NotificationType = "PrescreeningSent",
-                            Subject = "Pre-screening form sent"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 7,
-                            BodyTemplate = "{{CandidateName}} submitted their pre-screening form for {{VacancyTitle}}.",
-                            Channel = "Email",
-                            IsActive = true,
-                            NotificationType = "PrescreeningSubmitted",
-                            Subject = "Pre-screening form submitted"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 8,
-                            BodyTemplate = "An interview (Round {{RoundNumber}}) has been scheduled for {{ScheduledAt}} regarding your application to {{VacancyTitle}}.",
-                            Channel = "InApp",
-                            IsActive = true,
-                            NotificationType = "InterviewScheduled",
-                            Subject = "Interview scheduled"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 9,
-                            BodyTemplate = "Your interview for {{VacancyTitle}} has been rescheduled to {{ScheduledAt}}.",
-                            Channel = "InApp",
-                            IsActive = true,
-                            NotificationType = "InterviewRescheduled",
-                            Subject = "Interview rescheduled"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 10,
-                            BodyTemplate = "Your interview (Round {{RoundNumber}}) for {{VacancyTitle}} has been cancelled.",
-                            Channel = "InApp",
-                            IsActive = true,
-                            NotificationType = "InterviewCancelled",
-                            Subject = "Interview cancelled"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 11,
-                            BodyTemplate = "An offer letter for {{JobTitle}} has been sent. Please review and respond by {{ClosingDate}}.",
-                            Channel = "InApp",
-                            IsActive = true,
-                            NotificationType = "OfferSent",
-                            Subject = "Offer letter sent"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 12,
-                            BodyTemplate = "{{CandidateName}} has {{Status}} the offer for {{JobTitle}}.",
-                            Channel = "InApp",
-                            IsActive = true,
-                            NotificationType = "OfferResponded",
-                            Subject = "Offer letter response"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 13,
-                            BodyTemplate = "A pre-screening form has been sent for your application to {{VacancyTitle}}. Please download, complete, and upload it.",
-                            Channel = "InApp",
-                            IsActive = true,
-                            NotificationType = "PrescreeningSent",
-                            Subject = "Pre-screening form sent"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 14,
-                            BodyTemplate = "{{CandidateName}} submitted their pre-screening form for {{VacancyTitle}}.",
-                            Channel = "InApp",
-                            IsActive = true,
-                            NotificationType = "PrescreeningSubmitted",
-                            Subject = "Pre-screening form submitted"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 15,
-                            BodyTemplate = "This is a reminder to complete and submit your pre-screening form for {{VacancyTitle}}.",
-                            Channel = "Email",
-                            IsActive = true,
-                            NotificationType = "PrescreeningReminder",
-                            Subject = "Reminder: pre-screening form due"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 16,
-                            BodyTemplate = "This is a reminder to complete and submit your pre-screening form for {{VacancyTitle}}.",
-                            Channel = "InApp",
-                            IsActive = true,
-                            NotificationType = "PrescreeningReminder",
-                            Subject = "Reminder: pre-screening form due"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 17,
-                            BodyTemplate = "This is a reminder that you have an interview for {{VacancyTitle}} scheduled for {{ScheduledAt}}.",
-                            Channel = "Email",
-                            IsActive = true,
-                            NotificationType = "InterviewReminder",
-                            Subject = "Reminder: upcoming interview"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 18,
-                            BodyTemplate = "This is a reminder that you have an interview for {{VacancyTitle}} scheduled for {{ScheduledAt}}.",
-                            Channel = "InApp",
-                            IsActive = true,
-                            NotificationType = "InterviewReminder",
-                            Subject = "Reminder: upcoming interview"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 19,
-                            BodyTemplate = "This is a reminder to respond to your offer for {{JobTitle}} before it closes on {{ClosingDate}}.",
-                            Channel = "Email",
-                            IsActive = true,
-                            NotificationType = "OfferResponseReminder",
-                            Subject = "Reminder: offer response needed"
-                        },
-                        new
-                        {
-                            NotificationTemplateId = 20,
-                            BodyTemplate = "This is a reminder to respond to your offer for {{JobTitle}} before it closes on {{ClosingDate}}.",
-                            Channel = "InApp",
-                            IsActive = true,
-                            NotificationType = "OfferResponseReminder",
-                            Subject = "Reminder: offer response needed"
-                        });
                 });
 
             modelBuilder.Entity("TalentHub.Models.OfferLetter", b =>
@@ -885,9 +696,6 @@ namespace TalentHub.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime?>("ReminderSentAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("RespondedAt")
                         .HasColumnType("datetime2");
@@ -970,9 +778,6 @@ namespace TalentHub.Migrations
 
                     b.Property<string>("RecruiterNotes")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("ReminderSentAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("ReviewedAt")
                         .HasColumnType("datetime2");
@@ -1107,52 +912,6 @@ namespace TalentHub.Migrations
                     b.ToTable("TalentPoolEntries");
                 });
 
-            modelBuilder.Entity("TalentHub.Models.TalentPoolMatch", b =>
-                {
-                    b.Property<int>("TalentPoolMatchId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TalentPoolMatchId"));
-
-                    b.Property<int>("CandidateId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ComputedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("InvitedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ModelVersion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Reasoning")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Score")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Stage")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<int>("VacancyId")
-                        .HasColumnType("int");
-
-                    b.HasKey("TalentPoolMatchId");
-
-                    b.HasIndex("CandidateId");
-
-                    b.HasIndex("VacancyId", "Stage");
-
-                    b.ToTable("TalentPoolMatches");
-                });
-
             modelBuilder.Entity("TalentHub.Models.User", b =>
                 {
                     b.Property<int>("UserId")
@@ -1260,12 +1019,6 @@ namespace TalentHub.Migrations
                     b.Property<string>("EmploymentType")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("LastApplicantRankedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("LastPoolPulledAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("Location")
                         .IsRequired()
@@ -1678,25 +1431,6 @@ namespace TalentHub.Migrations
                     b.Navigation("Candidate");
 
                     b.Navigation("LastVacancy");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.TalentPoolMatch", b =>
-                {
-                    b.HasOne("TalentHub.Models.Candidate", "Candidate")
-                        .WithMany()
-                        .HasForeignKey("CandidateId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("TalentHub.Models.Vacancy", "Vacancy")
-                        .WithMany()
-                        .HasForeignKey("VacancyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Candidate");
-
-                    b.Navigation("Vacancy");
                 });
 
             modelBuilder.Entity("TalentHub.Models.UserNotificationPreference", b =>

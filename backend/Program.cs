@@ -1,12 +1,15 @@
+using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using SendGrid;
 using System.Text;
 using TalentHub.Data;
 using TalentHub.Models;
 using TalentHub.Services;
-using Microsoft.OpenApi.Models;
-using Microsoft.Extensions.FileProviders;
 
 
 
@@ -21,6 +24,7 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 
+
 // EF Core + SQL Server (LocalDB)
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -29,6 +33,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSection["Key"] ?? throw new InvalidOperationException("Jwt:Key is missing in appsettings.json");
 
+builder.Services.AddSingleton<ISendGridClient>(new SendGridClient(builder.Configuration["SendGrid:ApiKey"]));
+builder.Services.AddScoped<INotificationEmailSender, SendGridEmailSender>(); 
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -47,7 +53,13 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
     };
 });
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UseSqlServerStorage(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddHangfireServer();
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<IPrescreeningService, PrescreeningService>();
 
@@ -109,6 +121,9 @@ builder.Services.AddScoped<IInterviewService, InterviewService>();
 builder.Services.AddScoped<IOfferLetterService, OfferLetterService>();
 builder.Services.AddHttpClient<IResumeParsingService, ResumeParsingService>();
 builder.Services.AddHttpClient<ITalentPoolMatchingService, TalentPoolMatchingService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<NotificationDispatchJob>();
+builder.Services.AddScoped<ReminderScanJob>();
 var app = builder.Build();
 
 
@@ -139,10 +154,18 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseAuthentication();
 app.UseAuthorization();
-
+app.UseHangfireDashboard("/hangfire");
 
 
 app.MapControllers();
 
 
+RecurringJob.AddOrUpdate<ReminderScanJob>(
+    "reminder-scan",
+    job => job.RunAsync(),
+    "0 6 * * *");
+RecurringJob.AddOrUpdate<NotificationDispatchJob>(
+    "notification-dispatch",
+    job => job.RunAsync(),
+    "*/2 * * * *");
 app.Run();

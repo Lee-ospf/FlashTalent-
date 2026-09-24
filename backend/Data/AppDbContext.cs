@@ -35,6 +35,8 @@ namespace TalentHub.Data
         public DbSet<PrescreeningTemplate> PrescreeningTemplates => Set<PrescreeningTemplate>();
         public DbSet<OfferLetterTemplate> OfferLetterTemplates => Set<OfferLetterTemplate>();
         public DbSet<OfferLetter> OfferLetters => Set<OfferLetter>();
+        public DbSet<NotificationTemplate> NotificationTemplates => Set<NotificationTemplate>();
+        public DbSet<UserNotificationPreference> UserNotificationPreferences => Set<UserNotificationPreference>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -327,6 +329,40 @@ namespace TalentHub.Data
                 .WithMany(i => i.RescheduleHistory)
                 .HasForeignKey(h => h.InterviewId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<NotificationTemplate>()
+    .HasIndex(t => new { t.NotificationType, t.Channel })
+    .IsUnique();
+
+            modelBuilder.Entity<NotificationTemplate>().HasData(
+    new NotificationTemplate { NotificationTemplateId = 1, NotificationType = NotificationType.InterviewScheduled, Channel = NotificationChannel.Email, Subject = "Interview scheduled", BodyTemplate = "An interview (Round {{RoundNumber}}) has been scheduled for {{ScheduledAt}} regarding your application to {{VacancyTitle}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 2, NotificationType = NotificationType.InterviewRescheduled, Channel = NotificationChannel.Email, Subject = "Interview rescheduled", BodyTemplate = "Your interview for {{VacancyTitle}} has been rescheduled to {{ScheduledAt}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 3, NotificationType = NotificationType.InterviewCancelled, Channel = NotificationChannel.Email, Subject = "Interview cancelled", BodyTemplate = "Your interview (Round {{RoundNumber}}) for {{VacancyTitle}} has been cancelled.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 4, NotificationType = NotificationType.OfferSent, Channel = NotificationChannel.Email, Subject = "Offer letter sent", BodyTemplate = "An offer letter for {{JobTitle}} has been sent. Please review and respond by {{ClosingDate}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 5, NotificationType = NotificationType.OfferResponded, Channel = NotificationChannel.Email, Subject = "Offer letter response", BodyTemplate = "{{CandidateName}} has {{Status}} the offer for {{JobTitle}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 6, NotificationType = NotificationType.PrescreeningSent, Channel = NotificationChannel.Email, Subject = "Pre-screening form sent", BodyTemplate = "A pre-screening form has been sent for your application to {{VacancyTitle}}. Please download, complete, and upload it.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 7, NotificationType = NotificationType.PrescreeningSubmitted, Channel = NotificationChannel.Email, Subject = "Pre-screening form submitted", BodyTemplate = "{{CandidateName}} submitted their pre-screening form for {{VacancyTitle}}.", IsActive = true }
+);
+            modelBuilder.Entity<NotificationTemplate>().HasData(
+    new NotificationTemplate { NotificationTemplateId = 8, NotificationType = NotificationType.InterviewScheduled, Channel = NotificationChannel.InApp, Subject = "Interview scheduled", BodyTemplate = "An interview (Round {{RoundNumber}}) has been scheduled for {{ScheduledAt}} regarding your application to {{VacancyTitle}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 9, NotificationType = NotificationType.InterviewRescheduled, Channel = NotificationChannel.InApp, Subject = "Interview rescheduled", BodyTemplate = "Your interview for {{VacancyTitle}} has been rescheduled to {{ScheduledAt}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 10, NotificationType = NotificationType.InterviewCancelled, Channel = NotificationChannel.InApp, Subject = "Interview cancelled", BodyTemplate = "Your interview (Round {{RoundNumber}}) for {{VacancyTitle}} has been cancelled.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 11, NotificationType = NotificationType.OfferSent, Channel = NotificationChannel.InApp, Subject = "Offer letter sent", BodyTemplate = "An offer letter for {{JobTitle}} has been sent. Please review and respond by {{ClosingDate}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 12, NotificationType = NotificationType.OfferResponded, Channel = NotificationChannel.InApp, Subject = "Offer letter response", BodyTemplate = "{{CandidateName}} has {{Status}} the offer for {{JobTitle}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 13, NotificationType = NotificationType.PrescreeningSent, Channel = NotificationChannel.InApp, Subject = "Pre-screening form sent", BodyTemplate = "A pre-screening form has been sent for your application to {{VacancyTitle}}. Please download, complete, and upload it.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 14, NotificationType = NotificationType.PrescreeningSubmitted, Channel = NotificationChannel.InApp, Subject = "Pre-screening form submitted", BodyTemplate = "{{CandidateName}} submitted their pre-screening form for {{VacancyTitle}}.", IsActive = true }
+);
+            modelBuilder.Entity<NotificationTemplate>().HasData(
+    new NotificationTemplate { NotificationTemplateId = 15, NotificationType = NotificationType.PrescreeningReminder, Channel = NotificationChannel.Email, Subject = "Reminder: pre-screening form due", BodyTemplate = "This is a reminder to complete and submit your pre-screening form for {{VacancyTitle}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 16, NotificationType = NotificationType.PrescreeningReminder, Channel = NotificationChannel.InApp, Subject = "Reminder: pre-screening form due", BodyTemplate = "This is a reminder to complete and submit your pre-screening form for {{VacancyTitle}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 17, NotificationType = NotificationType.InterviewReminder, Channel = NotificationChannel.Email, Subject = "Reminder: upcoming interview", BodyTemplate = "This is a reminder that you have an interview for {{VacancyTitle}} scheduled for {{ScheduledAt}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 18, NotificationType = NotificationType.InterviewReminder, Channel = NotificationChannel.InApp, Subject = "Reminder: upcoming interview", BodyTemplate = "This is a reminder that you have an interview for {{VacancyTitle}} scheduled for {{ScheduledAt}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 19, NotificationType = NotificationType.OfferResponseReminder, Channel = NotificationChannel.Email, Subject = "Reminder: offer response needed", BodyTemplate = "This is a reminder to respond to your offer for {{JobTitle}} before it closes on {{ClosingDate}}.", IsActive = true },
+    new NotificationTemplate { NotificationTemplateId = 20, NotificationType = NotificationType.OfferResponseReminder, Channel = NotificationChannel.InApp, Subject = "Reminder: offer response needed", BodyTemplate = "This is a reminder to respond to your offer for {{JobTitle}} before it closes on {{ClosingDate}}.", IsActive = true }
+);
+
         }
+
     }
+
 }

@@ -52,6 +52,8 @@ namespace TalentHub.Models
         public User? SentByUser { get; set; }
 
         public DateTime SentAt { get; set; } = DateTime.UtcNow;
+        
+        public DateTime? ReminderSentAt { get; set; }
         public DateTime? RespondedAt { get; set; }
     }
 }

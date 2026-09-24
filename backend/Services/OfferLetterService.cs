@@ -9,9 +9,7 @@ namespace TalentHub.Services
     {
         string FillTemplate(string templateHtml, Dictionary<string, string> values);
         OfferLetterResponse MapToResponse(OfferLetter o, Application a);
-        Notification BuildSentNotification(Application a, OfferLetter o);
-        Notification BuildRespondedNotification(Application a, OfferLetter o);
-    }
+      }
 
     public class OfferLetterService : IOfferLetterService
     {
@@ -49,29 +47,5 @@ namespace TalentHub.Services
                 RespondedAt = o.RespondedAt
             };
         }
-
-        public Notification BuildSentNotification(Application a, OfferLetter o)
-        {
-            return new Notification
-            {
-                UserId = a.Candidate!.UserId,
-                NotificationType = NotificationType.OfferSent,
-                Subject = "Offer letter sent",
-                Body = $"An offer letter for {o.JobTitle} has been sent. Please review and respond by {o.ClosingDate:d}.",
-                SentAt = DateTime.UtcNow
-            };
-        }
-
-        public Notification BuildRespondedNotification(Application a, OfferLetter o)
-        {
-            return new Notification
-            {
-                UserId = a.Vacancy!.Recruiter!.UserId,
-                NotificationType = NotificationType.OfferResponded,
-                Subject = "Offer letter response",
-                Body = $"{(a.Candidate!.User != null ? $"{a.Candidate.User.FirstName} {a.Candidate.User.LastName}" : "The candidate")} has {o.Status} the offer for {o.JobTitle}.",
-                SentAt = DateTime.UtcNow
-            };
-        }
-    }
+}
 }

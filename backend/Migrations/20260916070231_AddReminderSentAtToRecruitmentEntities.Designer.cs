@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TalentHub.Data;
 
@@ -11,9 +12,11 @@ using TalentHub.Data;
 namespace TalentHub.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260916070231_AddReminderSentAtToRecruitmentEntities")]
+    partial class AddReminderSentAtToRecruitmentEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -162,9 +165,6 @@ namespace TalentHub.Migrations
                     b.Property<string>("Gender")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
-
-                    b.Property<DateTime>("LastProfileUpdateAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("Nationality")
                         .HasMaxLength(50)
@@ -577,10 +577,6 @@ namespace TalentHub.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("NotificationId"));
-
-                    b.Property<string>("ActionUrl")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
 
                     b.Property<int>("AttemptCount")
                         .HasColumnType("int");
@@ -1107,52 +1103,6 @@ namespace TalentHub.Migrations
                     b.ToTable("TalentPoolEntries");
                 });
 
-            modelBuilder.Entity("TalentHub.Models.TalentPoolMatch", b =>
-                {
-                    b.Property<int>("TalentPoolMatchId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TalentPoolMatchId"));
-
-                    b.Property<int>("CandidateId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ComputedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("InvitedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ModelVersion")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Reasoning")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Score")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Stage")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<int>("VacancyId")
-                        .HasColumnType("int");
-
-                    b.HasKey("TalentPoolMatchId");
-
-                    b.HasIndex("CandidateId");
-
-                    b.HasIndex("VacancyId", "Stage");
-
-                    b.ToTable("TalentPoolMatches");
-                });
-
             modelBuilder.Entity("TalentHub.Models.User", b =>
                 {
                     b.Property<int>("UserId")
@@ -1260,12 +1210,6 @@ namespace TalentHub.Migrations
                     b.Property<string>("EmploymentType")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("LastApplicantRankedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("LastPoolPulledAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("Location")
                         .IsRequired()
@@ -1678,25 +1622,6 @@ namespace TalentHub.Migrations
                     b.Navigation("Candidate");
 
                     b.Navigation("LastVacancy");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.TalentPoolMatch", b =>
-                {
-                    b.HasOne("TalentHub.Models.Candidate", "Candidate")
-                        .WithMany()
-                        .HasForeignKey("CandidateId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("TalentHub.Models.Vacancy", "Vacancy")
-                        .WithMany()
-                        .HasForeignKey("VacancyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Candidate");
-
-                    b.Navigation("Vacancy");
                 });
 
             modelBuilder.Entity("TalentHub.Models.UserNotificationPreference", b =>

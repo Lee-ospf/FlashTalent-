@@ -16,6 +16,8 @@ namespace TalentHub.Controllers
         private readonly IPrescreeningService _prescreeningService;
         private readonly IWebHostEnvironment _env;
         private readonly IApplicationStatusRules _statusRules;
+        private readonly INotificationService _notificationService;
+
 
         // Same conventions as CandidateDocumentsController - keep in sync if those change.
         private static readonly string[] AllowedExtensions = { ".pdf", ".doc", ".docx" };
@@ -25,11 +27,13 @@ namespace TalentHub.Controllers
      AppDbContext db,
      IPrescreeningService prescreeningService,
      IWebHostEnvironment env,
-     IApplicationStatusRules statusRules) : base(db)
+     IApplicationStatusRules statusRules,
+     INotificationService notificationService) : base(db)
         {
             _prescreeningService = prescreeningService;
             _env = env;
             _statusRules = statusRules;
+            _notificationService = notificationService;
         }
 
         // POST api/prescreening/template
@@ -155,9 +159,13 @@ namespace TalentHub.Controllers
 
             Db.Prescreenings.Add(prescreening);
 
-            var notification = await _prescreeningService.BuildSentNotification(application);
-            Db.Notifications.Add(notification);
-
+            var notifications = await _notificationService.Build(new NotificationRequest
+            {
+                UserId = application.Candidate!.UserId,
+                Type = NotificationType.PrescreeningSent,
+                TemplateData = new() { ["VacancyTitle"] = application.Vacancy!.Title }
+            });
+            Db.Notifications.AddRange(notifications);
             await _statusRules.TransitionAsync(application, ApplicationStatus.PrescreeningStage, CurrentUserId);
             await Db.SaveChangesAsync();
 
@@ -233,9 +241,19 @@ namespace TalentHub.Controllers
             application.Prescreening.SubmittedAt = DateTime.UtcNow;
             application.Prescreening.Status = PrescreeningStatus.Submitted;
 
-            var notification = await _prescreeningService.BuildSubmittedNotification(application);
-            Db.Notifications.Add(notification);
-
+            var notifications = await _notificationService.Build(new NotificationRequest
+            {
+                UserId = application.Vacancy!.Recruiter!.UserId,
+                Type = NotificationType.PrescreeningSubmitted,
+                TemplateData = new()
+                {
+                    ["CandidateName"] = application.Candidate!.User != null
+                        ? $"{application.Candidate.User.FirstName} {application.Candidate.User.LastName}"
+                        : "A candidate",
+                    ["VacancyTitle"] = application.Vacancy.Title
+                }
+            });
+            Db.Notifications.AddRange(notifications);
             await Db.SaveChangesAsync();
 
             return Ok(_prescreeningService.MapToResponse(application.Prescreening, application));

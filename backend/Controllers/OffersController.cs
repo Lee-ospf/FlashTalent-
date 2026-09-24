@@ -14,10 +14,12 @@ namespace TalentHub.Controllers
     public class OffersController : TalentHubControllerBase
     {
         private readonly IOfferLetterService _offerService;
+        private readonly INotificationService _notificationService;
 
-        public OffersController(AppDbContext db, IOfferLetterService offerService) : base(db)
+        public OffersController(AppDbContext db, IOfferLetterService offerService, INotificationService notificationService) : base(db)
         {
             _offerService = offerService;
+            _notificationService = notificationService;
         }
 
         // POST api/offers/template
@@ -148,8 +150,18 @@ namespace TalentHub.Controllers
 
             Db.OfferLetters.Add(offer);
 
-            var notification = _offerService.BuildSentNotification(application, offer);
-            Db.Notifications.Add(notification);
+            var notifications = await _notificationService.Build(new NotificationRequest
+            {
+                UserId = application.Candidate!.UserId,
+                Type = NotificationType.OfferSent,
+                TemplateData = new()
+                {
+                    ["JobTitle"] = offer.JobTitle,
+                    ["ClosingDate"] = offer.ClosingDate.ToString("d")
+                }
+            });
+            Db.Notifications.AddRange(notifications);
+            await Db.SaveChangesAsync();
 
             await Db.SaveChangesAsync();
 
@@ -261,9 +273,20 @@ namespace TalentHub.Controllers
             offer.Status = response;
             offer.RespondedAt = DateTime.UtcNow;
 
-            var notification = _offerService.BuildRespondedNotification(offer.Application, offer);
-            Db.Notifications.Add(notification);
-
+            var notifications = await _notificationService.Build(new NotificationRequest
+            {
+                UserId = offer.Application!.Vacancy!.Recruiter!.UserId,
+                Type = NotificationType.OfferResponded,
+                TemplateData = new()
+                {
+                    ["CandidateName"] = offer.Application.Candidate!.User != null
+                        ? $"{offer.Application.Candidate.User.FirstName} {offer.Application.Candidate.User.LastName}"
+                        : "The candidate",
+                    ["JobTitle"] = offer.JobTitle,
+                    ["Status"] = offer.Status.ToString()
+                }
+            });
+            Db.Notifications.AddRange(notifications);
             await Db.SaveChangesAsync();
 
             return Ok(_offerService.MapToResponse(offer, offer.Application));

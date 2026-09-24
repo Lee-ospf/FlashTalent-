@@ -25,6 +25,9 @@ namespace TalentHub.Controllers
                 {
                     NotificationId = n.NotificationId,
                     NotificationType = n.NotificationType.ToString(),
+                    Channel = n.Channel.ToString(),
+                    Status = n.Status.ToString(),
+                    ErrorMessage = n.ErrorMessage,
                     Subject = n.Subject,
                     Body = n.Body,
                     ActionUrl = n.ActionUrl,
@@ -86,5 +89,7 @@ namespace TalentHub.Controllers
 
             return NoContent();
         }
+
+
     }
 }

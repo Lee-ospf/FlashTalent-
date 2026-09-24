@@ -74,6 +74,8 @@ namespace TalentHub.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? CompletedAt { get; set; }
+       
+        public DateTime? ReminderSentAt { get; set; }
         public ICollection<InterviewRescheduleHistory> RescheduleHistory { get; set; } = new List<InterviewRescheduleHistory>();
     }
 }

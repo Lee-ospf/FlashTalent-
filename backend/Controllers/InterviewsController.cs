@@ -15,14 +15,17 @@ namespace TalentHub.Controllers
     {
         private readonly IInterviewService _interviewService;
         private readonly IApplicationStatusRules _statusRules;
+        private readonly INotificationService _notificationService;
 
         public InterviewsController(
             AppDbContext db,
             IInterviewService interviewService,
-            IApplicationStatusRules statusRules) : base(db)
+            IApplicationStatusRules statusRules,
+            INotificationService notificationService) : base(db)
         {
             _interviewService = interviewService;
             _statusRules = statusRules;
+            _notificationService = notificationService;
         }
 
         // POST api/interviews/{applicationId}/schedule
@@ -107,9 +110,18 @@ namespace TalentHub.Controllers
             };
 
             Db.Interviews.Add(interview);
-
-            var notification = _interviewService.BuildScheduledNotification(application, interview);
-            Db.Notifications.Add(notification);
+            var notifications = await _notificationService.Build(new NotificationRequest
+            {
+                UserId = application.Candidate!.UserId,
+                Type = NotificationType.InterviewScheduled,
+                TemplateData = new()
+                {
+                    ["RoundNumber"] = interview.RoundNumber.ToString(),
+                    ["ScheduledAt"] = interview.ScheduledAt.ToString("f"),
+                    ["VacancyTitle"] = application.Vacancy!.Title
+                }
+            });
+            Db.Notifications.AddRange(notifications);
 
             if (nextRound == 1)
             {
@@ -185,9 +197,17 @@ namespace TalentHub.Controllers
                 ChangedByUserId = CurrentUserId,
                 ChangedAt = DateTime.UtcNow
             });
-            var notification = _interviewService.BuildRescheduledNotification(interview.Application, interview);
-            Db.Notifications.Add(notification);
-
+            var notifications = await _notificationService.Build(new NotificationRequest
+            {
+                UserId = interview.Application!.Candidate!.UserId,
+                Type = NotificationType.InterviewRescheduled,
+                TemplateData = new()
+                {
+                    ["VacancyTitle"] = interview.Application.Vacancy!.Title,
+                    ["ScheduledAt"] = interview.ScheduledAt.ToString("f")
+                }
+            });
+            Db.Notifications.AddRange(notifications);
             await Db.SaveChangesAsync();
 
             return Ok(_interviewService.MapToResponse(interview, interview.Application));
@@ -246,9 +266,17 @@ namespace TalentHub.Controllers
 
             interview.Status = InterviewStatus.Cancelled;
 
-            var notification = _interviewService.BuildCancelledNotification(interview.Application, interview);
-            Db.Notifications.Add(notification);
-
+            var notifications = await _notificationService.Build(new NotificationRequest
+            {
+                UserId = interview.Application!.Candidate!.UserId,
+                Type = NotificationType.InterviewCancelled,
+                TemplateData = new()
+                {
+                    ["RoundNumber"] = interview.RoundNumber.ToString(),
+                    ["VacancyTitle"] = interview.Application.Vacancy!.Title
+                }
+            });
+            Db.Notifications.AddRange(notifications);
             await Db.SaveChangesAsync();
 
             return Ok(_interviewService.MapToResponse(interview, interview.Application));
@@ -345,5 +373,10 @@ namespace TalentHub.Controllers
 
             return Ok(result);
         }
+    
+    
+    
     }
-}
+
+    
+    }

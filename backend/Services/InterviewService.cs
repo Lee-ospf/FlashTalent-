@@ -8,10 +8,7 @@ namespace TalentHub.Services
     public interface IInterviewService
     {
         InterviewResponse MapToResponse(Interview i, Application a);
-        Notification BuildScheduledNotification(Application a, Interview i);
-        Notification BuildRescheduledNotification(Application a, Interview i);
-        Notification BuildCancelledNotification(Application a, Interview i);
-    }
+          }
 
     public class InterviewService : IInterviewService
     {
@@ -43,40 +40,6 @@ namespace TalentHub.Services
             };
         }
 
-        public Notification BuildScheduledNotification(Application a, Interview i)
-        {
-            return new Notification
-            {
-                UserId = a.Candidate!.UserId,
-                NotificationType = NotificationType.InterviewScheduled,
-                Subject = "Interview scheduled",
-                Body = $"An interview (Round {i.RoundNumber}) has been scheduled for {i.ScheduledAt:f} regarding your application to {a.Vacancy!.Title}.",
-                SentAt = DateTime.UtcNow
-            };
-        }
-
-        public Notification BuildRescheduledNotification(Application a, Interview i)
-        {
-            return new Notification
-            {
-                UserId = a.Candidate!.UserId,
-                NotificationType = NotificationType.InterviewRescheduled,
-                Subject = "Interview rescheduled",
-                Body = $"Your interview for {a.Vacancy!.Title} has been rescheduled to {i.ScheduledAt:f}.",
-                SentAt = DateTime.UtcNow
-            };
-        }
-
-        public Notification BuildCancelledNotification(Application a, Interview i)
-        {
-            return new Notification
-            {
-                UserId = a.Candidate!.UserId,
-                NotificationType = NotificationType.InterviewCancelled,
-                Subject = "Interview cancelled",
-                Body = $"Your interview (Round {i.RoundNumber}) for {a.Vacancy!.Title} has been cancelled.",
-                SentAt = DateTime.UtcNow
-            };
-        }
+      
     }
 }
