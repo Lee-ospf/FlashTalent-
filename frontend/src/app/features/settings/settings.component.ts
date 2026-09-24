@@ -1,4 +1,11 @@
-import { Component, inject, signal, ViewChild, OnInit } from '@angular/core';
+import {
+  Component,
+  inject,
+  signal,
+  computed,
+  ViewChild,
+  OnInit,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   FormBuilder,
@@ -20,12 +27,6 @@ import { NotificationPreferenceService } from '../../core/services/notification-
 function minLength8(c: { value: string }) {
   return c.value && c.value.length < 8 ? { minLength: true } : null;
 }
-
-const REMINDER_TYPES = [
-  'PrescreeningReminder',
-  'InterviewReminder',
-  'OfferResponseReminder',
-];
 
 @Component({
   selector: 'app-settings',
@@ -184,32 +185,51 @@ const REMINDER_TYPES = [
               >
                 Choose how you'd like to be notified.
               </div>
+              <div class="pref-list">
+                <div class="pref-row">
+                  <div class="pref-row-text">
+                    <i class="ti ti-mail"></i>
+                    <div>
+                      <div class="pref-title">Email</div>
+                      <div class="pref-sub">Sent on your primary email</div>
+                    </div>
+                  </div>
+                  <mat-slide-toggle
+                    [checked]="emailOn()"
+                    [disabled]="prefsSaving()"
+                    (change)="toggleChannel('email')"
+                  ></mat-slide-toggle>
+                </div>
 
-              <div class="form-section-label">Notification channel</div>
-              <div
-                style="font-size:12px;color:var(--text-muted);margin:4px 0 10px"
-              >
-                Applies to offers, interviews and updates.
-              </div>
-              <div class="channel-toggle-group">
-                <button
-                  type="button"
-                  class="channel-btn"
-                  [class.active]="globalChannel() === 'Email'"
-                  [disabled]="prefsSaving()"
-                  (click)="setGlobalChannel('Email')"
-                >
-                  <i class="ti ti-mail"></i> Email
-                </button>
-                <button
-                  type="button"
-                  class="channel-btn"
-                  [class.active]="globalChannel() === 'InApp'"
-                  [disabled]="prefsSaving()"
-                  (click)="setGlobalChannel('InApp')"
-                >
-                  <i class="ti ti-device-mobile"></i> In-app
-                </button>
+                <div class="pref-row">
+                  <div class="pref-row-text">
+                    <i class="ti ti-bell"></i>
+                    <div>
+                      <div class="pref-title">In-app</div>
+                      <div class="pref-sub">Delivered inside the app</div>
+                    </div>
+                  </div>
+                  <mat-slide-toggle
+                    [checked]="inappOn()"
+                    [disabled]="prefsSaving()"
+                    (change)="toggleChannel('inapp')"
+                  ></mat-slide-toggle>
+                </div>
+
+                <div class="pref-row">
+                  <div class="pref-row-text">
+                    <i class="ti ti-apps"></i>
+                    <div>
+                      <div class="pref-title">Both</div>
+                      <div class="pref-sub">Email and in-app together</div>
+                    </div>
+                  </div>
+                  <mat-slide-toggle
+                    [checked]="bothOn()"
+                    [disabled]="prefsSaving()"
+                    (change)="toggleChannel('both')"
+                  ></mat-slide-toggle>
+                </div>
               </div>
             </div>
           </div>
@@ -219,6 +239,33 @@ const REMINDER_TYPES = [
   `,
   styles: [
     `
+      .pref-list {
+        border: 0.5px solid var(--border-strong);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .pref-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-bottom: 0.5px solid var(--border);
+      }
+      .pref-row:last-child {
+        border-bottom: none;
+      }
+      .pref-row-text {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .pref-title {
+        font-size: 14px;
+      }
+      .pref-sub {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
       .settings-grid {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -228,31 +275,7 @@ const REMINDER_TYPES = [
         border-left: 0.5px solid var(--border);
         padding-left: 32px;
       }
-      .channel-toggle-group {
-        display: inline-flex;
-        border: 0.5px solid var(--border-strong);
-        border-radius: 6px;
-        overflow: hidden;
-      }
-      .channel-btn {
-        border: none;
-        background: transparent;
-        padding: 7px 14px;
-        font-size: 13px;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        cursor: pointer;
-        color: var(--text-primary);
-      }
-      .channel-btn.active {
-        background: var(--fill-accent, #1565c0);
-        color: var(--on-accent, #fff);
-      }
-      .channel-btn:disabled {
-        opacity: 0.6;
-        cursor: default;
-      }
+
       @media (max-width: 760px) {
         .settings-grid {
           grid-template-columns: 1fr;
@@ -281,8 +304,9 @@ export class SettingsComponent implements OnInit {
   saving = signal(false);
   apiError = '';
 
-  globalChannel = signal<string>('InApp'); // matches backend's current default until preferences exist
-  remindersEnabled = signal(true);
+  emailOn = signal(false);
+  inappOn = signal(false);
+  bothOn = computed(() => this.emailOn() && this.inappOn());
   prefsSaving = signal(false);
 
   form = this.fb.group(
@@ -298,66 +322,55 @@ export class SettingsComponent implements OnInit {
     this.notificationPrefs.getMine().subscribe({
       next: (prefs) => {
         const global = prefs.find((p) => p.notificationType === null);
-        if (global) this.globalChannel.set(global.channel);
-
-        const reminderOverride = prefs.find(
-          (p) =>
-            p.notificationType !== null &&
-            REMINDER_TYPES.includes(p.notificationType) &&
-            p.channel === 'None',
-        );
-        this.remindersEnabled.set(!reminderOverride);
+        const channel = global?.channel ?? 'Both';
+        this.emailOn.set(channel === 'Email' || channel === 'Both');
+        this.inappOn.set(channel === 'InApp' || channel === 'Both');
       },
       error: () =>
         this.toast.show("Couldn't load notification preferences.", 'error'),
     });
   }
 
-  setGlobalChannel(channel: string): void {
-    if (channel === this.globalChannel()) return;
+  toggleChannel(which: 'email' | 'inapp' | 'both'): void {
+    const turningBothOn = which === 'both' ? !this.bothOn() : null;
+    const nextEmail =
+      which === 'both'
+        ? turningBothOn!
+        : which === 'email'
+          ? !this.emailOn()
+          : this.emailOn();
+    const nextInapp =
+      which === 'both'
+        ? turningBothOn!
+        : which === 'inapp'
+          ? !this.inappOn()
+          : this.inappOn();
+
+    const resolved =
+      nextEmail && nextInapp
+        ? 'Both'
+        : nextEmail
+          ? 'Email'
+          : nextInapp
+            ? 'InApp'
+            : 'None';
+
+    const prevEmail = this.emailOn();
+    const prevInapp = this.inappOn();
+
+    this.emailOn.set(nextEmail);
+    this.inappOn.set(nextInapp);
     this.prefsSaving.set(true);
-    this.notificationPrefs.setPreference(null, channel).subscribe({
-      next: () => {
-        this.globalChannel.set(channel);
-        this.prefsSaving.set(false);
-      },
+
+    this.notificationPrefs.setPreference(null, resolved).subscribe({
+      next: () => this.prefsSaving.set(false),
       error: () => {
         this.toast.show("Couldn't update notification channel.", 'error');
+        this.emailOn.set(prevEmail);
+        this.inappOn.set(prevInapp);
         this.prefsSaving.set(false);
       },
     });
-  }
-
-  toggleReminders(enabled: boolean): void {
-    this.prefsSaving.set(true);
-    const calls = enabled
-      ? REMINDER_TYPES.map((t) => this.notificationPrefs.deletePreference(t))
-      : REMINDER_TYPES.map((t) =>
-          this.notificationPrefs.setPreference(t, 'None'),
-        );
-
-    let remaining = calls.length;
-    let failed = false;
-    calls.forEach((call) =>
-      call.subscribe({
-        next: () => {
-          remaining--;
-          if (remaining === 0) {
-            this.remindersEnabled.set(enabled && !failed);
-            this.prefsSaving.set(false);
-          }
-        },
-        error: () => {
-          failed = true;
-          remaining--;
-          if (remaining === 0) {
-            this.toast.show("Couldn't update reminder preference.", 'error');
-            this.remindersEnabled.set(!enabled); // revert the toggle visually
-            this.prefsSaving.set(false);
-          }
-        },
-      }),
-    );
   }
 
   private passwordsMatch(group: any) {
