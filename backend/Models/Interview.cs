@@ -33,6 +33,15 @@ namespace TalentHub.Models
         Failed
     }
 
+    public enum CalendarIntegrationStatus
+    {
+        NotIntegrated,
+        Created,
+        Updated,
+        Cancelled,
+        Failed
+    }
+
     [Table("Interviews")]
     public class Interview
     {
@@ -55,11 +64,31 @@ namespace TalentHub.Models
         [Required]
         public DateTime ScheduledAt { get; set; }
 
+        [Required]
+        public int DurationMinutes { get; set; } = 60;
+
         [MaxLength(300)]
         public string? Location { get; set; }
 
         [MaxLength(500)]
         public string? MeetingLink { get; set; }
+
+        // Extra guests the organizer wants on the calendar invite, beyond the
+        // scheduling recruiter and the candidate (e.g. a hiring manager or a
+        // co-interviewer). Stored as a semicolon-separated list of email
+        // addresses; GoogleCalendarService splits this back into attendees.
+        public string? AdditionalGuestEmails { get; set; }
+
+        [MaxLength(255)]
+        public string? CalendarEventId { get; set; }
+
+        [MaxLength(50)]
+        public string? CalendarProvider { get; set; }
+
+        [Required]
+        public CalendarIntegrationStatus CalendarIntegrationStatus { get; set; } = CalendarIntegrationStatus.NotIntegrated;
+
+        public string? CalendarIntegrationError { get; set; }
 
         [Required]
         public InterviewStatus Status { get; set; } = InterviewStatus.Scheduled;

@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using System.Linq;
 using TalentHub.Data;
 using TalentHub.DTOs;
 using TalentHub.Models;
@@ -30,13 +31,22 @@ namespace TalentHub.Services
                 InterviewType = i.InterviewType.ToString(),
                 InterviewCategory = i.InterviewCategory.ToString(),
                 ScheduledAt = i.ScheduledAt,
+                DurationMinutes = i.DurationMinutes,
+                EndTime = i.ScheduledAt.AddMinutes(i.DurationMinutes),
                 Location = i.Location,
                 MeetingLink = i.MeetingLink,
+                GuestEmails = string.IsNullOrWhiteSpace(i.AdditionalGuestEmails)
+                    ? new List<string>()
+                    : i.AdditionalGuestEmails.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
                 Status = i.Status.ToString(),
                 Outcome = i.Outcome.ToString(),
                 RecruiterNotes = i.RecruiterNotes,
                 CreatedAt = i.CreatedAt,
-                CompletedAt = i.CompletedAt
+                CompletedAt = i.CompletedAt,
+                CalendarIntegrationStatus = i.CalendarIntegrationStatus.ToString(),
+                CalendarEventId = i.CalendarEventId,
+                CalendarProvider = i.CalendarProvider,
+                CalendarIntegrationError = i.CalendarIntegrationError
             };
         }
 

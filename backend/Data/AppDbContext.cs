@@ -37,6 +37,7 @@ namespace TalentHub.Data
         public DbSet<OfferLetter> OfferLetters => Set<OfferLetter>();
         public DbSet<NotificationTemplate> NotificationTemplates => Set<NotificationTemplate>();
         public DbSet<UserNotificationPreference> UserNotificationPreferences => Set<UserNotificationPreference>();
+        public DbSet<GoogleCalendarConnection> GoogleCalendarConnections => Set<GoogleCalendarConnection>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
