@@ -34,6 +34,7 @@ namespace TalentHub.Data
         public DbSet<PrescreeningTemplate> PrescreeningTemplates => Set<PrescreeningTemplate>();
         public DbSet<OfferLetterTemplate> OfferLetterTemplates => Set<OfferLetterTemplate>();
         public DbSet<OfferLetter> OfferLetters => Set<OfferLetter>();
+        public DbSet<GoogleCalendarConnection> GoogleCalendarConnections => Set<GoogleCalendarConnection>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

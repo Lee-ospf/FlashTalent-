@@ -50,6 +50,8 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<IPrescreeningService, PrescreeningService>();
+builder.Services.Configure<GoogleCalendarOptions>(builder.Configuration.GetSection("GoogleCalendar"));
+builder.Services.AddScoped<IGoogleCalendarService, GoogleCalendarService>();
 
 // CORS - frontend (Person C/D) runs on a different origin/port, so the browser
 // needs explicit permission to call this API. Tighten this list to your actual

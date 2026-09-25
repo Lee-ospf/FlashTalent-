@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TalentHub.Data;
 
@@ -11,9 +12,11 @@ using TalentHub.Data;
 namespace TalentHub.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260922120000_AddInterviewGuestEmails")]
+    partial class AddInterviewGuestEmails
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -465,36 +468,6 @@ namespace TalentHub.Migrations
                     b.ToTable("Employees");
                 });
 
-            modelBuilder.Entity("TalentHub.Models.GoogleCalendarConnection", b =>
-                {
-                    b.Property<int>("GoogleCalendarConnectionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("GoogleCalendarConnectionId"));
-
-                    b.Property<DateTime>("ConnectedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("GoogleAccountEmail")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("RefreshToken")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("GoogleCalendarConnectionId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("GoogleCalendarConnections");
-                });
-
             modelBuilder.Entity("TalentHub.Models.Interview", b =>
                 {
                     b.Property<int>("InterviewId")
@@ -509,29 +482,11 @@ namespace TalentHub.Migrations
                     b.Property<int>("ApplicationId")
                         .HasColumnType("int");
 
-                    b.Property<string>("CalendarEventId")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("CalendarIntegrationError")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CalendarIntegrationStatus")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("CalendarProvider")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("DurationMinutes")
-                        .HasColumnType("int");
 
                     b.Property<string>("InterviewCategory")
                         .IsRequired()
@@ -1264,17 +1219,6 @@ namespace TalentHub.Migrations
                         .IsRequired();
 
                     b.Navigation("SourceApplication");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.GoogleCalendarConnection", b =>
-                {
-                    b.HasOne("TalentHub.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("User");
                 });

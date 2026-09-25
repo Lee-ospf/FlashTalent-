@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Net.Mail;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
@@ -15,14 +16,17 @@ namespace TalentHub.Controllers
     {
         private readonly IInterviewService _interviewService;
         private readonly IApplicationStatusRules _statusRules;
+        private readonly IGoogleCalendarService _calendarService;
 
         public InterviewsController(
             AppDbContext db,
             IInterviewService interviewService,
-            IApplicationStatusRules statusRules) : base(db)
+            IApplicationStatusRules statusRules,
+            IGoogleCalendarService calendarService) : base(db)
         {
             _interviewService = interviewService;
             _statusRules = statusRules;
+            _calendarService = calendarService;
         }
 
         // POST api/interviews/{applicationId}/schedule
@@ -63,6 +67,11 @@ namespace TalentHub.Controllers
                 return BadRequest(new { message = "MeetingLink is required for a Virtual interview." });
             }
 
+            if (!TryNormalizeGuestEmails(request.GuestEmails, out var guestEmails, out var guestError))
+            {
+                return BadRequest(new { message = guestError });
+            }
+
             if (application.Status == ApplicationStatus.NotSelected)
             {
                 return BadRequest(new { message = "This application has already been marked NotSelected - no further interviews can be scheduled." });
@@ -92,6 +101,26 @@ namespace TalentHub.Controllers
                 return BadRequest(new { message = $"Maximum of {InterviewService.MaxRounds} interview rounds reached for this application." });
             }
 
+            var durationMinutes = request.DurationMinutes > 0 ? request.DurationMinutes : 60;
+            var proposedEnd = request.ScheduledAt.AddMinutes(durationMinutes);
+
+            // Calendar availability check (Acceptance Criteria #4): if the scheduling
+            // recruiter has a connected calendar and it shows a conflict, notify them
+            // instead of silently double-booking. They can resubmit with
+            // IgnoreCalendarConflicts = true to proceed anyway.
+            if (!request.IgnoreCalendarConflicts)
+            {
+                var conflicts = await _calendarService.CheckAvailabilityAsync(CurrentUserId, request.ScheduledAt, proposedEnd);
+                if (conflicts.Count > 0)
+                {
+                    return Conflict(new
+                    {
+                        message = "You have a conflicting event on your Google Calendar at this time.",
+                        conflicts = conflicts.Select(c => new { conflictStart = c.Start, conflictEnd = c.End })
+                    });
+                }
+            }
+
             var interview = new Interview
             {
                 ApplicationId = applicationId,
@@ -99,8 +128,10 @@ namespace TalentHub.Controllers
                 InterviewType = type,
                 InterviewCategory = category,
                 ScheduledAt = request.ScheduledAt,
+                DurationMinutes = durationMinutes,
                 Location = type == InterviewType.InPerson ? request.Location : null,
                 MeetingLink = type == InterviewType.Virtual ? request.MeetingLink : null,
+                AdditionalGuestEmails = guestEmails.Count > 0 ? string.Join(";", guestEmails) : null,
                 Status = InterviewStatus.Scheduled,
                 ScheduledByUserId = CurrentUserId,
                 CreatedAt = DateTime.UtcNow
@@ -118,6 +149,13 @@ namespace TalentHub.Controllers
 
             await Db.SaveChangesAsync();
 
+            // Create the matching Google Calendar event (Acceptance Criteria #1-3, #8-10).
+            // This never blocks the interview from being scheduled: TalentHub's existing
+            // scheduling flow (#11) succeeds regardless of calendar outcome, and the
+            // integration status/error is surfaced back to Angular on the response.
+            await TrySyncCalendarCreateAsync(interview, application);
+            await Db.SaveChangesAsync();
+
             return Ok(_interviewService.MapToResponse(interview, application));
         }
 
@@ -129,6 +167,7 @@ namespace TalentHub.Controllers
             var interview = await Db.Interviews
                 .Include(i => i.Application).ThenInclude(a => a!.Candidate).ThenInclude(c => c!.User)
                 .Include(i => i.Application).ThenInclude(a => a!.Vacancy)
+                .Include(i => i.ScheduledByUser)
                 .FirstOrDefaultAsync(i => i.InterviewId == interviewId);
 
             if (interview == null || interview.Application == null)
@@ -166,16 +205,48 @@ namespace TalentHub.Controllers
             {
                 return BadRequest(new { message = "A reason is required when rescheduling an interview." });
             }
-            
+
+            // Null means "leave the guest list as it is"; an explicit (possibly
+            // empty) list replaces it.
+            List<string>? guestEmails = null;
+            if (request.GuestEmails != null)
+            {
+                if (!TryNormalizeGuestEmails(request.GuestEmails, out guestEmails, out var guestError))
+                {
+                    return BadRequest(new { message = guestError });
+                }
+            }
+
+            var effectiveDuration = request.DurationMinutes is > 0 ? request.DurationMinutes.Value : interview.DurationMinutes;
+            var proposedEnd = request.ScheduledAt.AddMinutes(effectiveDuration);
+
+            if (!request.IgnoreCalendarConflicts)
+            {
+                var conflicts = await _calendarService.CheckAvailabilityAsync(interview.ScheduledByUserId, request.ScheduledAt, proposedEnd);
+                if (conflicts.Count > 0)
+                {
+                    return Conflict(new
+                    {
+                        message = "You have a conflicting event on your Google Calendar at this time.",
+                        conflicts = conflicts.Select(c => new { conflictStart = c.Start, conflictEnd = c.End })
+                    });
+                }
+            }
+
             var oldScheduledAt = interview.ScheduledAt;   // capture before overwrite
 
             //set new date and type
             interview.ScheduledAt = request.ScheduledAt;
+            interview.DurationMinutes = effectiveDuration;
             interview.InterviewType = effectiveType;
             // Clear whichever field no longer applies when the type changes, so a
             interview.Location = effectiveType == InterviewType.InPerson ? request.Location : null;
             interview.MeetingLink = effectiveType == InterviewType.Virtual ? request.MeetingLink : null;
-           
+            if (guestEmails != null)
+            {
+                interview.AdditionalGuestEmails = guestEmails.Count > 0 ? string.Join(";", guestEmails) : null;
+            }
+
             Db.InterviewRescheduleHistories.Add(new InterviewRescheduleHistory
             {
                 InterviewId = interview.InterviewId,
@@ -188,6 +259,20 @@ namespace TalentHub.Controllers
             var notification = _interviewService.BuildRescheduledNotification(interview.Application, interview);
             Db.Notifications.Add(notification);
 
+            await Db.SaveChangesAsync();
+
+            // Update the existing calendar event using its stored CalendarEventId
+            // (Acceptance Criteria #5) rather than creating a new one. If there was no
+            // event yet (e.g. calendar wasn't connected at schedule time, or creation
+            // previously failed), try creating it now instead.
+            if (string.IsNullOrEmpty(interview.CalendarEventId))
+            {
+                await TrySyncCalendarCreateAsync(interview, interview.Application);
+            }
+            else
+            {
+                await TrySyncCalendarUpdateAsync(interview, interview.Application);
+            }
             await Db.SaveChangesAsync();
 
             return Ok(_interviewService.MapToResponse(interview, interview.Application));
@@ -249,6 +334,9 @@ namespace TalentHub.Controllers
             var notification = _interviewService.BuildCancelledNotification(interview.Application, interview);
             Db.Notifications.Add(notification);
 
+            await Db.SaveChangesAsync();
+
+            await TrySyncCalendarCancelAsync(interview);
             await Db.SaveChangesAsync();
 
             return Ok(_interviewService.MapToResponse(interview, interview.Application));
@@ -344,6 +432,161 @@ namespace TalentHub.Controllers
                 .ToList();
 
             return Ok(result);
+        }
+
+        // GET api/interviews/availability?scheduledAt=2026-09-20T10:00:00Z&durationMinutes=60
+        // Lets Angular pre-check the current recruiter's calendar before submitting Schedule/Reschedule.
+        [Authorize(Roles = "Recruiter,Admin")]
+        [HttpGet("interviews/availability")]
+        public async Task<ActionResult<CalendarAvailabilityResponse>> CheckAvailability(
+            [FromQuery] DateTime scheduledAt, [FromQuery] int durationMinutes = 60)
+        {
+            var isConnected = await _calendarService.IsConnectedAsync(CurrentUserId);
+            var conflicts = await _calendarService.CheckAvailabilityAsync(
+                CurrentUserId, scheduledAt, scheduledAt.AddMinutes(durationMinutes <= 0 ? 60 : durationMinutes));
+
+            return Ok(new CalendarAvailabilityResponse
+            {
+                CalendarConnected = isConnected,
+                IsAvailable = conflicts.Count == 0,
+                Conflicts = conflicts.Select(c => new CalendarConflictDto { ConflictStart = c.Start, ConflictEnd = c.End }).ToList()
+            });
+        }
+
+        // POST api/interviews/{interviewId}/calendar/retry
+        // Lets the recruiter retry calendar integration after a previous failure
+        // (Acceptance Criteria #10), without creating a duplicate event.
+        [Authorize(Roles = "Recruiter,Admin")]
+        [HttpPost("interviews/{interviewId}/calendar/retry")]
+        public async Task<ActionResult<InterviewResponse>> RetryCalendarSync(int interviewId)
+        {
+            var interview = await Db.Interviews
+                .Include(i => i.Application).ThenInclude(a => a!.Candidate).ThenInclude(c => c!.User)
+                .Include(i => i.Application).ThenInclude(a => a!.Vacancy)
+                .Include(i => i.ScheduledByUser)
+                .FirstOrDefaultAsync(i => i.InterviewId == interviewId);
+
+            if (interview == null || interview.Application == null)
+            {
+                return NotFound(new { message = $"No interview found with id {interviewId}." });
+            }
+
+            if (interview.Status == InterviewStatus.Cancelled)
+            {
+                await TrySyncCalendarCancelAsync(interview);
+            }
+            else if (string.IsNullOrEmpty(interview.CalendarEventId))
+            {
+                await TrySyncCalendarCreateAsync(interview, interview.Application);
+            }
+            else
+            {
+                await TrySyncCalendarUpdateAsync(interview, interview.Application);
+            }
+
+            await Db.SaveChangesAsync();
+
+            return Ok(_interviewService.MapToResponse(interview, interview.Application));
+        }
+
+        // Trims, dedupes (case-insensitive) and validates a list of guest email
+        // addresses the organizer wants added to the calendar invite. Returns
+        // false with a message if any entry isn't a valid email address.
+        private static bool TryNormalizeGuestEmails(List<string>? rawEmails, out List<string> emails, out string? error)
+        {
+            emails = new List<string>();
+            error = null;
+
+            if (rawEmails == null || rawEmails.Count == 0)
+            {
+                return true;
+            }
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var raw in rawEmails)
+            {
+                var email = raw?.Trim();
+                if (string.IsNullOrEmpty(email)) continue;
+
+                try
+                {
+                    _ = new MailAddress(email);
+                }
+                catch (FormatException)
+                {
+                    error = $"'{email}' is not a valid guest email address.";
+                    return false;
+                }
+
+                if (seen.Add(email))
+                {
+                    emails.Add(email);
+                }
+            }
+
+            return true;
+        }
+
+        // --- Calendar sync helpers -------------------------------------------------
+        // Each wraps the corresponding IGoogleCalendarService call so a calendar-side
+        // failure (bad token, API outage, etc.) never throws out of the request and
+        // never blocks the underlying interview action (Acceptance Criteria #10, #11).
+        // Caller is responsible for SaveChangesAsync afterwards.
+
+        private async Task TrySyncCalendarCreateAsync(Interview interview, Application application)
+        {
+            try
+            {
+                var calendarEvent = await _calendarService.CreateEventForInterviewAsync(interview, application);
+                if (calendarEvent != null)
+                {
+                    interview.CalendarEventId = calendarEvent.Value.EventId;
+                    interview.CalendarProvider = "Google";
+                    interview.CalendarIntegrationStatus = CalendarIntegrationStatus.Created;
+                    interview.CalendarIntegrationError = null;
+                }
+                else
+                {
+                    // Recruiter simply hasn't connected a calendar - not an error.
+                    interview.CalendarIntegrationStatus = CalendarIntegrationStatus.NotIntegrated;
+                    interview.CalendarIntegrationError = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                interview.CalendarIntegrationStatus = CalendarIntegrationStatus.Failed;
+                interview.CalendarIntegrationError = ex.Message;
+            }
+        }
+
+        private async Task TrySyncCalendarUpdateAsync(Interview interview, Application application)
+        {
+            try
+            {
+                await _calendarService.UpdateEventForInterviewAsync(interview, application);
+                interview.CalendarIntegrationStatus = CalendarIntegrationStatus.Updated;
+                interview.CalendarIntegrationError = null;
+            }
+            catch (Exception ex)
+            {
+                interview.CalendarIntegrationStatus = CalendarIntegrationStatus.Failed;
+                interview.CalendarIntegrationError = ex.Message;
+            }
+        }
+
+        private async Task TrySyncCalendarCancelAsync(Interview interview)
+        {
+            try
+            {
+                await _calendarService.CancelEventForInterviewAsync(interview);
+                interview.CalendarIntegrationStatus = CalendarIntegrationStatus.Cancelled;
+                interview.CalendarIntegrationError = null;
+            }
+            catch (Exception ex)
+            {
+                interview.CalendarIntegrationStatus = CalendarIntegrationStatus.Failed;
+                interview.CalendarIntegrationError = ex.Message;
+            }
         }
     }
 }
