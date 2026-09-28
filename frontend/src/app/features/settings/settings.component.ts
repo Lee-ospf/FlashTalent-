@@ -7,6 +7,7 @@ import {
   OnInit,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import {
   FormBuilder,
   FormGroupDirective,
@@ -41,6 +42,7 @@ function minLength8(c: { value: string }) {
     MatIconModule,
     MatProgressSpinnerModule,
     MatSlideToggleModule,
+    RouterLink,
   ],
   template: `
     <div class="page-container">
@@ -235,6 +237,30 @@ function minLength8(c: { value: string }) {
           </div>
         </mat-card-content>
       </mat-card>
+
+      @if (user()?.role === 'Recruiter' || user()?.role === 'Admin') {
+        <mat-card
+          class="mat-elevation-z1"
+          style="border-radius:12px;max-width:880px;margin-top:16px"
+        >
+          <mat-card-content style="padding:20px">
+            <div class="card-header">
+              <i class="ti ti-calendar-event"></i> Calendar
+            </div>
+            <p class="form-note" style="margin-top:6px">
+              Connect Google Calendar or Microsoft Outlook/Teams to sync
+              interviews you schedule and check for clashes.
+            </p>
+            <a
+              routerLink="/settings/calendar"
+              mat-stroked-button
+              style="border-radius:8px;margin-top:8px;display:inline-flex;align-items:center"
+            >
+              <i class="ti ti-calendar-event"></i>&nbsp;Manage calendar connection
+            </a>
+          </mat-card-content>
+        </mat-card>
+      }
     </div>
   `,
   styles: [

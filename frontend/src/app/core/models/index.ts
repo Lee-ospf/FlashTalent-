@@ -386,16 +386,52 @@ export interface ScheduleInterviewRequest {
   interviewType: InterviewType;
   interviewCategory: InterviewCategory;
   scheduledAt: string; // ISO string
+  durationMinutes?: number;
   location?: string;
   meetingLink?: string;
+  // Extra guest emails the organizer wants on the calendar invite, on top
+  // of the candidate (e.g. a hiring manager or co-interviewer).
+  guestEmails?: string[];
+  ignoreCalendarConflicts?: boolean;
 }
 
 export interface RescheduleInterviewRequest {
   scheduledAt: string;
+  durationMinutes?: number;
   interviewType?: InterviewType;
   location?: string;
   meetingLink?: string;
+  // Omit to leave the existing guest list as-is; pass a (possibly empty)
+  // array to replace it.
+  guestEmails?: string[];
   rescheduleReason: string;
+  ignoreCalendarConflicts?: boolean;
+}
+
+// ── Calendar integration ─────────────────────────────────────────
+export type CalendarIntegrationStatus =
+  | 'NotIntegrated'
+  | 'Created'
+  | 'Updated'
+  | 'Cancelled'
+  | 'Failed';
+
+export interface CalendarConflictDto {
+  conflictStart: string;
+  conflictEnd: string;
+}
+
+export interface CalendarAvailabilityResponse {
+  isAvailable: boolean;
+  calendarConnected: boolean;
+  calendarProvider?: 'Google' | 'Microsoft' | null;
+  conflicts: CalendarConflictDto[];
+}
+
+// Shape of the 409 body InterviewsController returns on a scheduling conflict.
+export interface CalendarConflictErrorBody {
+  message: string;
+  conflicts: CalendarConflictDto[];
 }
 
 export interface SetInterviewOutcomeRequest {
@@ -422,11 +458,19 @@ export interface InterviewResponse {
   scheduledAt: string;
   location?: string;
   meetingLink?: string;
+  guestEmails: string[];
   status: string; // 'Scheduled' | 'Completed' | 'Cancelled'
   outcome: string; // 'Pending' | 'Passed' | 'Failed'
   recruiterNotes?: string;
   createdAt: string;
   completedAt?: string;
+
+  // Calendar sync outcome (Google or Microsoft) for this interview (populated by the backend
+  // after every schedule/reschedule/cancel/retry call).
+  calendarIntegrationStatus: CalendarIntegrationStatus;
+  calendarEventId?: string;
+  calendarProvider?: string;
+  calendarIntegrationError?: string;
 }
 
 //_______Precreening_________________

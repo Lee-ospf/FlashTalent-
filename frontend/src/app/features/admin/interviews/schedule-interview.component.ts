@@ -3,12 +3,33 @@ import {
   inject,
   signal,
   computed,
+  Signal,
   OnInit,
   OnDestroy,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { CommonModule, Location } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormArray,
+  FormControl,
+  ReactiveFormsModule,
+  Validators,
+  AbstractControl,
+} from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
+import {
+  Observable,
+  combineLatest,
+  concat,
+  of,
+  map,
+  startWith,
+  debounceTime,
+  distinctUntilChanged,
+  switchMap,
+  catchError,
+} from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -16,7 +37,10 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
-import { InterviewService } from '../../../core/services/interview.service';
+import {
+  InterviewService,
+  CalendarConflictError,
+} from '../../../core/services/interview.service';
 import { ApplicationService } from '../../../core/services/application.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -26,7 +50,19 @@ import {
   InterviewType,
   InterviewCategory,
   InterviewRescheduleResponse,
+  CalendarConflictDto,
 } from '../../../core/models';
+
+// Result of a proactive (non-blocking) calendar availability check
+// for a candidate date/time on the schedule or reschedule form.
+interface AvailabilityCheckState {
+  checking: boolean;
+  conflicts: CalendarConflictDto[] | null;
+}
+const NO_AVAILABILITY_WARNING: AvailabilityCheckState = {
+  checking: false,
+  conflicts: null,
+};
 
 type ViewMode = 'schedule' | 'view' | 'reschedule' | 'outcome' | 'decision';
 
@@ -77,6 +113,42 @@ const MAX_INTERVIEW_ROUNDS = 5;
       @if (apiError) {
         <div class="api-error" style="margin-bottom:14px">
           <i class="ti ti-alert-circle"></i> {{ apiError }}
+        </div>
+      }
+
+      @if (calendarConflicts().length) {
+        <div class="info-banner warn" style="margin-bottom:14px">
+          <i class="ti ti-alert-triangle"></i>
+          <div>
+            <div>{{ calendarConflictMessage() }}</div>
+            <ul style="margin:6px 0 10px 18px">
+              @for (c of calendarConflicts(); track c.conflictStart) {
+                <li>
+                  {{ formatDateTime(c.conflictStart) }} –
+                  {{ formatDateTime(c.conflictEnd) }}
+                </li>
+              }
+            </ul>
+            <div style="display:flex;gap:10px">
+              <button
+                mat-stroked-button
+                type="button"
+                style="border-radius:8px"
+                (click)="dismissCalendarConflicts()"
+              >
+                Pick a different time
+              </button>
+              <button
+                mat-raised-button
+                color="warn"
+                type="button"
+                style="border-radius:8px"
+                (click)="scheduleAnyway()"
+              >
+                Schedule anyway
+              </button>
+            </div>
+          </div>
         </div>
       }
 
@@ -150,8 +222,64 @@ const MAX_INTERVIEW_ROUNDS = 5;
                 />
               </mat-form-field>
             }
+            @if (existingInterview()!.guestEmails.length) {
+              <div class="form-note" style="align-items:flex-start;gap:8px;margin-bottom:12px">
+                <i class="ti ti-users" style="margin-top:2px"></i>
+                <span>
+                  Guests:
+                  {{ existingInterview()!.guestEmails.join(', ') }}
+                </span>
+              </div>
+            }
+
+            <mat-divider style="margin:8px 0 16px"></mat-divider>
+            <div class="form-note" style="align-items:center;gap:8px">
+              <i
+                class="ti"
+                [class.ti-calendar-check]="
+                  existingInterview()!.calendarIntegrationStatus ===
+                    'Created' ||
+                  existingInterview()!.calendarIntegrationStatus === 'Updated'
+                "
+                [class.ti-calendar-x]="
+                  existingInterview()!.calendarIntegrationStatus ===
+                  'Cancelled'
+                "
+                [class.ti-alert-circle]="
+                  existingInterview()!.calendarIntegrationStatus === 'Failed'
+                "
+                [class.ti-calendar-off]="
+                  existingInterview()!.calendarIntegrationStatus ===
+                  'NotIntegrated'
+                "
+              ></i>
+              <span>{{
+                calendarStatusLabel(
+                  existingInterview()!.calendarIntegrationStatus,
+                  existingInterview()!.calendarProvider
+                )
+              }}</span>
+              @if (existingInterview()!.calendarIntegrationStatus === 'Failed') {
+                <button
+                  mat-stroked-button
+                  type="button"
+                  style="border-radius:8px;margin-left:8px"
+                  [disabled]="syncingCalendar()"
+                  (click)="retryCalendarSync()"
+                >
+                  @if (syncingCalendar()) {
+                    <mat-spinner
+                      diameter="14"
+                      style="display:inline-block;margin-right:6px"
+                    ></mat-spinner>
+                  }
+                  Retry sync
+                </button>
+              }
+            </div>
+
             @if (lastReschedule()) {
-              <mat-divider style="margin:8px 0 20px"></mat-divider>
+              <mat-divider style="margin:16px 0 20px"></mat-divider>
               <div class="form-note" style="align-items:flex-start;gap:8px">
                 <i class="ti ti-history" style="margin-top:2px"></i>
                 <span>
@@ -340,6 +468,61 @@ const MAX_INTERVIEW_ROUNDS = 5;
                   must be in the future
                 </p>
               }
+              @if (rescheduleAvailability().checking) {
+                <p class="form-note">
+                  <mat-spinner diameter="14" style="display:inline-block;margin-right:6px"></mat-spinner>
+                  Checking your calendar…
+                </p>
+              } @else if (rescheduleAvailability().conflicts) {
+                <p class="form-note" style="color:var(--warn,#c62828)">
+                  <i class="ti ti-alert-triangle"></i> This clashes with an
+                  event on your calendar.
+                </p>
+              }
+
+              <mat-divider style="margin:16px 0"></mat-divider>
+              <div formArrayName="guestEmails">
+                <p class="form-note" style="margin-bottom:8px">
+                  <i class="ti ti-users"></i> Additional guests (optional)
+                </p>
+                @for (
+                  guestCtrl of rescheduleGuestEmailForms.controls;
+                  track guestCtrl;
+                  let i = $index
+                ) {
+                  <div style="display:flex;gap:8px;align-items:flex-start">
+                    <mat-form-field appearance="outline" style="flex:1">
+                      <mat-label>Guest email</mat-label>
+                      <input
+                        matInput
+                        type="email"
+                        [formControlName]="i"
+                        placeholder="e.g. hiring.manager@company.com"
+                      />
+                      @if (guestCtrl.invalid && (guestCtrl.dirty || guestCtrl.touched)) {
+                        <mat-error>Enter a valid email address</mat-error>
+                      }
+                    </mat-form-field>
+                    <button
+                      mat-icon-button
+                      type="button"
+                      style="margin-top:6px"
+                      (click)="removeRescheduleGuestEmail(i)"
+                      aria-label="Remove guest"
+                    >
+                      <i class="ti ti-x"></i>
+                    </button>
+                  </div>
+                }
+                <button
+                  mat-stroked-button
+                  type="button"
+                  style="border-radius:8px;margin-bottom:16px"
+                  (click)="addRescheduleGuestEmail()"
+                >
+                  <i class="ti ti-plus"></i> Add guest
+                </button>
+              </div>
 
               <mat-form-field appearance="outline" style="width:100%">
                 <mat-label>Reason for rescheduling</mat-label>
@@ -665,8 +848,62 @@ const MAX_INTERVIEW_ROUNDS = 5;
                   must be in the future
                 </p>
               }
+              @if (scheduleAvailability().checking) {
+                <p class="form-note">
+                  <mat-spinner diameter="14" style="display:inline-block;margin-right:6px"></mat-spinner>
+                  Checking your calendar…
+                </p>
+              } @else if (scheduleAvailability().conflicts) {
+                <p class="form-note" style="color:var(--warn,#c62828)">
+                  <i class="ti ti-alert-triangle"></i> This clashes with an
+                  event on your calendar.
+                </p>
+              }
 
               <mat-divider style="margin:8px 0 20px"></mat-divider>
+
+              <div formArrayName="guestEmails">
+                <p class="form-note" style="margin-bottom:8px">
+                  <i class="ti ti-users"></i> Additional guests (optional)
+                </p>
+                @for (
+                  guestCtrl of guestEmailForms.controls;
+                  track guestCtrl;
+                  let i = $index
+                ) {
+                  <div style="display:flex;gap:8px;align-items:flex-start">
+                    <mat-form-field appearance="outline" style="flex:1">
+                      <mat-label>Guest email</mat-label>
+                      <input
+                        matInput
+                        type="email"
+                        [formControlName]="i"
+                        placeholder="e.g. hiring.manager@company.com"
+                      />
+                      @if (guestCtrl.invalid && (guestCtrl.dirty || guestCtrl.touched)) {
+                        <mat-error>Enter a valid email address</mat-error>
+                      }
+                    </mat-form-field>
+                    <button
+                      mat-icon-button
+                      type="button"
+                      style="margin-top:6px"
+                      (click)="removeGuestEmail(i)"
+                      aria-label="Remove guest"
+                    >
+                      <i class="ti ti-x"></i>
+                    </button>
+                  </div>
+                }
+                <button
+                  mat-stroked-button
+                  type="button"
+                  style="border-radius:8px;margin-bottom:16px"
+                  (click)="addGuestEmail()"
+                >
+                  <i class="ti ti-plus"></i> Add guest
+                </button>
+              </div>
 
               <mat-form-field appearance="outline" style="width:100%">
                 <mat-label>Scheduled by</mat-label>
@@ -731,6 +968,14 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
   lastReschedule = signal<InterviewRescheduleResponse | null>(null);
   minDate = new Date().toISOString().substring(0, 10);
 
+  // Calendar conflict handling: when schedule()/saveReschedule() gets
+  // a 409, we stash the conflicting windows here and offer "Schedule anyway",
+  // which resubmits the same form with ignoreCalendarConflicts: true.
+  calendarConflicts = signal<CalendarConflictDto[]>([]);
+  calendarConflictMessage = signal('');
+  private pendingIgnoreConflicts = false;
+  syncingCalendar = signal(false);
+
   form = this.fb.group(
     {
       interviewType: ['InPerson' as InterviewType, Validators.required],
@@ -739,6 +984,7 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
       scheduledTime: ['', Validators.required],
       location: [''],
       meetingLink: [''],
+      guestEmails: this.fb.array<FormControl<string>>([]),
     },
     { validators: this.futureDateTime },
   );
@@ -750,15 +996,72 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
       scheduledTime: ['', Validators.required],
       location: [''],
       meetingLink: [''],
+      guestEmails: this.fb.array<FormControl<string>>([]),
       rescheduleReason: ['', [Validators.required, Validators.minLength(5)]],
     },
     { validators: this.futureDateTime },
   );
 
+  // The organizer (the recruiter scheduling/rescheduling) can invite extra
+  // guests - e.g. a hiring manager or a co-interviewer - beyond themselves
+  // and the candidate, who are always added automatically.
+  get guestEmailForms(): FormArray<FormControl<string>> {
+    return this.form.get('guestEmails') as FormArray<FormControl<string>>;
+  }
+  get rescheduleGuestEmailForms(): FormArray<FormControl<string>> {
+    return this.rescheduleForm.get('guestEmails') as FormArray<
+      FormControl<string>
+    >;
+  }
+
+  addGuestEmail(): void {
+    this.guestEmailForms.push(
+      this.fb.control('', { nonNullable: true, validators: [Validators.email] }),
+    );
+  }
+  removeGuestEmail(index: number): void {
+    this.guestEmailForms.removeAt(index);
+  }
+  addRescheduleGuestEmail(): void {
+    this.rescheduleGuestEmailForms.push(
+      this.fb.control('', { nonNullable: true, validators: [Validators.email] }),
+    );
+  }
+  removeRescheduleGuestEmail(index: number): void {
+    this.rescheduleGuestEmailForms.removeAt(index);
+  }
+  private setGuestEmails(array: FormArray<FormControl<string>>, emails: string[]): void {
+    array.clear();
+    for (const email of emails) {
+      array.push(
+        this.fb.control(email, { nonNullable: true, validators: [Validators.email] }),
+      );
+    }
+  }
+  // Non-empty, trimmed guest emails ready to send to the API.
+  private collectGuestEmails(array: FormArray<FormControl<string>>): string[] {
+    return array.value.map((e) => e.trim()).filter((e) => e.length > 0);
+  }
+
   outcomeForm = this.fb.group({
     outcome: ['' as '' | 'Passed' | 'Failed', Validators.required],
     recruiterNotes: [''],
   });
+
+  // Proactive, non-blocking calendar availability check. Each of
+  // these is a single derived signal built from the form's own date/time
+  // controls - no manual subscribe/unsubscribe, no separate "checking" and
+  // "warning" state to keep in sync, and toSignal() ties its lifetime to
+  // this component automatically. The hard check still happens on submit
+  // (see CalendarConflictError handling in save()/saveReschedule()).
+  scheduleAvailability = this.buildAvailabilitySignal(
+    this.form.get('scheduledDate')!,
+    this.form.get('scheduledTime')!,
+  );
+  rescheduleAvailability = this.buildAvailabilitySignal(
+    this.rescheduleForm.get('scheduledDate')!,
+    this.rescheduleForm.get('scheduledTime')!,
+  );
 
   interviewHasStarted = computed(() => {
     const iv = this.existingInterview();
@@ -885,6 +1188,68 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
     });
   }
 
+  // Builds a signal that tracks a form's scheduledDate/scheduledTime
+  // controls and reports whether that moment clashes with the recruiter's
+  // connected calendar - purely as a heads-up while typing; the hard check
+  // still happens server-side on submit (see CalendarConflictError).
+  //
+  // Design notes on why this shape, not a manual subscribe():
+  //  - combineLatest + map derives one "candidate instant" from the two
+  //    controls, so date and time changes are debounced together instead
+  //    of racing each other with two independent timers.
+  //  - distinctUntilChanged skips re-checking when the derived instant
+  //    hasn't actually changed (e.g. an unrelated field on the form fires
+  //    valueChanges too, or the same date/time is re-emitted).
+  //  - switchMap cancels any in-flight request the moment a newer
+  //    date/time comes in, so a slow response for an old value can never
+  //    land after - and overwrite - a fresher one.
+  //  - catchError is scoped to the *inner* HTTP call, so one failed check
+  //    (e.g. offline) reports "no warning" without ever killing the outer
+  //    stream - later edits keep working.
+  //  - toSignal ties the subscription to this component's lifetime via
+  //    DestroyRef, so there's no Subscription field or manual unsubscribe
+  //    to remember in ngOnDestroy.
+  private buildAvailabilitySignal(
+    dateCtrl: AbstractControl<string | null>,
+    timeCtrl: AbstractControl<string | null>,
+  ): Signal<AvailabilityCheckState> {
+    const candidateInstant$ = combineLatest([
+      dateCtrl.valueChanges.pipe(startWith(dateCtrl.value)),
+      timeCtrl.valueChanges.pipe(startWith(timeCtrl.value)),
+    ]).pipe(
+      map(([date, time]: [string | null, string | null]) => {
+        if (!date || !time) return null;
+        const candidate = new Date(`${date}T${time}`);
+        return candidate.getTime() > Date.now() ? candidate.toISOString() : null;
+      }),
+      distinctUntilChanged(),
+      debounceTime(400),
+    );
+
+    const state$: Observable<AvailabilityCheckState> = candidateInstant$.pipe(
+      switchMap((scheduledAt) => {
+        if (!scheduledAt) return of(NO_AVAILABILITY_WARNING);
+
+        return concat(
+          of({ checking: true, conflicts: null }),
+          this.interviewService.checkAvailability(scheduledAt).pipe(
+            map((res) => ({
+              checking: false,
+              conflicts:
+                res.calendarConnected && !res.isAvailable
+                  ? res.conflicts
+                  : null,
+            })),
+            // Non-critical - stay silent, the hard check on submit still applies.
+            catchError(() => of(NO_AVAILABILITY_WARNING)),
+          ),
+        );
+      }),
+    );
+
+    return toSignal(state$, { initialValue: NO_AVAILABILITY_WARNING });
+  }
+
   ngOnDestroy(): void {
     if (this.clockHandle) clearInterval(this.clockHandle);
   }
@@ -905,6 +1270,7 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
     }
 
     this.apiError = '';
+    this.calendarConflicts.set([]);
     this.saving.set(true);
 
     const scheduledAt = new Date(
@@ -920,18 +1286,44 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
         location: type === 'InPerson' ? this.form.value.location! : undefined,
         meetingLink:
           type === 'Virtual' ? this.form.value.meetingLink! : undefined,
+        guestEmails: this.collectGuestEmails(this.guestEmailForms),
+        ignoreCalendarConflicts: this.pendingIgnoreConflicts,
       })
       .subscribe({
         next: () => {
           this.saving.set(false);
+          this.pendingIgnoreConflicts = false;
           this.toast.show('Interview scheduled.', 'success');
           this.router.navigate(['/admin/applications']);
         },
         error: (err: Error) => {
           this.saving.set(false);
-          this.apiError = err.message;
+          if (err instanceof CalendarConflictError) {
+            this.calendarConflictMessage.set(err.body.message);
+            this.calendarConflicts.set(err.body.conflicts);
+            this.apiError = '';
+          } else {
+            this.apiError = err.message;
+          }
         },
       });
+  }
+
+  // Called from the "Schedule anyway" button that appears once a calendar
+  // conflict is shown. Resubmits the same form with the override flag set.
+  scheduleAnyway(): void {
+    this.pendingIgnoreConflicts = true;
+    this.calendarConflicts.set([]);
+    if (this.mode() === 'reschedule') {
+      this.saveReschedule();
+    } else {
+      this.save();
+    }
+  }
+
+  dismissCalendarConflicts(): void {
+    this.pendingIgnoreConflicts = false;
+    this.calendarConflicts.set([]);
   }
 
   startReschedule(): void {
@@ -950,6 +1342,7 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
       meetingLink: interview.meetingLink ?? '',
       rescheduleReason: '',
     });
+    this.setGuestEmails(this.rescheduleGuestEmailForms, interview.guestEmails ?? []);
     this.apiError = '';
     this.mode.set('reschedule');
   }
@@ -979,6 +1372,7 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
     }
 
     this.apiError = '';
+    this.calendarConflicts.set([]);
     this.saving.set(true);
 
     const scheduledAt = new Date(
@@ -995,11 +1389,14 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
           type === 'Virtual'
             ? this.rescheduleForm.value.meetingLink!
             : undefined,
+        guestEmails: this.collectGuestEmails(this.rescheduleGuestEmailForms),
         rescheduleReason: this.rescheduleForm.value.rescheduleReason!,
+        ignoreCalendarConflicts: this.pendingIgnoreConflicts,
       })
       .subscribe({
         next: (updated) => {
           this.saving.set(false);
+          this.pendingIgnoreConflicts = false;
           this.existingInterview.set(updated);
           this.mode.set('view');
           this.toast.show('Interview rescheduled.', 'success');
@@ -1007,6 +1404,11 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
         },
         error: (err: Error) => {
           this.saving.set(false);
+          if (err instanceof CalendarConflictError) {
+            this.calendarConflictMessage.set(err.body.message);
+            this.calendarConflicts.set(err.body.conflicts);
+            return;
+          }
           this.apiError = err.message;
         },
       });
@@ -1078,6 +1480,7 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
       location: '',
       meetingLink: '',
     });
+    this.guestEmailForms.clear();
     this.apiError = '';
     this.mode.set('schedule');
   }
@@ -1124,5 +1527,48 @@ export class ScheduleInterviewComponent implements OnInit, OnDestroy {
 
   goBack(): void {
     this.location.back();
+  }
+
+  // Retries the calendar sync for the currently-viewed interview after
+  // a previous failure (calendarIntegrationStatus === 'Failed').
+  retryCalendarSync(): void {
+    const interview = this.existingInterview();
+    if (!interview) return;
+
+    this.syncingCalendar.set(true);
+    this.interviewService.retryCalendarSync(interview.interviewId).subscribe({
+      next: (updated) => {
+        this.syncingCalendar.set(false);
+        this.existingInterview.set(updated);
+        if (updated.calendarIntegrationStatus === 'Failed') {
+          this.toast.show(
+            updated.calendarIntegrationError || 'Calendar sync failed again.',
+            'error',
+          );
+        } else {
+          this.toast.show('Calendar sync retried.', 'success');
+        }
+      },
+      error: (err: Error) => {
+        this.syncingCalendar.set(false);
+        this.toast.show(err.message, 'error');
+      },
+    });
+  }
+
+  calendarStatusLabel(status: string, provider?: string): string {
+    switch (status) {
+      case 'Created':
+      case 'Updated':
+        return provider === 'Microsoft'
+          ? 'Synced to Outlook calendar'
+          : 'Synced to Google Calendar';
+      case 'Cancelled':
+        return 'Calendar event cancelled';
+      case 'Failed':
+        return 'Calendar sync failed';
+      default:
+        return 'Not synced (no calendar connected)';
+    }
   }
 }
