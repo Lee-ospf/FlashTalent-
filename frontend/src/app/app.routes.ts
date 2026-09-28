@@ -231,6 +231,16 @@ export const routes: Routes = [
       ),
   },
   {
+    // Recruiter/Admin only - matches the Angular redirect URL that
+    // Google/MicrosoftAuthController.Callback send their OAuth flows back to.
+    path: 'settings/calendar',
+    canActivate: [roleGuard(['Recruiter', 'Admin'])],
+    loadComponent: () =>
+      import('./features/settings/calendar-settings.component').then(
+        (m) => m.CalendarSettingsComponent,
+      ),
+  },
+  {
     path: 'notifications',
     canActivate: [authGuard],
     loadComponent: () =>
