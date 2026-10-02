@@ -392,9 +392,13 @@ interface InterviewSubState {
         cursor: help;
       }
       .btn-primary.vp-action-btn {
-        
         width: 200px;
         justify-content: center;
+      }
+      .app-title-link,
+      .app-title-link:visited {
+        color: inherit;
+        text-decoration: none;
       }
     </style>
   `,
