@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
 using TalentHub.DTOs;
+using TalentHub.Models;
 
 namespace TalentHub.Controllers
 {
@@ -19,7 +20,7 @@ namespace TalentHub.Controllers
         public async Task<ActionResult<List<NotificationResponse>>> GetAll()
         {
             var notifications = await Db.Notifications
-                .Where(n => n.UserId == CurrentUserId)
+                .Where(n => n.UserId == CurrentUserId && n.Channel != NotificationChannel.Email)
                 .OrderByDescending(n => n.SentAt)
                 .Select(n => new NotificationResponse
                 {
@@ -44,7 +45,7 @@ namespace TalentHub.Controllers
         public async Task<ActionResult<UnreadCountResponse>> GetUnreadCount()
         {
             var count = await Db.Notifications
-                .CountAsync(n => n.UserId == CurrentUserId && !n.IsRead);
+                .CountAsync(n => n.UserId == CurrentUserId && !n.IsRead && n.Channel != NotificationChannel.Email);
 
             return Ok(new UnreadCountResponse { UnreadCount = count });
         }

@@ -63,7 +63,7 @@ public class NotificationService : INotificationService
                 ErrorMessage = $"No active template for {request.Type} on {channel}."
             };
         }
-
+        var isInApp = channel == NotificationChannel.InApp;
         return new Notification
         {
             UserId = request.UserId,
@@ -73,7 +73,8 @@ public class NotificationService : INotificationService
             Subject = Render(template.Subject ?? string.Empty, request.TemplateData),
             Body = Render(template.BodyTemplate, request.TemplateData),
             ScheduledAt = request.ScheduledAt,
-            Status = DeliveryStatus.Pending
+            Status = isInApp ? DeliveryStatus.Sent : DeliveryStatus.Pending,
+            SentAt = isInApp ? DateTime.UtcNow : null
         };
     }
 

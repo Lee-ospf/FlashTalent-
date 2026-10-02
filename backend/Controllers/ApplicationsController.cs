@@ -296,13 +296,13 @@ namespace TalentHub.Controllers
             return Ok(history);
         }
 
-        // GET api/applications/{id}/review
-        // Returns the full enriched review payload for the recruiter split-screen view.
-        [Authorize(Roles = "Recruiter,Admin")]
+          [Authorize(Roles = "Recruiter,Admin")]
         [HttpGet("{id}/review")]
         public async Task<ActionResult<ApplicationReviewResponse>> GetReview(int id)
         {
             var application = await Db.Applications
+                .AsNoTracking()      
+                .AsSplitQuery()      
                 .Include(a => a.Candidate)
                     .ThenInclude(c => c!.User)
                 .Include(a => a.Candidate)
@@ -312,8 +312,6 @@ namespace TalentHub.Controllers
                     .ThenInclude(c => c!.Qualifications)
                 .Include(a => a.Candidate)
                     .ThenInclude(c => c!.Experiences)
-                .Include(a => a.Candidate)
-                    .ThenInclude(c => c!.Documents)
                 .Include(a => a.Vacancy)
                     .ThenInclude(v => v.VacancySkills)
                         .ThenInclude(vs => vs.Skill)
@@ -333,11 +331,13 @@ namespace TalentHub.Controllers
             if (user == null)
                 return NotFound(new { message = "Candidate user account not found." });
 
-            //get the most recent CV document URL for the candidate, if it exists
-            var cvUrl = c.Documents
-       .Where(d => d.DocumentType == DocumentType.CV)
-       .OrderByDescending(d => d.UploadedAt)
-       .FirstOrDefault()?.FileUrl;
+            
+            var cvUrl = await Db.CandidateDocuments
+                .AsNoTracking()
+                .Where(d => d.CandidateId == c.CandidateId && d.DocumentType == DocumentType.CV)
+                .OrderByDescending(d => d.UploadedAt)
+                .Select(d => d.FileUrl)
+                .FirstOrDefaultAsync();
 
             // PostedFor — department name for internal, client name for placement
             var postedFor = v.VacancyType == VacancyType.Internal
@@ -422,7 +422,6 @@ namespace TalentHub.Controllers
 
             return Ok(response);
         }
-
         // GET api/applications/{id}/activity
         [HttpGet("{id}/activity")]
         public async Task<ActionResult<List<ApplicationActivityEntry>>> GetActivity(int id)
