@@ -1,4 +1,11 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  signal,
+  computed,
+  OnInit,
+} from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -7,17 +14,21 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { FormsModule } from '@angular/forms';
 import { ApplicationService } from '../../../core/services/application.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { ApplicationReviewResponse } from '../../../core/models';
+import {
+  ApplicationReviewResponse,
+  CandidateDocumentResponse,
+} from '../../../core/models';
 import { environment } from '../../../../environments/environment';
 import {
   DocumentService,
   DOCUMENT_TYPE_LABELS,
   DocumentTypeKey,
 } from '../../../core/services/document.service';
-import { CandidateDocumentResponse } from '../../../core/models';
+
 @Component({
   selector: 'app-application-review',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     MatButtonModule,
@@ -42,13 +53,9 @@ import { CandidateDocumentResponse } from '../../../core/models';
                   {{ data()!.candidate.lastName }}
                 </div>
                 <div class="topbar-meta">
-                  Applied {{ formatDate(data()!.application.appliedAt) }}
+                  Applied {{ appliedDate() }}
                   &nbsp;·&nbsp;
-                  <span
-                    class="status-pill s-{{
-                      statusClass(data()!.application.status)
-                    }}"
-                  >
+                  <span class="status-pill s-{{ currentStatusClass() }}">
                     {{ data()!.application.status }}
                   </span>
                 </div>
@@ -87,7 +94,7 @@ import { CandidateDocumentResponse } from '../../../core/models';
         </div>
       } @else {
         <div class="split-container">
-          <!-- ── LEFT PANEL — Candidate ── -->
+          <!-- LEFT PANEL — Candidate -->
           <div class="split-panel">
             <div class="panel-label">
               <i class="ti ti-user"></i> Candidate Profile
@@ -115,6 +122,7 @@ import { CandidateDocumentResponse } from '../../../core/models';
                   </div>
                 </div>
               }
+
               <!-- Contact -->
               <div class="info-section">
                 <div class="section-heading">Contact</div>
@@ -136,7 +144,8 @@ import { CandidateDocumentResponse } from '../../../core/models';
                   }}</span>
                 </div>
               </div>
-              <!--Documents-->
+
+              <!-- Documents -->
               <div class="info-section">
                 <div class="section-heading">Submitted Documents</div>
                 @if (documentsLoading()) {
@@ -181,6 +190,7 @@ import { CandidateDocumentResponse } from '../../../core/models';
                   <span class="info-empty">No documents submitted</span>
                 }
               </div>
+
               <!-- Skills -->
               <div class="info-section">
                 <div class="section-heading">Skills</div>
@@ -189,11 +199,11 @@ import { CandidateDocumentResponse } from '../../../core/models';
                     @for (s of data()!.candidate.skills; track s.skillId) {
                       <span
                         class="tag"
-                        [class.tag-match]="isSkillMatch(s.skillId)"
+                        [class.tag-match]="vacancySkillIds().has(s.skillId)"
                       >
                         {{ s.skillName }}
                         <span class="tag-sub">{{ s.proficiencyLevel }}</span>
-                        @if (isSkillMatch(s.skillId)) {
+                        @if (vacancySkillIds().has(s.skillId)) {
                           <i class="ti ti-check tag-check"></i>
                         }
                       </span>
@@ -212,7 +222,7 @@ import { CandidateDocumentResponse } from '../../../core/models';
               <div class="info-section">
                 <div class="section-heading">Qualifications</div>
                 @if (data()!.candidate.qualifications.length) {
-                  @for (q of data()!.candidate.qualifications; track q.name) {
+                  @for (q of data()!.candidate.qualifications; track $index) {
                     <div class="qual-card">
                       <div class="qual-name">{{ q.name }}</div>
                       <div class="qual-sub">
@@ -230,7 +240,7 @@ import { CandidateDocumentResponse } from '../../../core/models';
               <div class="info-section">
                 <div class="section-heading">Certifications</div>
                 @if (data()!.candidate.certifications.length) {
-                  @for (c of data()!.candidate.certifications; track c.name) {
+                  @for (c of data()!.candidate.certifications; track $index) {
                     <div class="qual-card">
                       <div class="qual-name">{{ c.name }}</div>
                       <div class="qual-sub">
@@ -248,7 +258,7 @@ import { CandidateDocumentResponse } from '../../../core/models';
               <div class="info-section">
                 <div class="section-heading">Experience</div>
                 @if (data()!.candidate.experiences.length) {
-                  @for (e of data()!.candidate.experiences; track e.company) {
+                  @for (e of data()!.candidate.experiences; track $index) {
                     <div class="exp-card">
                       <div class="exp-role">{{ e.role }}</div>
                       <div class="exp-company">{{ e.company }}</div>
@@ -273,7 +283,7 @@ import { CandidateDocumentResponse } from '../../../core/models';
           <!-- DIVIDER -->
           <div class="split-divider"></div>
 
-          <!-- ── RIGHT PANEL — Vacancy ── -->
+          <!-- RIGHT PANEL — Vacancy -->
           <div class="split-panel">
             <div class="panel-label">
               <i class="ti ti-briefcase"></i> Vacancy Requirements
@@ -387,8 +397,7 @@ import { CandidateDocumentResponse } from '../../../core/models';
               [(ngModel)]="dropNotes"
               placeholder="Reason for dropping (optional)..."
               rows="3"
-            >
-            </textarea>
+            ></textarea>
             <div class="confirm-actions">
               <button mat-stroked-button (click)="showDropConfirm.set(false)">
                 Cancel
@@ -434,8 +443,9 @@ import { CandidateDocumentResponse } from '../../../core/models';
         </div>
       }
     </div>
-
-    <style>
+  `,
+  styles: [
+    `
       .review-shell {
         display: flex;
         flex-direction: column;
@@ -488,7 +498,6 @@ import { CandidateDocumentResponse } from '../../../core/models';
         color: var(--text);
         text-align: left;
       }
-
       .topbar-meta {
         font-size: 12px;
         color: var(--text-muted);
@@ -720,7 +729,7 @@ import { CandidateDocumentResponse } from '../../../core/models';
         height: 500px;
         border: 1px solid var(--border);
         border-radius: 8px;
-        margin: 4px 0 4px 44px; /* aligns with .doc-info's left offset, roughly matching icon width + gap */
+        margin: 4px 0 4px 44px;
       }
       .match-summary {
         border-radius: 12px;
@@ -759,7 +768,6 @@ import { CandidateDocumentResponse } from '../../../core/models';
         font-size: 12px;
         color: var(--text-muted);
       }
-
       .match-high {
         background: var(--green-bg);
         border-color: var(--green-mid);
@@ -771,7 +779,6 @@ import { CandidateDocumentResponse } from '../../../core/models';
       .match-high .match-bar-fill {
         background: var(--green);
       }
-
       .match-medium {
         background: var(--amber-bg);
         border-color: #ffe0b2;
@@ -783,7 +790,6 @@ import { CandidateDocumentResponse } from '../../../core/models';
       .match-medium .match-bar-fill {
         background: var(--amber);
       }
-
       .match-low {
         background: var(--red-bg);
         border-color: #ffcdd2;
@@ -795,8 +801,8 @@ import { CandidateDocumentResponse } from '../../../core/models';
       .match-low .match-bar-fill {
         background: var(--red);
       }
-    </style>
-  `,
+    `,
+  ],
 })
 export class ApplicationReviewComponent implements OnInit {
   private route = inject(ActivatedRoute);
@@ -805,8 +811,12 @@ export class ApplicationReviewComponent implements OnInit {
   private sanitizer = inject(DomSanitizer);
   private toast = inject(ToastService);
   private documentService = inject(DocumentService);
-  private rawDocuments = signal<CandidateDocumentResponse[]>([]);
   private location = inject(Location);
+
+  private rawDocuments = signal<CandidateDocumentResponse[]>([]);
+
+  private safeUrlCache = new Map<number, SafeResourceUrl>();
+
   data = signal<ApplicationReviewResponse | null>(null);
   loading = signal(true);
   actioning = signal(false);
@@ -815,6 +825,7 @@ export class ApplicationReviewComponent implements OnInit {
   documentsLoading = signal(false);
   expandedDocId = signal<number | null>(null);
   previewModalDoc = signal<CandidateDocumentResponse | null>(null);
+
   documents = computed(() => {
     const latestByKey = new Map<string, CandidateDocumentResponse>();
     for (const doc of this.rawDocuments()) {
@@ -830,54 +841,26 @@ export class ApplicationReviewComponent implements OnInit {
     return Array.from(latestByKey.values());
   });
 
-  // Set of vacancy skill IDs for O(1) lookup when highlighting candidate skills
-  private vacancySkillIds = computed(
+  // Derived values: computed once per data change, not on every CD pass
+  candidateInitials = computed(() => {
+    const c = this.data()?.candidate;
+    if (!c) return '';
+    return ((c.firstName?.[0] ?? '') + (c.lastName?.[0] ?? '')).toUpperCase();
+  });
+
+  appliedDate = computed(() =>
+    this.formatDate(this.data()?.application.appliedAt),
+  );
+
+  currentStatusClass = computed(() =>
+    this.statusClass(this.data()?.application.status),
+  );
+
+  vacancySkillIds = computed(
     () =>
       new Set(this.data()?.vacancy.requiredSkills.map((s) => s.skillId) ?? []),
   );
 
-  private readonly STATUS_CLASS: Record<string, string> = {
-    Applied: 'applied',
-    UnderReview: 'shortlisted',
-    Shortlisted: 'interview',
-    OfferExtended: 'offer',
-    Hired: 'offer',
-    NotSelected: 'rejected',
-  };
-
-  ngOnInit(): void {
-    const id = Number(this.route.snapshot.paramMap.get('id'));
-    this.appService.getReview(id).subscribe({
-      next: (d) => {
-        this.data.set(d);
-        this.loading.set(false);
-        this.loadDocuments(d.candidate.candidateId);
-      },
-      error: (err: Error) => {
-        this.toast.show(err.message, 'error');
-        this.loading.set(false);
-      },
-    });
-  }
-
-  private loadDocuments(candidateId: number): void {
-    this.documentsLoading.set(true);
-    this.documentService.getAll(candidateId).subscribe({
-      next: (docs) => {
-        this.rawDocuments.set(docs);
-        this.documentsLoading.set(false);
-      },
-      error: () => this.documentsLoading.set(false),
-    });
-  }
-  candidateInitials(): string {
-    const c = this.data()?.candidate;
-    if (!c) return '';
-    return (c.firstName[0] + c.lastName[0]).toUpperCase();
-  }
-  isSkillMatch(skillId: number): boolean {
-    return this.vacancySkillIds().has(skillId);
-  }
   skillMatchSummary = computed(() => {
     const required = this.data()?.vacancy.requiredSkills ?? [];
     const candidateSkillIds = new Set(
@@ -897,6 +880,46 @@ export class ApplicationReviewComponent implements OnInit {
     if (pct >= 40) return 'match-medium';
     return 'match-low';
   });
+
+  private readonly STATUS_CLASS: Record<string, string> = {
+    Applied: 'applied',
+    UnderReview: 'shortlisted',
+    Shortlisted: 'interview',
+    OfferExtended: 'offer',
+    Hired: 'offer',
+    NotSelected: 'rejected',
+  };
+
+  ngOnInit(): void {
+    const id = Number(this.route.snapshot.paramMap.get('id'));
+    const t0 = performance.now();
+    this.appService.getReview(id).subscribe({
+      next: (d) => {
+        console.log('getReview ms:', performance.now() - t0);
+        this.data.set(d);
+        this.loading.set(false);
+        this.loadDocuments(d.candidate.candidateId);
+      },
+      error: (err: Error) => {
+        this.toast.show(err.message, 'error');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  private loadDocuments(candidateId: number): void {
+    const t0 = performance.now();
+    this.documentsLoading.set(true);
+    this.documentService.getAll(candidateId).subscribe({
+      next: (docs) => {
+        console.log('documents ms:', performance.now() - t0, docs.length);
+        this.rawDocuments.set(docs);
+        this.documentsLoading.set(false);
+      },
+      error: () => this.documentsLoading.set(false),
+    });
+  }
+
   shortlist(): void {
     const app = this.data()?.application;
     if (!app) return;
@@ -951,6 +974,7 @@ export class ApplicationReviewComponent implements OnInit {
       year: 'numeric',
     });
   }
+
   docLabel(type: string): string {
     return DOCUMENT_TYPE_LABELS[type as DocumentTypeKey] ?? type;
   }
@@ -976,13 +1000,19 @@ export class ApplicationReviewComponent implements OnInit {
   }
 
   safeDocUrl(doc: CandidateDocumentResponse): SafeResourceUrl {
-    const full = `${environment.apiUrl.replace('/api', '')}${doc.fileUrl}#toolbar=0&navpanes=0&zoom=page-width`;
-    return this.sanitizer.bypassSecurityTrustResourceUrl(full);
+    let url = this.safeUrlCache.get(doc.candidateDocumentId);
+    if (!url) {
+      const full = `${this.docDownloadUrl(doc)}#toolbar=0&navpanes=0&zoom=page-width`;
+      url = this.sanitizer.bypassSecurityTrustResourceUrl(full);
+      this.safeUrlCache.set(doc.candidateDocumentId, url);
+    }
+    return url;
   }
 
   docDownloadUrl(doc: CandidateDocumentResponse): string {
     return `${environment.apiUrl.replace('/api', '')}${doc.fileUrl}`;
   }
+
   goBack(): void {
     this.location.back();
   }

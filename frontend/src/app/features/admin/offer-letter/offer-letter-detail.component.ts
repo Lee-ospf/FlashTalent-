@@ -1,5 +1,5 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, ActivatedRoute } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -10,7 +10,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-
 import { ApplicationService } from '../../../core/services/application.service';
 import { VacancyService } from '../../../core/services/vacancy.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -40,7 +39,7 @@ import { DatePickerTriggerDirective } from '../../../shared/directives/date-pick
   template: `
     <div class="page-container ol-page">
       <div class="ol-top-bar">
-        <a [routerLink]="['/admin/applications', applicationId]" class="back-link">
+        <a (click)="goBack()" class="back-link">
           <i class="ti ti-arrow-left"></i> Back to application
         </a>
         @if (application(); as topApp) {
@@ -531,6 +530,7 @@ export class OfferLetterDetailComponent implements OnInit {
   private vacancyService = inject(VacancyService);
   private offerLetter = inject(OfferLetterService);
   private toast = inject(ToastService);
+  private location = inject(Location);
 
   loading = signal(true);
   loadError = signal<string | null>(null);
@@ -558,6 +558,7 @@ export class OfferLetterDetailComponent implements OnInit {
   generateError = signal<string | null>(null);
 
   previewOpen = signal(false);
+ 
   openPreview(): void {
     this.previewOpen.set(true);
   }
@@ -694,6 +695,9 @@ export class OfferLetterDetailComponent implements OnInit {
   downloadOffer(): void {
     const o = this.offer();
     if (o) this.offerLetter.downloadLetter(o);
+  }
+   goBack(): void {
+    this.location.back();
   }
 
   initials(name: string): string {

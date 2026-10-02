@@ -137,50 +137,9 @@ type QuickFilterKey =
               [(ngModel)]="searchQ"
               type="search"
               class="search-input"
-              placeholder="Search by candidate or vacancy…"
+              placeholder="Search forvacancy…"
             />
           </div>
-
-          <mat-form-field
-            appearance="outline"
-            class="compact-select"
-            style="width:200px"
-          >
-            <mat-label>Vacancy</mat-label>
-            <mat-select [(ngModel)]="vacancyFilter">
-              <mat-option [value]="''">All vacancies</mat-option>
-              @for (v of vacancyOptions(); track v.id) {
-                <mat-option [value]="v.id">{{ v.title }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field
-            appearance="outline"
-            class="compact-select"
-            style="width:180px"
-          >
-            <mat-label>Status</mat-label>
-            <mat-select [(ngModel)]="statusFilter">
-              <mat-option [value]="''">All statuses</mat-option>
-              @for (s of allStatuses; track s) {
-                <mat-option [value]="s">{{ label(s) }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <button
-            mat-stroked-button
-            style="border-radius:8px;height:56px"
-            (click)="toggleExpandAll()"
-          >
-            <i
-              class="ti"
-              [class.ti-chevrons-down]="!allExpanded()"
-              [class.ti-chevrons-up]="allExpanded()"
-            ></i>
-            {{ allExpanded() ? 'Collapse all' : 'Expand all' }}
-          </button>
         </div>
       }
       <div #resultsAnchor></div>
@@ -211,184 +170,18 @@ type QuickFilterKey =
                   </div>
                 </div>
                 <div class="vlist-header-right">
-                  <div class="vlist-breakdown">
-                    @for (row of statusBreakdown(group); track row.status) {
-                      <span class="status-pill s-{{ statusClass(row.status) }}"
-                        >{{ row.count }} {{ label(row.status) }}</span
-                      >
-                    }
-                  </div>
                   <button
-                    class="btn-stroked vp-open-btn"
+                    class="btn-primary vp-action-btn"
                     matTooltip="Open vacancy applications view"
                     (click)="
                       $event.stopPropagation();
                       goToVacancyApplications(group.vacancyId)
                     "
                   >
-                    <i class="ti ti-external-link"></i>
+                    <i class="ti ti-external-link"></i>Go to Applications
                   </button>
-                  <i
-                    class="ti ti-chevron-down vgroup-chevron"
-                    [class.open]="isExpanded(group.vacancyId)"
-                  ></i>
                 </div>
               </div>
-
-              @if (isExpanded(group.vacancyId)) {
-                <div class="vlist-body">
-                  <div class="vd-section-label">Applications</div>
-                  <div style="margin-top:6px">
-                    @for (
-                      a of group.applications;
-                      track a.applicationId;
-                      let i = $index
-                    ) {
-                      <div class="app-row">
-                        <div class="app-rank" [matTooltip]="'Submission order'">
-                          #{{ i + 1 }}
-                        </div>
-                        <div
-                          class="app-icon-wrap"
-                          [class]="'app-icon-' + statusClass(a.status)"
-                        >
-                          <i class="ti ti-user"></i>
-                        </div>
-                        <div class="app-row-main">
-                          <a
-                            class="app-title app-title-link"
-                            [routerLink]="[
-                              '/admin/applications',
-                              a.applicationId,
-                              'candidate',
-                            ]"
-                            (click)="$event.stopPropagation()"
-                          >
-                            {{ a.candidateName }}
-                          </a>
-                          <div class="app-sub">
-                            Applied {{ formatDate(a.appliedAt)
-                            }}{{ i === 0 ? ' · First to apply' : '' }}
-                          </div>
-                        </div>
-                        <div class="app-status">
-                          <span
-                            class="status-pill"
-                            [class]="'s-' + statusClass(a.status)"
-                          >
-                            {{ label(a.status) }}
-                          </span>
-                        </div>
-                        <div class="app-actions">
-                          @switch (a.status) {
-                            @case ('Applied') {
-                              <button
-                                class="btn-primary app-action-btn"
-                                (click)="openReview(a, group.vacancyId)"
-                              >
-                                <i class="ti ti-eye"></i> Review
-                              </button>
-                            }
-
-                            @case ('UnderReview') {
-                              <button
-                                class="btn-primary app-action-btn"
-                                (click)="openReview(a, group.vacancyId)"
-                              >
-                                <i class="ti ti-eye"></i> Continue Review
-                              </button>
-                            }
-
-                            @case ('Shortlisted') {
-                              <button
-                                class="btn-primary app-action-btn"
-                                (click)="openPreScreeningReview(a)"
-                              >
-                                <i class="ti ti-clipboard-list"></i> Open
-                                Pre-Screening
-                              </button>
-                            }
-
-                            @case ('PrescreeningStage') {
-                              @if (prescreeningPassed().has(a.applicationId)) {
-                                <button
-                                  class="btn-primary app-action-btn"
-                                  (click)="
-                                    scheduleInterview(a, group.vacancyId)
-                                  "
-                                >
-                                  <i class="ti ti-calendar-event"></i> Schedule
-                                  Interview
-                                </button>
-                              } @else {
-                                <button
-                                  class="btn-primary app-action-btn"
-                                  (click)="openPreScreeningReview(a)"
-                                >
-                                  <i class="ti ti-clock"></i> Awaiting
-                                  pre-screening outcome
-                                </button>
-                              }
-                            }
-
-                            @case ('InterviewStage') {
-                              @if (maxRoundsReached().has(a.applicationId)) {
-                                <span
-                                  class="form-note"
-                                  [matTooltip]="
-                                    'All ' +
-                                    maxRounds +
-                                    ' interview rounds passed — move this application forward manually'
-                                  "
-                                >
-                                  <i class="ti ti-flag-check"></i> Final round
-                                  completed
-                                </span>
-                              } @else {
-                                <button
-                                  class="btn-primary app-action-btn"
-                                  (click)="
-                                    scheduleInterview(a, group.vacancyId)
-                                  "
-                                >
-                                  <i class="ti ti-calendar-event"></i> View
-                                  Interview
-                                </button>
-                              }
-                            }
-
-                            @case ('OfferExtended') {
-                              @if (offerAccepted().has(a.applicationId)) {
-                                <button
-                                  class="btn-primary app-action-btn"
-                                  (click)="openOfferLetter(a)"
-                                >
-                                  <i class="ti ti-circle-check"></i> Offer
-                                  Accepted
-                                </button>
-                              } @else {
-                                <button
-                                  class="btn-primary app-action-btn"
-                                  (click)="openOfferLetter(a)"
-                                >
-                                  <i class="ti ti-clock"></i> Awaiting candidate
-                                  response
-                                </button>
-                              }
-                            }
-
-                            @default {
-                              <span class="form-note">
-                                <i class="ti ti-lock"></i> Final stage
-                              </span>
-                            }
-                          }
-                        </div>
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
             </mat-card>
           }
         </div>
@@ -396,21 +189,6 @@ type QuickFilterKey =
     </div>
 
     <style>
-      .status-pill-link {
-        text-decoration: none;
-        cursor: pointer;
-        border: 1px solid transparent;
-        transition:
-          box-shadow 0.15s,
-          transform 0.1s;
-      }
-      .status-pill-link:hover {
-        box-shadow: 0 0 0 1px currentColor inset;
-      }
-      .status-pill-link:active {
-        transform: scale(0.97);
-      }
-
       .app-row-open {
         display: inline-flex;
         align-items: center;
@@ -452,22 +230,6 @@ type QuickFilterKey =
         min-width: 0;
         flex: 1;
       }
-      .vlist-title {
-        font-size: 16px;
-        font-weight: 700;
-        color: var(--text);
-      }
-      .vlist-ref {
-        font-size: 12px;
-        color: var(--text-muted);
-        margin-top: 2px;
-      }
-      .vlist-header-right {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        flex-shrink: 0;
-      }
       .vlist-breakdown {
         display: flex;
         gap: 6px;
@@ -482,17 +244,6 @@ type QuickFilterKey =
       }
       .vgroup-chevron.open {
         transform: rotate(180deg);
-      }
-      .vlist-body {
-        padding: 16px 22px 18px;
-        border-top: 1px solid var(--border);
-      }
-      .vd-section-label {
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--navy);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
       }
       .app-title-link {
         text-decoration: none;
@@ -899,77 +650,10 @@ export class ApplicationListComponent implements OnInit {
     });
   }
 
-  toggleExpandAll(): void {
-    if (this.allExpanded()) {
-      this.expandedIds.set(new Set());
-    } else {
-      this.expandedIds.set(
-        new Set(this.filteredGroups.map((g) => g.vacancyId)),
-      );
-    }
-  }
-
   nextOptions(status: string) {
     return getValidNextStatuses(status);
   }
   label(s: string): string {
     return sharedStatusLabel(s);
-  }
-  statusClass(s: string): string {
-    return sharedStatusClass(s);
-  }
-  formatDate(d: string): string {
-    return new Date(d).toLocaleDateString('en-ZA', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  }
-
-  openReview(a: ApplicationResponse, vacancyId: number): void {
-    if (a.status === 'Applied') {
-      this.appService
-        .updateStatus(a.applicationId, { newStatus: 'UnderReview' })
-        .subscribe({
-          next: (updated) => {
-            this.rawGroups.update((groups) =>
-              groups.map((g) => ({
-                ...g,
-                applications: g.applications.map((x) =>
-                  x.applicationId === updated.applicationId ? updated : x,
-                ),
-              })),
-            );
-            this.router.navigate(['/applications/review', a.applicationId], {
-              queryParams: { vacancyId },
-            });
-          },
-          error: (err: Error) => this.toast.show(err.message, 'error'),
-        });
-    } else {
-      this.router.navigate(['/applications/review', a.applicationId], {
-        queryParams: { vacancyId },
-      });
-    }
-  }
-  openPreScreeningReview(a: ApplicationResponse): void {
-    this.router.navigate(['/admin/applications', a.applicationId]);
-  }
-  openOfferLetter(a: ApplicationResponse): void {
-    this.router.navigate(['/admin/applications', a.applicationId, 'offer']);
-  }
-  scheduleInterview(
-    a: ApplicationResponse,
-    vacancyId: number,
-    interviewId?: number,
-  ): void {
-    const queryParams: any = { vacancyId };
-    if (interviewId) {
-      queryParams.interviewId = interviewId; // Add when rescheduling
-    }
-    this.router.navigate(
-      ['/applications', a.applicationId, 'schedule-interview'],
-      { queryParams },
-    );
   }
 }

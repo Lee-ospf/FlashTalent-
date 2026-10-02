@@ -61,9 +61,17 @@ interface InterviewSubState {
           </div>
           <div style="display:flex;align-items:center;gap:10px">
             @if (vacancy()!.status === 'Published') {
-              <button class="btn-primary" (click)="rankCandidates()" [disabled]="ranking() || !appliedCount()">
+              <button
+                class="btn-primary"
+                (click)="rankCandidates()"
+                [disabled]="ranking() || !appliedCount()"
+              >
                 @if (ranking()) {
-                  <mat-spinner diameter="14" style="display:inline-block;margin-right:6px"></mat-spinner> Ranking…
+                  <mat-spinner
+                    diameter="14"
+                    style="display:inline-block;margin-right:6px"
+                  ></mat-spinner>
+                  Ranking…
                 } @else {
                   <i class="ti ti-sparkles"></i> Rank new applicants
                 }
@@ -81,7 +89,12 @@ interface InterviewSubState {
 
         @if (rankedMatches().size > 0) {
           <p class="form-note" style="margin-bottom:12px">
-            <i class="ti ti-sparkles"></i> Applied candidates sorted by AI fit score{{ lastRankedAt() ? ' — ranked ' + formatDateTime(lastRankedAt()!) : '' }}.
+            <i class="ti ti-sparkles"></i> Applied candidates sorted by AI fit
+            score{{
+              lastRankedAt()
+                ? ' — ranked ' + formatDateTime(lastRankedAt()!)
+                : ''
+            }}.
           </p>
         }
 
@@ -129,18 +142,34 @@ interface InterviewSubState {
               </thead>
               <tbody>
                 @for (a of filteredApplications(); track a.applicationId) {
-                  <tr class="vp-row" (click)="openHistory(a)">
-                    <td class="vp-name">{{ a.candidateName }}</td>
+                  <tr class="vp-row">
+                    <td class="vp-name">
+                      <a
+                        class="app-title app-title-link"
+                        [href]="
+                          '/admin/applications/' +
+                          a.applicationId +
+                          '/candidate'
+                        "
+                        (click)="$event.stopPropagation()"
+                      >
+                        {{ a.candidateName }}
+                      </a>
+                    </td>
                     @if (rankedMatches().size > 0) {
                       <td (click)="$event.stopPropagation()">
                         @if (rankedMatches().get(a.candidateId); as m) {
-                          <span class="vp-fit-badge" [title]="m.reasoning">{{ m.score }}</span>
+                          <span class="vp-fit-badge" [title]="m.reasoning">{{
+                            m.score
+                          }}</span>
                         } @else {
                           <span class="vp-muted">—</span>
                         }
                       </td>
                     }
-                    <td class="vp-muted">{{ formatDate(a.appliedAt) }}</td>
+                    <td class="vp-muted" (click)="openHistory(a)">
+                      {{ formatDate(a.appliedAt) }}
+                    </td>
                     <td>
                       <span class="status-pill s-{{ statusClass(a.status) }}">{{
                         statusLabel(a)
@@ -193,10 +222,13 @@ interface InterviewSubState {
                               submission
                             </button>
                           } @else {
-                            <span class="form-note"
-                              ><i class="ti ti-hourglass"></i> Waiting for
-                              pre-screening form from candidate</span
+                            <button
+                              class="btn-primary vp-action-btn"
+                              (click)="openPreScreeningReview(a)"
                             >
+                              <i class="ti ti-clipboard-check"></i> View
+                              pre-screening form
+                            </button>
                           }
                         }
                         @case ('InterviewStage') {
@@ -216,10 +248,13 @@ interface InterviewSubState {
                           }
                         }
                         @case ('OfferExtended') {
-                          <span class="form-note"
-                            ><i class="ti ti-mail"></i>
-                            {{ offerDetail(a) }}</span
+                          <button
+                            class="btn-primary vp-action-btn"
+                            (click)="openOfferLetter(a)"
                           >
+                            <i class="ti ti-clipboard-check"></i> View Offer
+                            Details
+                          </button>
                         }
                         @default {
                           <span class="form-note"
@@ -356,6 +391,11 @@ interface InterviewSubState {
         font-size: 12px;
         cursor: help;
       }
+      .btn-primary.vp-action-btn {
+        
+        width: 200px;
+        justify-content: center;
+      }
     </style>
   `,
 })
@@ -390,7 +430,9 @@ export class VacancyApplicationsComponent implements OnInit {
   rankedMatches = signal<Map<number, AiTalentPoolMatchResponse>>(new Map()); // keyed by candidateId
   lastRankedAt = signal<string | null>(null);
 
-  appliedCount = computed(() => this.applications().filter(a => a.status === 'Applied').length);
+  appliedCount = computed(
+    () => this.applications().filter((a) => a.status === 'Applied').length,
+  );
 
   ngOnInit(): void {
     this.vacancyId = Number(this.route.snapshot.paramMap.get('id'));
@@ -430,9 +472,9 @@ export class VacancyApplicationsComponent implements OnInit {
   // this page later still shows the last ranked batch and re-sorts by it.
   private loadExistingRanking(): void {
     this.matchingService.getMatches(this.vacancyId, 'FullRanking').subscribe({
-      next: matches => {
+      next: (matches) => {
         if (!matches.length) return;
-        const map = new Map(matches.map(m => [m.candidateId, m]));
+        const map = new Map(matches.map((m) => [m.candidateId, m]));
         this.rankedMatches.set(map);
         this.lastRankedAt.set(matches[0]?.computedAt ?? null);
         this.resortByRanking();
@@ -445,8 +487,8 @@ export class VacancyApplicationsComponent implements OnInit {
     if (this.ranking()) return;
     this.ranking.set(true);
     this.matchingService.rankApplicants(this.vacancyId).subscribe({
-      next: result => {
-        const map = new Map(result.matches.map(m => [m.candidateId, m]));
+      next: (result) => {
+        const map = new Map(result.matches.map((m) => [m.candidateId, m]));
         this.rankedMatches.set(map);
         this.lastRankedAt.set(result.rankedAt);
         this.resortByRanking();
@@ -458,7 +500,10 @@ export class VacancyApplicationsComponent implements OnInit {
           result.matches.length ? 'success' : 'warn',
         );
       },
-      error: (err: Error) => { this.ranking.set(false); this.toast.show(err.message, 'error'); },
+      error: (err: Error) => {
+        this.ranking.set(false);
+        this.toast.show(err.message, 'error');
+      },
     });
   }
 
@@ -467,7 +512,7 @@ export class VacancyApplicationsComponent implements OnInit {
   // ranked) sink to the bottom rather than being hidden.
   private resortByRanking(): void {
     const map = this.rankedMatches();
-    this.applications.update(list =>
+    this.applications.update((list) =>
       [...list].sort((a, b) => {
         const scoreA = map.get(a.candidateId)?.score ?? -1;
         const scoreB = map.get(b.candidateId)?.score ?? -1;
@@ -686,5 +731,10 @@ export class VacancyApplicationsComponent implements OnInit {
       ['/applications', a.applicationId, 'schedule-interview'],
       { queryParams: { vacancyId: this.vacancyId } },
     );
+  }
+  openOfferLetter(a: ApplicationResponse): void {
+    this.router.navigate(['/admin/applications', a.applicationId, 'offer'], {
+      queryParams: { vacancyId: this.vacancyId },
+    });
   }
 }
