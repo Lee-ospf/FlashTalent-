@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TalentHub.Data;
 
@@ -11,9 +12,11 @@ using TalentHub.Data;
 namespace TalentHub.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260928113126_AddGoogleCalendarConnectionsTable")]
+    partial class AddGoogleCalendarConnectionsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -156,8 +159,27 @@ namespace TalentHub.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CandidateId"));
 
+                    b.Property<DateTime?>("DateOfBirth")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Gender")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<DateTime>("LastProfileUpdateAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Nationality")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Race")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime>("RegisteredAt")
                         .HasColumnType("datetime2");
@@ -393,8 +415,12 @@ namespace TalentHub.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("DepartmentId")
-                        .HasColumnType("int");
+                    b.Property<DateTime?>("DateOfBirth")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("EmployeeNumber")
                         .HasMaxLength(20)
@@ -404,16 +430,25 @@ namespace TalentHub.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<string>("ExternalEmployeeId")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTime?>("HireDate")
-                        .HasColumnType("datetime2");
+                    b.Property<string>("Gender")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("JobTitle")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Nationality")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Race")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<int?>("SourceApplicationId")
                         .HasColumnType("int");
@@ -428,140 +463,12 @@ namespace TalentHub.Migrations
 
                     b.HasKey("EmployeeId");
 
-                    b.HasIndex("DepartmentId");
-
-                    b.HasIndex("ExternalEmployeeId")
-                        .IsUnique()
-                        .HasFilter("[ExternalEmployeeId] IS NOT NULL");
-
-                    b.HasIndex("SourceApplicationId")
-                        .IsUnique()
-                        .HasFilter("[SourceApplicationId] IS NOT NULL");
+                    b.HasIndex("SourceApplicationId");
 
                     b.HasIndex("UserId")
                         .IsUnique();
 
                     b.ToTable("Employees");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.EmployeeExperience", b =>
-                {
-                    b.Property<int>("EmployeeExperienceId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EmployeeExperienceId"));
-
-                    b.Property<string>("Company")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("EmployeeId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("EndDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ProjectsAndDuties")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("EmployeeExperienceId");
-
-                    b.HasIndex("EmployeeId");
-
-                    b.ToTable("EmployeeExperiences");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.EmployeeQualification", b =>
-                {
-                    b.Property<int>("EmployeeQualificationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EmployeeQualificationId"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("EmployeeId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("ExpiryDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Institution")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("QualificationType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("YearCompleted")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("EmployeeQualificationId");
-
-                    b.HasIndex("EmployeeId");
-
-                    b.ToTable("EmployeeQualifications");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.EmployeeSkill", b =>
-                {
-                    b.Property<int>("EmployeeSkillId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EmployeeSkillId"));
-
-                    b.Property<DateTime>("AddedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("EmployeeId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ProficiencyLevel")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<int>("SkillId")
-                        .HasColumnType("int");
-
-                    b.HasKey("EmployeeSkillId");
-
-                    b.HasIndex("SkillId");
-
-                    b.HasIndex("EmployeeId", "SkillId")
-                        .IsUnique();
-
-                    b.ToTable("EmployeeSkills");
                 });
 
             modelBuilder.Entity("TalentHub.Models.GoogleCalendarConnection", b =>
@@ -1311,9 +1218,6 @@ namespace TalentHub.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime?>("DateOfBirth")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -1323,10 +1227,6 @@ namespace TalentHub.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Gender")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -1339,25 +1239,9 @@ namespace TalentHub.Migrations
                     b.Property<bool>("MustChangePassword")
                         .HasColumnType("bit");
 
-                    b.Property<string>("Nationality")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PersonalEmail")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("Race")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -1705,11 +1589,6 @@ namespace TalentHub.Migrations
 
             modelBuilder.Entity("TalentHub.Models.Employee", b =>
                 {
-                    b.HasOne("TalentHub.Models.Department", "Department")
-                        .WithMany()
-                        .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("TalentHub.Models.Application", "SourceApplication")
                         .WithMany()
                         .HasForeignKey("SourceApplicationId")
@@ -1721,52 +1600,9 @@ namespace TalentHub.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Department");
-
                     b.Navigation("SourceApplication");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.EmployeeExperience", b =>
-                {
-                    b.HasOne("TalentHub.Models.Employee", "Employee")
-                        .WithMany("Experiences")
-                        .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Employee");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.EmployeeQualification", b =>
-                {
-                    b.HasOne("TalentHub.Models.Employee", "Employee")
-                        .WithMany("Qualifications")
-                        .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Employee");
-                });
-
-            modelBuilder.Entity("TalentHub.Models.EmployeeSkill", b =>
-                {
-                    b.HasOne("TalentHub.Models.Employee", "Employee")
-                        .WithMany("EmployeeSkills")
-                        .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TalentHub.Models.Skill", "Skill")
-                        .WithMany("EmployeeSkills")
-                        .HasForeignKey("SkillId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Employee");
-
-                    b.Navigation("Skill");
                 });
 
             modelBuilder.Entity("TalentHub.Models.GoogleCalendarConnection", b =>
@@ -2039,15 +1875,6 @@ namespace TalentHub.Migrations
                     b.Navigation("Vacancies");
                 });
 
-            modelBuilder.Entity("TalentHub.Models.Employee", b =>
-                {
-                    b.Navigation("EmployeeSkills");
-
-                    b.Navigation("Experiences");
-
-                    b.Navigation("Qualifications");
-                });
-
             modelBuilder.Entity("TalentHub.Models.Interview", b =>
                 {
                     b.Navigation("RescheduleHistory");
@@ -2061,8 +1888,6 @@ namespace TalentHub.Migrations
             modelBuilder.Entity("TalentHub.Models.Skill", b =>
                 {
                     b.Navigation("CandidateSkills");
-
-                    b.Navigation("EmployeeSkills");
                 });
 
             modelBuilder.Entity("TalentHub.Models.User", b =>

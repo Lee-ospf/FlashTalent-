@@ -38,6 +38,9 @@ namespace TalentHub.Data
         public DbSet<NotificationTemplate> NotificationTemplates => Set<NotificationTemplate>();
         public DbSet<UserNotificationPreference> UserNotificationPreferences => Set<UserNotificationPreference>();
         public DbSet<GoogleCalendarConnection> GoogleCalendarConnections => Set<GoogleCalendarConnection>();
+        public DbSet<EmployeeSkill> EmployeeSkills => Set<EmployeeSkill>();
+        public DbSet<EmployeeQualification> EmployeeQualifications => Set<EmployeeQualification>();
+        public DbSet<EmployeeExperience> EmployeeExperiences => Set<EmployeeExperience>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -295,6 +298,66 @@ namespace TalentHub.Data
             modelBuilder.Entity<OfferLetter>()
                 .HasIndex(o => new { o.ApplicationId, o.VersionNumber })
                 .IsUnique();
+
+            // ---------- Employee: onboarding-system link ----------
+            // On SQL Server, unique indexes on nullable columns are automatically
+            // filtered (WHERE col IS NOT NULL), so employees without these values are allowed.
+            modelBuilder.Entity<Employee>()
+                .HasIndex(e => e.ExternalEmployeeId)
+                .IsUnique();
+
+            modelBuilder.Entity<Employee>()
+                .HasIndex(e => e.SourceApplicationId)
+                .IsUnique();
+
+            modelBuilder.Entity<Employee>()
+                .HasOne(e => e.Department)
+                .WithMany()
+                .HasForeignKey(e => e.DepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // ---------- EmployeeSkill (shared Skills table) ----------
+            modelBuilder.Entity<EmployeeSkill>()
+                .Property(es => es.ProficiencyLevel)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            modelBuilder.Entity<EmployeeSkill>()
+                .HasOne(es => es.Employee)
+                .WithMany(e => e.EmployeeSkills)
+                .HasForeignKey(es => es.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<EmployeeSkill>()
+                .HasOne(es => es.Skill)
+                .WithMany(s => s.EmployeeSkills)
+                .HasForeignKey(es => es.SkillId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // An employee can't have the same skill listed twice
+            modelBuilder.Entity<EmployeeSkill>()
+                .HasIndex(es => new { es.EmployeeId, es.SkillId })
+                .IsUnique();
+
+            // ---------- EmployeeQualification ----------
+            modelBuilder.Entity<EmployeeQualification>()
+                .HasOne(q => q.Employee)
+                .WithMany(e => e.Qualifications)
+                .HasForeignKey(q => q.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<EmployeeQualification>()
+                .Property(q => q.QualificationType)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            // ---------- EmployeeExperience ----------
+            modelBuilder.Entity<EmployeeExperience>()
+                .HasOne(x => x.Employee)
+                .WithMany(e => e.Experiences)
+                .HasForeignKey(x => x.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             // convert all enums to strings in the database for readability
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {
@@ -332,8 +395,8 @@ namespace TalentHub.Data
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<NotificationTemplate>()
-    .HasIndex(t => new { t.NotificationType, t.Channel })
-    .IsUnique();
+                  .HasIndex(t => new { t.NotificationType, t.Channel })
+                  .IsUnique();
 
             modelBuilder.Entity<NotificationTemplate>().HasData(
     new NotificationTemplate { NotificationTemplateId = 1, NotificationType = NotificationType.InterviewScheduled, Channel = NotificationChannel.Email, Subject = "Interview scheduled", BodyTemplate = "An interview (Round {{RoundNumber}}) has been scheduled for {{ScheduledAt}} regarding your application to {{VacancyTitle}}.", IsActive = true },

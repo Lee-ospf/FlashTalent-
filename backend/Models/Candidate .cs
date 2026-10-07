@@ -1,6 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace TalentHub.Models
 {
@@ -16,23 +15,7 @@ namespace TalentHub.Models
 
         public User? User { get; set; }
 
-        [MaxLength(20)]
-        public string? Phone { get; set; }
-
-        [MaxLength(20)]
-        public string? Gender { get; set; }
-
-        [MaxLength(50)]
-        public string? Race { get; set; }
-
-        [MaxLength(50)]
-        public string? Nationality { get; set; }
-
-
-        public DateTime? DateOfBirth { get; set; }
-
-
-
+        // Phone, Gender, Race, Nationality and DateOfBirth now live on User.
 
         public DateTime RegisteredAt { get; set; } = DateTime.UtcNow;
         public DateTime LastProfileUpdateAt { get; set; } = DateTime.UtcNow;

@@ -28,5 +28,6 @@ namespace TalentHub.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<CandidateSkill> CandidateSkills { get; set; } = new List<CandidateSkill>();
+        public ICollection<EmployeeSkill> EmployeeSkills { get; set; } = new List<EmployeeSkill>();
     }
 }

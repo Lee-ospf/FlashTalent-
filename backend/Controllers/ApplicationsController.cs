@@ -358,7 +358,7 @@ namespace TalentHub.Controllers
                     FirstName = user.FirstName,
                     LastName = user.LastName,
                     Email = user.Email,
-                    Phone = c.Phone,
+                    Phone = user.Phone,
                     CvUrl = cvUrl,
                     Skills = c.CandidateSkills
                         .Where(cs => cs.Skill != null)

@@ -40,7 +40,7 @@ namespace TalentHub.Services
 
                 var expired = await db.Vacancies
                     .Where(v =>
-                        v.Status == VacancyStatus.Published &&
+                       ( v.Status == VacancyStatus.Published || v.Status == VacancyStatus.TalentPoolOnly) && 
                         v.ClosingDate.HasValue &&
                         v.ClosingDate.Value < DateTime.UtcNow)
                     .ToListAsync();

@@ -26,7 +26,7 @@ namespace TalentHub.Controllers
                 return Ok(new { suggestions = new List<object>() });
 
             var apiKey = _config["GoogleMaps:ApiKey"];
-            var client = _httpClientFactory.CreateClient();
+            var client = _httpClientFactory.CreateClient(); 
 
             var requestBody = new
             {

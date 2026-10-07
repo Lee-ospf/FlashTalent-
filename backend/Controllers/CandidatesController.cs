@@ -17,7 +17,6 @@ namespace TalentHub.Controllers
         }
 
         // POST api/candidates
-        // Creates a Candidate profile linked to the LOGGED-IN user (never trusts a UserId from the body).
         [Authorize(Roles = "Candidate")]
         [HttpPost]
         public async Task<ActionResult<CandidateResponse>> Create(CreateCandidateRequest request)
@@ -35,30 +34,18 @@ namespace TalentHub.Controllers
             {
                 return Conflict(new { message = "This user already has a candidate profile." });
             }
-            if (request.DateOfBirth > DateTime.UtcNow)
-            {
-                return BadRequest(new { message = "Date of Birth cannot be in the future." });
-            }
 
-            var age = DateTime.UtcNow.Year - request.DateOfBirth.Year;
-            if (request.DateOfBirth.Date > DateTime.UtcNow.AddYears(-age).Date) age--;
-
-            if (age < 18)
-            {
-                return BadRequest(new { message = "Candidates must be at least 18 years old to register." });
-            }
+            var dobError = ValidateDateOfBirth(request.DateOfBirth);
+            if (dobError != null) return BadRequest(new { message = dobError });
 
             var now = DateTime.UtcNow;
+
+            ApplyPersonalDetails(user, request.Phone, request.Gender, request.Race,
+                request.Nationality, request.DateOfBirth);
+
             var candidate = new Candidate
             {
                 UserId = userId,
-                Phone = request.Phone,
-                Gender = request.Gender,
-                Race = request.Race,
-                Nationality = request.Nationality,
-
-                DateOfBirth = request.DateOfBirth,
-
                 RegisteredAt = now,
                 LastProfileUpdateAt = now
             };
@@ -146,34 +133,48 @@ namespace TalentHub.Controllers
 
             if (!await IsOwnerOrAdmin(id)) return Forbid();
 
-            if (request.DateOfBirth > DateTime.UtcNow)
-            {
-                return BadRequest(new { message = "Date of Birth cannot be in the future." });
-            }
+            var dobError = ValidateDateOfBirth(request.DateOfBirth);
+            if (dobError != null) return BadRequest(new { message = dobError });
 
-            var age = DateTime.UtcNow.Year - request.DateOfBirth.Year;
-            if (request.DateOfBirth.Date > DateTime.UtcNow.AddYears(-age).Date) age--;
+            ApplyPersonalDetails(candidate.User, request.Phone, request.Gender, request.Race,
+                request.Nationality, request.DateOfBirth);
 
-            if (age < 18)
-            {
-                return BadRequest(new { message = "Candidates must be at least 18 years old to register." });
-            }
-
-
-            candidate.Phone = request.Phone;
-            candidate.Gender = request.Gender;
-            candidate.Race = request.Race;
-            candidate.Nationality = request.Nationality;
-
-            candidate.DateOfBirth = request.DateOfBirth;
-
-            
             candidate.LastProfileUpdateAt = DateTime.UtcNow;
 
             await Db.SaveChangesAsync();
 
             var docTypes = candidate.Documents.Select(d => d.DocumentType.ToString()).ToList();
             return Ok(MapToResponse(candidate, candidate.User, docTypes));
+        }
+
+        // Returns an error message, or null when the date of birth is valid.
+        private static string? ValidateDateOfBirth(DateTime dateOfBirth)
+        {
+            if (dateOfBirth > DateTime.UtcNow)
+            {
+                return "Date of Birth cannot be in the future.";
+            }
+
+            var age = DateTime.UtcNow.Year - dateOfBirth.Year;
+            if (dateOfBirth.Date > DateTime.UtcNow.AddYears(-age).Date) age--;
+
+            if (age < 18)
+            {
+                return "Candidates must be at least 18 years old to register.";
+            }
+
+            return null;
+        }
+
+        private static void ApplyPersonalDetails(User user, string? phone, string? gender,
+            string? race, string? nationality, DateTime dateOfBirth)
+        {
+            user.Phone = phone;
+            user.Gender = gender;
+            user.Race = race;
+            user.Nationality = nationality;
+            user.DateOfBirth = dateOfBirth;
+            user.UpdatedAt = DateTime.UtcNow;
         }
 
         private static CandidateResponse MapToResponse(Candidate c, User u, List<string> documentTypes)
@@ -185,13 +186,11 @@ namespace TalentHub.Controllers
                 FirstName = u.FirstName,
                 LastName = u.LastName,
                 Email = u.Email,
-                Phone = c.Phone,
-                Gender = c.Gender,
-                Race = c.Race,
-                Nationality = c.Nationality,
-
-                DateOfBirth = c.DateOfBirth,
-
+                Phone = u.Phone,
+                Gender = u.Gender,
+                Race = u.Race,
+                Nationality = u.Nationality,
+                DateOfBirth = u.DateOfBirth,
                 RegisteredAt = c.RegisteredAt,
                 UploadedDocumentTypes = documentTypes
             };

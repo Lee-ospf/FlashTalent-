@@ -15,11 +15,17 @@ namespace TalentHub.Controllers
     {
         private readonly IOfferLetterService _offerService;
         private readonly INotificationService _notificationService;
+        private readonly IApplicationStatusRules _statusRules;
 
-        public OffersController(AppDbContext db, IOfferLetterService offerService, INotificationService notificationService) : base(db)
+        public OffersController(
+            AppDbContext db,
+            IOfferLetterService offerService,
+            INotificationService notificationService,
+            IApplicationStatusRules statusRules) : base(db)
         {
             _offerService = offerService;
             _notificationService = notificationService;
+            _statusRules = statusRules;
         }
 
         // POST api/offers/template
@@ -270,8 +276,25 @@ namespace TalentHub.Controllers
                 return BadRequest(new { message = "Response must be 'Accepted' or 'Declined'." });
             }
 
+            // Accepting only makes sense while the application is still at OfferExtended
+            
+            if (response == OfferLetterStatus.Accepted &&
+                offer.Application.Status != ApplicationStatus.OfferExtended)
+            {
+                return Conflict(new
+                {
+                    message = $"This offer can no longer be accepted - the application is '{offer.Application.Status}'."
+                });
+            }
+
             offer.Status = response;
             offer.RespondedAt = DateTime.UtcNow;
+
+            // Accepted -> Hired, through the shared status rules so the history row is written.
+            if (response == OfferLetterStatus.Accepted)
+            {
+                await _statusRules.TransitionAsync(offer.Application, ApplicationStatus.Hired, CurrentUserId);
+            }
 
             var notifications = await _notificationService.Build(new NotificationRequest
             {

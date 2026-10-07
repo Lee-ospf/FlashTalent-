@@ -34,7 +34,9 @@ var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSection["Key"] ?? throw new InvalidOperationException("Jwt:Key is missing in appsettings.json");
 
 builder.Services.AddSingleton<ISendGridClient>(new SendGridClient(builder.Configuration["SendGrid:ApiKey"]));
-builder.Services.AddScoped<INotificationEmailSender, SendGridEmailSender>(); 
+builder.Services.AddScoped<INotificationEmailSender, SendGridEmailSender>();
+builder.Services.AddScoped<IEmployeeProfileCopyService, EmployeeProfileCopyService>();
+builder.Services.AddScoped<IEmployeeOnboardingService, EmployeeOnboardingService>();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
