@@ -8,6 +8,7 @@ import {
   OnDestroy,
   signal,
 } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { Router, NavigationEnd, RouterModule } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -178,9 +179,10 @@ export class TopbarComponent implements OnInit, OnDestroy {
   pageTitle = 'Dashboard';
   unreadCount = signal(0);
   private pollHandle?: ReturnType<typeof setInterval>;
+  private navSub?: Subscription;
 
   constructor() {
-    this.router.events
+    this.navSub = this.router.events
       .pipe(
         filter((e) => e instanceof NavigationEnd),
         map((e: any) => ROUTE_TITLES[e.urlAfterRedirects] ?? 'FlashTalent'),
@@ -195,14 +197,16 @@ export class TopbarComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.refreshUnreadCount();
-    this.pollHandle = setInterval(() => this.refreshUnreadCount(), 30_000);
+    this.pollHandle = setInterval(() => this.refreshUnreadCount(), 3_000);
   }
 
   ngOnDestroy(): void {
     if (this.pollHandle) clearInterval(this.pollHandle);
+    this.navSub?.unsubscribe();
   }
 
   private refreshUnreadCount(): void {
+    if (!this.auth.isLoggedIn()) return;
     this.notificationService.getUnreadCount().subscribe({
       next: (r) => this.unreadCount.set(r.unreadCount),
       error: () => {}, // non-critical, silently ignore

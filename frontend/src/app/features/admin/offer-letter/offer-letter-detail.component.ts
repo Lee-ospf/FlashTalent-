@@ -40,7 +40,7 @@ import { DatePickerTriggerDirective } from '../../../shared/directives/date-pick
     <div class="page-container ol-page">
       <div class="ol-top-bar">
         <a (click)="goBack()" class="back-link">
-          <i class="ti ti-arrow-left"></i> Back to application
+          <i class="ti ti-arrow-left"></i> Back
         </a>
         @if (application(); as topApp) {
           <a class="btn-secondary doc-view-btn ol-top-btn"
@@ -59,24 +59,24 @@ import { DatePickerTriggerDirective } from '../../../shared/directives/date-pick
       } @else {
         @if (application(); as app) {
 
-        <mat-card class="mat-elevation-z1 ol-card">
-          <mat-card-content style="padding:28px 32px">
-            <!-- Header - styled to match the Manage Vacancy detail page -->
-            <div class="vd-header">
-              <div class="ol-header-info">
-                <div class="ol-avatar">{{ initials(app.candidateName) }}</div>
-                <div>
-                  <div class="vd-title">Offer letter</div>
+          <mat-card class="mat-elevation-z1 ol-card">
+            <mat-card-content style="padding:28px 32px">
+              <!-- Header - styled to match the Manage Vacancy detail page -->
+              <div class="vd-header">
+                <div class="ol-header-info">
+                  <div class="ol-avatar">{{ initials(app.candidateName) }}</div>
+                  <div>
+                    <div class="vd-title">Offer letter</div>
                   <div class="vd-ref">{{ app.candidateName }} · {{ app.vacancyTitle }}</div>
+                  </div>
                 </div>
-              </div>
-              @if (offer(); as o) {
+                @if (offer(); as o) {
                 <span class="pill" [class.pill-pub]="o.status === 'Sent' || o.status === 'Accepted'"
                       [class.pill-type]="o.status === 'Declined'">
-                  {{ o.status }} · v{{ o.versionNumber }}
-                </span>
-              }
-            </div>
+                    {{ o.status }} · v{{ o.versionNumber }}
+                  </span>
+                }
+              </div>
 
               <mat-divider style="margin:18px 0"></mat-divider>
 
@@ -309,15 +309,15 @@ import { DatePickerTriggerDirective } from '../../../shared/directives/date-pick
                   </p>
                 }
 
-              <div class="assess-footer">
+                <div class="assess-footer">
                 <button class="btn-secondary doc-view-btn" (click)="openPreview()"><i class="ti ti-eye"></i> View letter</button>
                 <button class="btn-secondary doc-view-btn" (click)="downloadOffer()"><i class="ti ti-download"></i> Download letter</button>
-              </div>
-            }
-          </mat-card-content>
-        </mat-card>
+                </div>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
       }
-    }
     </div>
 
     @if (previewOpen()) {
@@ -558,7 +558,7 @@ export class OfferLetterDetailComponent implements OnInit {
   generateError = signal<string | null>(null);
 
   previewOpen = signal(false);
- 
+
   openPreview(): void {
     this.previewOpen.set(true);
   }
@@ -696,7 +696,7 @@ export class OfferLetterDetailComponent implements OnInit {
     const o = this.offer();
     if (o) this.offerLetter.downloadLetter(o);
   }
-   goBack(): void {
+  goBack(): void {
     this.location.back();
   }
 

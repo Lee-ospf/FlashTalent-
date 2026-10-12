@@ -1,11 +1,13 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { environment } from '../../../../environments/environment';
 import { ApplicationService } from '../../../core/services/application.service';
 import { VacancyAdminService } from '../../../core/services/vacancy-admin.service';
 import { PrescreeningService } from '../../../core/services/prescreening.service';
@@ -25,15 +27,59 @@ import {
 } from '../../../core/utils/application-status';
 
 const MAX_INTERVIEW_ROUNDS = 5;
-type TabKey = 'all' | 'review' | 'prescreen' | 'interview' | 'offer';
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+type TabKey = 'all' | 'review' | 'prescreen' | 'interview' | 'offer' | 'hired';
 interface InterviewSubState {
   label: string;
   detail: string;
 }
 
+interface OnboardingCompleteResponse {
+  employeeId: number;
+  userId: number;
+  loginEmail: string;
+  personalEmail?: string | null;
+  role: string;
+  mustChangePassword: boolean;
+  alreadyOnboarded: boolean;
+  message: string;
+  profileCopied?: {
+    skills: number;
+    qualifications: number;
+    experiences: number;
+  } | null;
+}
+interface DepartmentOption {
+  id: number;
+  name: string;
+}
+// GET api/employees/awaiting-onboarding: Hired applications with no Employee yet
+interface AwaitingOnboardingItem {
+  applicationId: number;
+  candidateId: number;
+  candidateName: string;
+  email: string;
+  vacancyTitle: string;
+  hiredAt?: string | null;
+}
+type OnboardField =
+  | 'externalEmployeeId'
+  | 'hireDate'
+  | 'jobTitle'
+  | 'departmentId'
+  | 'workEmail';
+
+// Lets the page read employeeId before it is added to the shared
+// ApplicationResponse model (the backend must return it - see notes).
+type ApplicationWithEmployee = ApplicationResponse & {
+  employeeId?: number | null;
+};
+
 @Component({
   selector: 'app-vacancy-applications',
   standalone: true,
+  host: { '(document:keydown.escape)': 'closeOnboardModal()' },
   imports: [
     CommonModule,
     FormsModule,
@@ -43,7 +89,7 @@ interface InterviewSubState {
   template: `
     <div class="page-container">
       <a (click)="goBack()" class="back-link" style="cursor:pointer">
-        <i class="ti ti-arrow-left"></i> Back to Applications
+        <i class="ti ti-arrow-left"></i> Back
       </a>
 
       @if (loading()) {
@@ -256,6 +302,30 @@ interface InterviewSubState {
                             Details
                           </button>
                         }
+                        @case ('Hired') {
+                          @if (
+                            employeeIdByApp().get(a.applicationId);
+                            as empId
+                          ) {
+                            <button
+                              class="btn-primary vp-action-btn"
+                              (click)="openEmployee(empId)"
+                            >
+                              <i class="ti ti-user-check"></i> View employee
+                            </button>
+                          } @else if (isOnboarded(a)) {
+                            <span class="form-note"
+                              ><i class="ti ti-user-check"></i> Onboarded</span
+                            >
+                          } @else {
+                            <button
+                              class="btn-primary vp-action-btn"
+                              (click)="openOnboardModal(a)"
+                            >
+                              <i class="ti ti-user-plus"></i> Mark as onboarded
+                            </button>
+                          }
+                        }
                         @default {
                           <span class="form-note"
                             ><i class="ti ti-lock"></i> Final stage</span
@@ -271,6 +341,150 @@ interface InterviewSubState {
         }
       }
     </div>
+
+    @if (onboardTarget(); as target) {
+      <div class="mo-backdrop" (click)="closeOnboardModal()">
+        <div
+          class="mo-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mo-title"
+          (click)="$event.stopPropagation()"
+        >
+          <div class="mo-head">
+            <div>
+              <div class="mo-title" id="mo-title">Mark as onboarded</div>
+              <div class="mo-sub">{{ target.candidateName }}</div>
+            </div>
+            <button
+              class="mo-close"
+              type="button"
+              aria-label="Close"
+              (click)="closeOnboardModal()"
+            >
+              <i class="ti ti-x"></i>
+            </button>
+          </div>
+
+          @if (onboardError()) {
+            <div class="mo-error" role="alert">
+              <i class="ti ti-alert-circle"></i> {{ onboardError() }}
+            </div>
+          }
+
+          <form (ngSubmit)="submitOnboard()" novalidate>
+            <div class="mo-grid">
+              <div class="mo-field">
+                <label for="mo-empno">Employee number *</label>
+                <input
+                  id="mo-empno"
+                  name="externalEmployeeId"
+                  type="text"
+                  maxlength="50"
+                  [(ngModel)]="onboardForm.externalEmployeeId"
+                />
+                @if (fieldError('externalEmployeeId'); as err) {
+                  <div class="mo-field-error">{{ err }}</div>
+                }
+              </div>
+
+              <div class="mo-field">
+                <label for="mo-start">Start date *</label>
+                <input
+                  id="mo-start"
+                  name="hireDate"
+                  type="date"
+                  [(ngModel)]="onboardForm.hireDate"
+                />
+                @if (fieldError('hireDate'); as err) {
+                  <div class="mo-field-error">{{ err }}</div>
+                }
+              </div>
+
+              <div class="mo-field">
+                <label for="mo-title-input">Job title *</label>
+                <input
+                  id="mo-title-input"
+                  name="jobTitle"
+                  type="text"
+                  maxlength="100"
+                  [(ngModel)]="onboardForm.jobTitle"
+                />
+                <div class="mo-hint">Pre-filled from the vacancy</div>
+                @if (fieldError('jobTitle'); as err) {
+                  <div class="mo-field-error">{{ err }}</div>
+                }
+              </div>
+
+              <div class="mo-field">
+                <label for="mo-dept">Department *</label>
+                <select
+                  id="mo-dept"
+                  name="departmentId"
+                  [(ngModel)]="onboardForm.departmentId"
+                >
+                  <option [ngValue]="null" disabled>Select a department</option>
+                  @for (d of deptOptions(); track d.id) {
+                    <option [ngValue]="d.id">{{ d.name }}</option>
+                  }
+                </select>
+                @if (vacancy()?.departmentId) {
+                  <div class="mo-hint">Pre-filled from the vacancy</div>
+                }
+                @if (fieldError('departmentId'); as err) {
+                  <div class="mo-field-error">{{ err }}</div>
+                }
+              </div>
+
+              <div class="mo-field mo-span">
+                <label for="mo-email">Work email *</label>
+                <input
+                  id="mo-email"
+                  name="workEmail"
+                  type="email"
+                  maxlength="150"
+                  [(ngModel)]="onboardForm.workEmail"
+                />
+                <div class="mo-hint">
+                  This becomes their login. Their current email is kept as a
+                  personal email, and they must change their password at first
+                  sign-in.
+                </div>
+                @if (fieldError('workEmail'); as err) {
+                  <div class="mo-field-error">{{ err }}</div>
+                }
+              </div>
+            </div>
+
+            <div class="mo-actions">
+              <button
+                type="button"
+                class="mo-cancel"
+                (click)="closeOnboardModal()"
+                [disabled]="onboardSaving()"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                class="btn-primary"
+                [disabled]="onboardSaving()"
+              >
+                @if (onboardSaving()) {
+                  <mat-spinner
+                    diameter="14"
+                    style="display:inline-block;margin-right:6px"
+                  ></mat-spinner>
+                  Saving…
+                } @else {
+                  Mark as onboarded
+                }
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    }
 
     <style>
       .back-link {
@@ -400,12 +614,130 @@ interface InterviewSubState {
         color: inherit;
         text-decoration: none;
       }
+
+      /* ── Mark as onboarded modal ── */
+      .mo-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+      .mo-dialog {
+        background: #fff;
+        border-radius: 14px;
+        width: min(560px, 100%);
+        max-height: 90vh;
+        overflow: auto;
+        padding: 20px 24px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+      }
+      .mo-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 14px;
+      }
+      .mo-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .mo-sub {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+      .mo-close {
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-size: 18px;
+        color: var(--text-muted);
+      }
+      .mo-error {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        background: #fdecea;
+        color: #b3261e;
+      }
+      .mo-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .mo-span {
+        grid-column: span 2;
+      }
+      .mo-field label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      .mo-field input,
+      .mo-field select {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 9px 10px;
+        font: inherit;
+        font-size: 13px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fff;
+      }
+      .mo-field input:focus,
+      .mo-field select:focus {
+        outline: 2px solid var(--navy);
+        outline-offset: 1px;
+      }
+      .mo-hint {
+        margin-top: 3px;
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+      .mo-field-error {
+        margin-top: 3px;
+        font-size: 12px;
+        color: #b3261e;
+      }
+      .mo-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 18px;
+      }
+      .mo-cancel {
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      @media (max-width: 520px) {
+        .mo-grid {
+          grid-template-columns: 1fr;
+        }
+        .mo-span {
+          grid-column: span 1;
+        }
+      }
     </style>
   `,
 })
 export class VacancyApplicationsComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private http = inject(HttpClient);
   private appService = inject(ApplicationService);
   private vacancyService = inject(VacancyAdminService);
   private prescreeningService = inject(PrescreeningService);
@@ -433,6 +765,21 @@ export class VacancyApplicationsComponent implements OnInit {
   ranking = signal(false);
   rankedMatches = signal<Map<number, AiTalentPoolMatchResponse>>(new Map()); // keyed by candidateId
   lastRankedAt = signal<string | null>(null);
+
+  employeeIdByApp = signal<Map<number, number>>(new Map());
+  awaitingIds = signal<Set<number> | null>(null);
+  onboardTarget = signal<ApplicationResponse | null>(null);
+  onboardSaving = signal(false);
+  onboardError = signal<string | null>(null);
+  onboardSubmitted = signal(false);
+  departments = signal<DepartmentOption[]>([]);
+  onboardForm = {
+    externalEmployeeId: '',
+    hireDate: '',
+    jobTitle: '',
+    departmentId: null as number | null,
+    workEmail: '',
+  };
 
   appliedCount = computed(
     () => this.applications().filter((a) => a.status === 'Applied').length,
@@ -463,6 +810,8 @@ export class VacancyApplicationsComponent implements OnInit {
           ),
         );
         this.loading.set(false);
+        this.seedEmployeeIds(apps);
+        this.loadOnboardingState(apps);
         this.enrich(apps);
       },
       error: (err: Error) => {
@@ -470,6 +819,37 @@ export class VacancyApplicationsComponent implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  private seedEmployeeIds(apps: ApplicationResponse[]): void {
+    const m = new Map<number, number>();
+    (apps as ApplicationWithEmployee[]).forEach((a) => {
+      if (a.employeeId) m.set(a.applicationId, a.employeeId);
+    });
+    this.employeeIdByApp.set(m);
+  }
+
+  private loadOnboardingState(apps: ApplicationResponse[]): void {
+    if (!apps.some((a) => a.status === 'Hired')) {
+      this.awaitingIds.set(new Set());
+      return;
+    }
+    this.http
+      .get<AwaitingOnboardingItem[]>(
+        `${environment.apiUrl}/employees/awaiting-onboarding`,
+      )
+      .pipe(catchError(() => of(null)))
+      .subscribe((items) =>
+        this.awaitingIds.set(
+          items ? new Set(items.map((i) => i.applicationId)) : null,
+        ),
+      );
+  }
+
+  isOnboarded(a: ApplicationResponse): boolean {
+    if (this.employeeIdByApp().has(a.applicationId)) return true;
+    const awaiting = this.awaitingIds();
+    return awaiting !== null && !awaiting.has(a.applicationId);
   }
 
   // Loads any previous ranking without re-running AI, so navigating back to
@@ -628,6 +1008,7 @@ export class VacancyApplicationsComponent implements OnInit {
       return 'prescreen';
     if (status === 'InterviewStage') return 'interview';
     if (status === 'OfferExtended') return 'offer';
+    if (status === 'Hired') return 'hired';
     return 'all';
   }
 
@@ -649,6 +1030,7 @@ export class VacancyApplicationsComponent implements OnInit {
         count: count('interview'),
       },
       { key: 'offer' as TabKey, label: 'Offer', count: count('offer') },
+      { key: 'hired' as TabKey, label: 'Hired', count: count('hired') },
     ];
   });
 
@@ -677,6 +1059,11 @@ export class VacancyApplicationsComponent implements OnInit {
       if (status === 'Accepted') return 'Offer \u00b7 Accepted';
       if (status === 'Declined') return 'Offer \u00b7 Declined';
       return 'Offer \u00b7 Awaiting response';
+    }
+    if (a.status === 'Hired') {
+      return this.isOnboarded(a)
+        ? 'Hired \u00b7 Onboarded'
+        : 'Hired \u00b7 Awaiting onboarding';
     }
     return base;
   }
@@ -740,5 +1127,141 @@ export class VacancyApplicationsComponent implements OnInit {
     this.router.navigate(['/admin/applications', a.applicationId, 'offer'], {
       queryParams: { vacancyId: this.vacancyId },
     });
+  }
+
+  // ── Mark as onboarded modal ──────────────────────────────────────
+
+  openOnboardModal(a: ApplicationResponse): void {
+    const v = this.vacancy();
+    this.onboardForm = {
+      externalEmployeeId: '',
+      hireDate: '',
+      jobTitle: v?.title ?? '',
+      departmentId: v?.departmentId ?? null,
+      workEmail: '',
+    };
+    this.onboardSubmitted.set(false);
+    this.onboardError.set(null);
+    this.onboardTarget.set(a);
+  }
+
+  closeOnboardModal(): void {
+    if (this.onboardSaving()) return;
+    this.onboardTarget.set(null);
+  }
+
+  // Falls back to one option so the pre-filled vacancy department still shows
+  // until a real department lookup is wired in.
+  deptOptions(): DepartmentOption[] {
+    const list = this.departments();
+    const id = this.onboardForm.departmentId;
+    if (id !== null && !list.some((d) => d.id === id)) {
+      return [...list, { id, name: 'Vacancy department' }];
+    }
+    return list;
+  }
+
+  // Rules mirror the backend OnboardingCompleteRequest.
+  fieldError(name: OnboardField): string | null {
+    if (!this.onboardSubmitted()) return null;
+    const f = this.onboardForm;
+    switch (name) {
+      case 'externalEmployeeId': {
+        const v = f.externalEmployeeId.trim();
+        return !v
+          ? 'Enter the employee number.'
+          : v.length > 50
+            ? 'Maximum 50 characters.'
+            : null;
+      }
+      case 'hireDate':
+        return f.hireDate ? null : 'Choose a start date.';
+      case 'jobTitle': {
+        const v = f.jobTitle.trim();
+        return !v
+          ? 'Enter the job title.'
+          : v.length > 100
+            ? 'Maximum 100 characters.'
+            : null;
+      }
+      case 'departmentId':
+        return f.departmentId !== null ? null : 'Select a department.';
+      case 'workEmail': {
+        const v = f.workEmail.trim();
+        return !EMAIL_RE.test(v)
+          ? 'Enter a valid work email.'
+          : v.length > 150
+            ? 'Maximum 150 characters.'
+            : null;
+      }
+    }
+  }
+
+  private onboardHasErrors(): boolean {
+    const names: OnboardField[] = [
+      'externalEmployeeId',
+      'hireDate',
+      'jobTitle',
+      'departmentId',
+      'workEmail',
+    ];
+    return names.some((n) => !!this.fieldError(n));
+  }
+
+  submitOnboard(): void {
+    const target = this.onboardTarget();
+    if (!target || this.onboardSaving()) return; // double-click guard
+    this.onboardSubmitted.set(true);
+    if (this.onboardHasErrors()) return;
+
+    const f = this.onboardForm;
+    this.onboardSaving.set(true);
+    this.onboardError.set(null);
+
+    this.http
+      .post<OnboardingCompleteResponse>(
+        `${environment.apiUrl}/employees/onboarding-complete`,
+        {
+          sourceApplicationId: target.applicationId,
+          externalEmployeeId: f.externalEmployeeId.trim(),
+          workEmail: f.workEmail.trim(),
+          hireDate: f.hireDate,
+          jobTitle: f.jobTitle.trim(),
+          departmentId: f.departmentId,
+        },
+      )
+      .subscribe({
+        next: (r) => {
+          const m = new Map(this.employeeIdByApp());
+          m.set(target.applicationId, r.employeeId);
+          this.employeeIdByApp.set(m);
+          this.onboardSaving.set(false);
+          this.onboardTarget.set(null);
+          this.toast.show(
+            r.alreadyOnboarded
+              ? `${target.candidateName} was already onboarded.`
+              : `${target.candidateName} onboarded. They now sign in with ${r.loginEmail}.`,
+            'success',
+          );
+        },
+        error: (err) => {
+          this.onboardSaving.set(false);
+          this.onboardError.set(this.onboardErrorMessage(err));
+        },
+      });
+  }
+
+  private onboardErrorMessage(err: any): string {
+    const e = err?.error;
+    if (e?.message) return e.message;
+    if (e?.errors) {
+      const first = (Object.values(e.errors) as unknown[]).flat()[0];
+      if (first) return String(first);
+    }
+    return err?.message ?? 'Could not mark as onboarded. Try again.';
+  }
+
+  openEmployee(employeeId: number): void {
+    this.router.navigate(['/admin/employees', employeeId]); // ASSUMPTION: HR profile route, built later
   }
 }

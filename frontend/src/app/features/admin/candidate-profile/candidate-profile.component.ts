@@ -1,12 +1,19 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
-import { RouterLink, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-
+import {
+  PrescreeningService,
+  PrescreeningResponse,
+} from '../../../core/services/prescreening.service';
+import {
+  OfferLetterService,
+  OfferLetterResponse,
+} from '../../../core/services/offer-letter.service';
 import { ApplicationService } from '../../../core/services/application.service';
 import { CandidateService } from '../../../core/services/candidate.service';
 import {
@@ -62,7 +69,46 @@ import {
             </div>
 
             <mat-divider style="margin:20px 0"></mat-divider>
+            <div class="vd-section-label">Application workflow</div>
+            <div class="wf-grid">
+              <a
+                class="wf-card"
+                [routerLink]="['/admin/applications', app.applicationId]"
+              >
+                <span class="wf-icon wf-icon-ps"
+                  ><i class="ti ti-clipboard-check"></i
+                ></span>
+                <div class="wf-body">
+                  <div class="wf-title">Pre-screening</div>
+                  <span class="wf-pill wf-{{ prescreeningStatus().tone }}">{{
+                    prescreeningStatus().text
+                  }}</span>
+                </div>
+                <i class="ti ti-chevron-right wf-arrow"></i>
+              </a>
 
+              <a
+                class="wf-card"
+                [routerLink]="[
+                  '/admin/applications',
+                  app.applicationId,
+                  'offer',
+                ]"
+              >
+                <span class="wf-icon wf-icon-offer"
+                  ><i class="ti ti-file-certificate"></i
+                ></span>
+                <div class="wf-body">
+                  <div class="wf-title">Offer letter</div>
+                  <span class="wf-pill wf-{{ offerStatus().tone }}">{{
+                    offerStatus().text
+                  }}</span>
+                </div>
+                <i class="ti ti-chevron-right wf-arrow"></i>
+              </a>
+            </div>
+
+            <mat-divider style="margin:20px 0"></mat-divider>
             <div class="vd-section-label">Candidate details</div>
             @if (candidate(); as c) {
               <div class="kv-grid" style="margin-top:10px">
@@ -345,7 +391,91 @@ import {
         align-items: center;
         gap: 6px;
       }
+      .wf-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 10px;
+      }
+      .wf-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.15s;
+      }
+      .wf-card:hover {
+        border-color: var(--navy);
+        box-shadow: var(--shadow-sm);
+        transform: translateY(-1px);
+      }
+      .wf-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+      }
+      .wf-icon-ps {
+        background: var(--blue-bg);
+        color: var(--blue);
+      }
+      .wf-icon-offer {
+        background: var(--purple-bg);
+        color: var(--purple);
+      }
+      .wf-body {
+        flex: 1;
+        min-width: 0;
+      }
+      .wf-title {
+        font-size: 13.5px;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 4px;
+      }
+      .wf-arrow {
+        color: var(--text-muted);
+        font-size: 16px;
+      }
+      .wf-card:hover .wf-arrow {
+        color: var(--navy);
+      }
+      .wf-pill {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 20px;
+      }
+      .wf-none {
+        background: var(--surface-2);
+        color: var(--text-muted);
+      }
+      .wf-wait {
+        background: #fff8e1;
+        color: #8a5a00;
+      }
+      .wf-ok {
+        background: var(--green-bg, #e8f5e9);
+        color: #1a5c35;
+      }
+      .wf-bad {
+        background: #fdecea;
+        color: var(--red, #c62828);
+      }
 
+      @media (max-width: 600px) {
+        .wf-grid {
+          grid-template-columns: 1fr;
+        }
+      }
       /* ── Candidate details ── */
       .kv-grid {
         display: grid;
@@ -601,6 +731,8 @@ export class CandidateProfileComponent implements OnInit {
   private experienceService = inject(CandidateExperienceService);
   private qualificationService = inject(CandidateQualificationService);
   private location = inject(Location);
+  private prescreening = inject(PrescreeningService);
+  private offerLetter = inject(OfferLetterService);
   loading = signal(true);
   loadError = signal<string | null>(null);
 
@@ -610,6 +742,8 @@ export class CandidateProfileComponent implements OnInit {
   experience = signal<ExperienceResponse[]>([]);
   qualifications = signal<QualificationResponse[]>([]);
   documents = signal<CandidateDocumentResponse[]>([]);
+  psDoc = signal<PrescreeningResponse | null>(null);
+  offer = signal<OfferLetterResponse | null>(null);
 
   applicationId = 0;
 
@@ -640,12 +774,20 @@ export class CandidateProfileComponent implements OnInit {
           documents: this.documentService
             .getAll(app.candidateId)
             .pipe(catchError(() => of([]))),
+          prescreening: this.prescreening
+            .getByApplication(app.applicationId)
+            .pipe(catchError(() => of(null))),
+          offer: this.offerLetter
+            .getLatest(app.applicationId)
+            .pipe(catchError(() => of(null))),
         }).subscribe((res) => {
           this.candidate.set(res.candidate);
           this.skills.set(res.skills);
           this.experience.set(res.experience);
           this.qualifications.set(res.qualifications);
-          this.documents.set(res.documents);
+          this.documents.set(this.latestPerType(res.documents));
+          this.psDoc.set(res.prescreening);
+          this.offer.set(res.offer ?? null);
           this.loading.set(false);
         });
       },
@@ -656,6 +798,21 @@ export class CandidateProfileComponent implements OnInit {
     });
   }
 
+  private latestPerType(
+  docs: CandidateDocumentResponse[],
+): CandidateDocumentResponse[] {
+  const latest = new Map<string, CandidateDocumentResponse>();
+  for (const d of docs) {
+    const current = latest.get(d.documentType);
+    if (!current || new Date(d.uploadedAt) > new Date(current.uploadedAt)) {
+      latest.set(d.documentType, d);
+    }
+  }
+  return [...latest.values()].sort(
+    (a, b) =>
+      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+  );
+}
   docLabel(t: string): string {
     return (DOCUMENT_TYPE_LABELS as Record<string, string>)[t] ?? t;
   }
@@ -689,7 +846,27 @@ export class CandidateProfileComponent implements OnInit {
     const origin = environment.apiUrl.replace(/\/api\/?$/, '');
     return fileUrl.startsWith('/') ? origin + fileUrl : `${origin}/${fileUrl}`;
   }
+  prescreeningStatus(): { text: string; tone: 'none' | 'wait' | 'ok' | 'bad' } {
+    const d = this.psDoc();
+    if (!d) return { text: 'Not sent', tone: 'none' };
+    if (d.status === 'Sent')
+      return { text: 'Awaiting candidate', tone: 'wait' };
+    if (d.status === 'Submitted')
+      return { text: 'Ready to review', tone: 'wait' };
+    if (d.outcome === 'Passed') return { text: 'Passed', tone: 'ok' };
+    if (d.outcome === 'Failed') return { text: 'Failed', tone: 'bad' };
+    return { text: d.status, tone: 'none' };
+  }
 
+  offerStatus(): { text: string; tone: 'none' | 'wait' | 'ok' | 'bad' } {
+    const o = this.offer();
+    if (!o) return { text: 'Not generated', tone: 'none' };
+    const v = `v${o.versionNumber}`;
+    if (o.status === 'Accepted') return { text: `Accepted · ${v}`, tone: 'ok' };
+    if (o.status === 'Declined')
+      return { text: `Declined · ${v}`, tone: 'bad' };
+    return { text: `Sent · ${v}`, tone: 'wait' };
+  }
   goBack() {
     this.location.back();
   }

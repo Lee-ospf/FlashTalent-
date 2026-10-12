@@ -248,7 +248,25 @@ export const routes: Routes = [
         (m) => m.NotificationsComponent,
       ),
   },
+  // ---------- Employee self-service ----------
+  {
+    path: 'my-profile',
+    canActivate: [roleGuard(['Employee'])],
+    loadComponent: () =>
+      import('./features/employee/employee-profile/employee-profile.component').then(
+        (m) => m.EmployeeProfileComponent,
+      ),
+  },
 
+  // ---------- HR read-only view of an employee profile ----------
+  {
+    path: 'admin/employees/:id',
+    canActivate: [roleGuard(['Recruiter', 'Admin'])],
+    loadComponent: () =>
+      import('./features/employee/employee-profile/employee-profile.component').then(
+        (m) => m.EmployeeProfileComponent,
+      ),
+  },
   // ---------- Public ----------
   {
     path: 'register',

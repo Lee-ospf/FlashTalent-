@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { SidebarComponent } from './shared/components/sidebar/sidebar.component';
 import { TopbarComponent } from './shared/components/topbar/topbar.component';
+import { EmployeeNavComponent } from './shared/components/employee-nav/employee-nav.component';
 import { ToastComponent } from './shared/components/toast/toast.component';
 import { TempPasswordBannerComponent } from './shared/components/temp-password-banner/temp-password-banner.component';
 import { AuthService } from './core/services/auth.service';
@@ -18,32 +19,52 @@ const COLLAPSE_BREAKPOINT = 1280;
     CommonModule,
     SidebarComponent,
     TopbarComponent,
+    EmployeeNavComponent,
     ToastComponent,
     TempPasswordBannerComponent,
   ],
   template: `
     @if (auth.isLoggedIn()) {
-      <div class="app-shell">
-        <app-sidebar
-          [collapsed]="sidebarCollapsed()"
-          (toggleSidebar)="toggleSidebar()"
-        />
-        <div class="app-main" [class.sidebar-collapsed]="sidebarCollapsed()">
-          <app-topbar
-            [sidebarCollapsed]="sidebarCollapsed()"
-            (toggleSidebar)="toggleSidebar()"
-          />
+      @if (isEmployee()) {
+        <!-- Employees: top tabs instead of the sidebar + topbar -->
+        <div class="employee-shell">
+          <app-employee-nav />
           <app-temp-password-banner />
           <div class="app-content">
             <router-outlet />
           </div>
         </div>
-      </div>
+      } @else {
+        <div class="app-shell">
+          <app-sidebar
+            [collapsed]="sidebarCollapsed()"
+            (toggleSidebar)="toggleSidebar()"
+          />
+          <div class="app-main" [class.sidebar-collapsed]="sidebarCollapsed()">
+            <app-topbar
+              [sidebarCollapsed]="sidebarCollapsed()"
+              (toggleSidebar)="toggleSidebar()"
+            />
+            <app-temp-password-banner />
+            <div class="app-content">
+              <router-outlet />
+            </div>
+          </div>
+        </div>
+      }
     } @else {
       <router-outlet />
     }
     <app-toast />
   `,
+  styles: [
+    `
+      .employee-shell {
+        min-height: 100vh;
+        background: var(--bg, #f6f7f9);
+      }
+    `,
+  ],
 })
 export class AppComponent implements OnInit {
   auth = inject(AuthService);
@@ -51,8 +72,17 @@ export class AppComponent implements OnInit {
   sidebarCollapsed = signal(false);
   private isNarrow = false;
 
+  isEmployee(): boolean {
+    return this.auth.currentUser()?.role === 'Employee';
+  }
+
   ngOnInit(): void {
-    if (this.auth.isLoggedIn()) {
+    // GET api/candidates/me is Candidate-only (403 for every other role), so only
+    // Candidates load it. The login component already follows the same rule.
+    if (
+      this.auth.isLoggedIn() &&
+      this.auth.currentUser()?.role === 'Candidate'
+    ) {
       this.state.loadMyProfile().subscribe();
     }
     this.isNarrow = window.innerWidth < COLLAPSE_BREAKPOINT;

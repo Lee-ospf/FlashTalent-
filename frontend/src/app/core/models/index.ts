@@ -178,6 +178,7 @@ export interface ApplicationResponse {
   status: string; // 'Applied' | 'UnderReview' | 'Shortlisted' | 'OfferExtended' | 'Hired' | 'NotSelected'
   appliedAt: string;
   updatedAt?: string;
+  employeeId?: number | null;
 }
 export interface ApplicationReviewResponse {
   application: {

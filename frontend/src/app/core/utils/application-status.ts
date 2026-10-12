@@ -8,8 +8,7 @@ export type ApplicationStatusKey =
   | 'OfferExtended'
   | 'Hired'
   | 'NotSelected'
-  // ── Front-end-only overlay stages — never sent to the backend as a real
-  // application status, only displayed on top of it. 'OfferSent'/'OfferAccepted'/
+
   // 'OfferDeclined' overlay 'OfferExtended' (see OfferLetterService).
   | 'OfferSent'
   | 'OfferAccepted'
@@ -18,15 +17,7 @@ export type ApplicationStatusKey =
 // Matches the backend's ApplicationStatusRules exactly:
 // Applied → UnderReview → Shortlisted → PrescreeningStage → InterviewStage
 // → OfferExtended → Hired, with NotSelected reachable at any active stage.
-//
-// Two transitions are deliberately left OUT of this manual "move to next
-// status" list even though the backend allows them via IsValidTransition:
-// - Shortlisted → PrescreeningStage only happens via PrescreeningController.Send()
-//   (which also creates the Prescreening record and checks a template exists),
-//   never via the plain status-update endpoint. So it's excluded here to steer
-//   recruiters through the "Send pre-screening form" button instead.
-// - PrescreeningStage → NotSelected on a Failed outcome happens automatically
-//   inside PrescreeningController.SetOutcome, not through this dropdown.
+
 const ALLOWED_TRANSITIONS: Record<
   ApplicationStatusKey,
   ApplicationStatusKey[]

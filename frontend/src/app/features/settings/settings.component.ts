@@ -6,8 +6,8 @@ import {
   ViewChild,
   OnInit,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { CommonModule, Location } from '@angular/common';
+import { RouterLink,Router } from '@angular/router';
 import {
   FormBuilder,
   FormGroupDirective,
@@ -46,6 +46,15 @@ function minLength8(c: { value: string }) {
   ],
   template: `
     <div class="page-container">
+            <a
+        class="st-back"
+        role="link"
+        tabindex="0"
+        (click)="goBack()"
+        (keydown.enter)="goBack()"
+      >
+        <i class="ti ti-arrow-left"></i> Back
+      </a>
       <div class="page-header">
         <div>
           <h2 class="page-title"><i class="ti ti-settings"></i> Settings</h2>
@@ -314,6 +323,19 @@ function minLength8(c: { value: string }) {
           margin-top: 20px;
         }
       }
+            .st-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer;
+        margin-bottom: 14px;
+      }
+      .st-back:hover {
+        color: var(--navy);
+      }
     `,
   ],
 })
@@ -321,6 +343,9 @@ export class SettingsComponent implements OnInit {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
   private toast = inject(ToastService);
+    private location = inject(Location);
+  private router = inject(Router);
+
   private notificationPrefs = inject(NotificationPreferenceService);
   @ViewChild(FormGroupDirective) formDirective!: FormGroupDirective;
 
@@ -409,7 +434,13 @@ export class SettingsComponent implements OnInit {
     const c = this.form.get(field);
     return !!c && c.invalid && (c.dirty || c.touched);
   }
-
+  goBack(): void {
+    if (window.history.length > 1) {
+      this.location.back();
+    } else {
+      this.router.navigate(['/dashboard']);
+    }
+  }
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();

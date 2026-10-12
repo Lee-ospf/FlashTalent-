@@ -473,7 +473,6 @@ const STATUS_CLASS: Record<string, string> = {
 })
 export class ApplicationDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
-  private router = inject(Router);
   private appService = inject(ApplicationService);
   private candidateService = inject(CandidateService);
   private documentService = inject(DocumentService);
@@ -510,11 +509,7 @@ export class ApplicationDetailComponent implements OnInit {
   template = signal<PrescreeningTemplateResponse | null>(null);
 
   // ── File view/download (submitted assessment) ─────────────────────
-  // Plain `<a href>` navigation doesn't go through the auth interceptor,
-  // so if the file endpoint needs the bearer token it just silently fails.
-  // Fetching via HttpClient (through PrescreeningService) attaches the
-  // token and gives a real object URL to preview/download instead - the
-  // same approach used on the candidate-facing applications page.
+
   private fileActionKey = signal<string | null>(null);
   previewingFile = signal<{
     fileName: string;
@@ -577,10 +572,6 @@ export class ApplicationDetailComponent implements OnInit {
     const app = this.application();
     if (!app) return '';
     const base = this.prescreening.effectiveStatus(app.applicationId, app.status);
-    // The offer overlay only applies while the real backend status is still
-    // 'OfferExtended' - once the recruiter moves it on to Hired/NotSelected,
-    // that real status should take over so the app doesn't get stuck showing
-    // "Offer Accepted" forever.
     return base === 'OfferExtended' ? this.offerLetter.effectiveStatus(app.applicationId, base) : base;
   }
 
