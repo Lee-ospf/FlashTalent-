@@ -113,6 +113,7 @@ namespace TalentHub.Controllers
             };
 
             Db.EmployeeSkills.Add(entry);
+            MarkProfileUpdated(employee);
             await Db.SaveChangesAsync();
 
             return Ok(EmployeeProfileMapper.ToSkillDto(entry, skill));
@@ -131,6 +132,7 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No skill entry found with id {id} on your profile." });
 
             entry.ProficiencyLevel = request.ProficiencyLevel;
+            MarkProfileUpdated(employee);
             await Db.SaveChangesAsync();
 
             return Ok(EmployeeProfileMapper.ToSkillDto(entry, entry.Skill));
@@ -149,6 +151,7 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No skill entry found with id {id} on your profile." });
 
             Db.EmployeeSkills.Remove(entry);
+            MarkProfileUpdated(employee);
             await Db.SaveChangesAsync();
 
             return NoContent();
@@ -192,6 +195,7 @@ namespace TalentHub.Controllers
             };
 
             Db.EmployeeQualifications.Add(entry);
+            MarkProfileUpdated(employee);
             await Db.SaveChangesAsync();
 
             return Ok(EmployeeProfileMapper.ToQualificationDto(entry));
@@ -219,6 +223,7 @@ namespace TalentHub.Controllers
             entry.ExpiryDate = request.ExpiryDate;
             entry.UpdatedAt = DateTime.UtcNow;
 
+            MarkProfileUpdated(employee);
             await Db.SaveChangesAsync();
 
             return Ok(EmployeeProfileMapper.ToQualificationDto(entry));
@@ -237,6 +242,7 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No qualification found with id {id} on your profile." });
 
             Db.EmployeeQualifications.Remove(entry);
+            MarkProfileUpdated(employee);
             await Db.SaveChangesAsync();
 
             return NoContent();
@@ -280,6 +286,7 @@ namespace TalentHub.Controllers
             };
 
             Db.EmployeeExperiences.Add(entry);
+            MarkProfileUpdated(employee);
             await Db.SaveChangesAsync();
 
             return Ok(EmployeeProfileMapper.ToExperienceDto(entry));
@@ -307,6 +314,7 @@ namespace TalentHub.Controllers
             entry.ProjectsAndDuties = request.ProjectsAndDuties;
             entry.UpdatedAt = DateTime.UtcNow;
 
+            MarkProfileUpdated(employee);
             await Db.SaveChangesAsync();
 
             return Ok(EmployeeProfileMapper.ToExperienceDto(entry));
@@ -325,6 +333,7 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No work history entry found with id {id} on your profile." });
 
             Db.EmployeeExperiences.Remove(entry);
+            MarkProfileUpdated(employee);
             await Db.SaveChangesAsync();
 
             return NoContent();
@@ -342,6 +351,8 @@ namespace TalentHub.Controllers
 
             return employee == null ? null : EmployeeProfileMapper.ToResponse(employee);
         }
+
+        private void MarkProfileUpdated(Employee employee) => employee.ProfileUpdatedAt = DateTime.UtcNow;
 
         // Returns an error message, or null when valid.
         private static string? ValidateQualification(EmployeeQualificationRequest r)

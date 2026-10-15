@@ -11,7 +11,7 @@ namespace TalentHub.Controllers
     // HR-side endpoints. Recruiters/Admins act as HR for now.
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Recruiter,Admin")]
+    
     public class EmployeesController : TalentHubControllerBase
     {
         private readonly IEmployeeOnboardingService _onboarding;
@@ -25,6 +25,7 @@ namespace TalentHub.Controllers
         // The contract the onboarding system will call once integrated. Until then,
         // a recruiter/admin triggers it by hand ("mark as onboarded").
         [HttpPost("onboarding-complete")]
+        [Authorize(Roles = "Recruiter,Admin")]
         public async Task<ActionResult<OnboardingCompleteResponse>> OnboardingComplete(OnboardingCompleteRequest request)
         {
             var result = await _onboarding.CompleteAsync(request);
@@ -45,6 +46,7 @@ namespace TalentHub.Controllers
         // GET api/employees/awaiting-onboarding
         // Hired applications with no Employee record yet ("Hired, awaiting onboarding").
         // Derived - no extra status. Oldest first, so anyone who has waited longest is at the top.
+        [Authorize(Roles = "Recruiter,Admin")]
         [HttpGet("awaiting-onboarding")]
         public async Task<ActionResult<List<AwaitingOnboardingItem>>> GetAwaitingOnboarding()
         {
@@ -68,6 +70,7 @@ namespace TalentHub.Controllers
         }
 
         // GET api/employees?search=...&departmentId=...
+        [Authorize(Roles = "Recruiter,HR,Admin")]
         [HttpGet]
         public async Task<ActionResult<List<EmployeeListItem>>> GetAll(
             [FromQuery] string? search, [FromQuery] int? departmentId)
@@ -108,6 +111,7 @@ namespace TalentHub.Controllers
 
         // GET api/employees/{id}
         // Full profile, read-only for HR.
+        [Authorize(Roles = "Recruiter,HR,Admin")]
         [HttpGet("{id:int}")]
         public async Task<ActionResult<EmployeeProfileResponse>> GetById(int id)
         {

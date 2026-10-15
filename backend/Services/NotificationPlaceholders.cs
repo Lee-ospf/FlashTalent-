@@ -19,6 +19,7 @@ namespace TalentHub.Services
             [NotificationType.OfferSent] = new[] { "JobTitle", "ClosingDate" },
             [NotificationType.OfferResponded] = new[] { "CandidateName", "JobTitle", "Status" },
             [NotificationType.OfferResponseReminder] = new[] { "JobTitle", "ClosingDate" },
+            [NotificationType.AddedToProject] = new[] { "ProjectName" },
             [NotificationType.StatusChanged] = Array.Empty<string>(),
             [NotificationType.DocumentMissing] = Array.Empty<string>(),
             [NotificationType.General] = Array.Empty<string>(),

@@ -9,7 +9,8 @@ namespace TalentHub.Models
         Candidate,
         Recruiter,
         Admin,
-        Employee
+        Employee,
+        HR
     }
 
     [Table("Users")]
@@ -66,5 +67,7 @@ namespace TalentHub.Models
         // Navigation: one User has at most one Candidate profile
         public Candidate? Candidate { get; set; }
         public Recruiter? Recruiter { get; set; }
+        public HrProfile? HrProfile { get; set; }
+
     }
 }

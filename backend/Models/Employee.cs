@@ -50,7 +50,10 @@ namespace TalentHub.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        public DateTime? ProfileUpdatedAt { get; set; }
+
         // Profile 
+        public ICollection<ProjectMember> ProjectMemberships { get; set; } = new List<ProjectMember>();
         public ICollection<EmployeeSkill> EmployeeSkills { get; set; } = new List<EmployeeSkill>();
         public ICollection<EmployeeQualification> Qualifications { get; set; } = new List<EmployeeQualification>();
         public ICollection<EmployeeExperience> Experiences { get; set; } = new List<EmployeeExperience>();

@@ -18,7 +18,8 @@ namespace TalentHub.Models
         OfferResponded,
         OfferResponseReminder,
         TalentPoolInvite,
-        General
+        General,
+        AddedToProject
     }
 
     public enum NotificationChannel

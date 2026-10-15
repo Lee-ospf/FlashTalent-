@@ -128,6 +128,8 @@ builder.Services.AddHttpClient<ITalentPoolMatchingService, TalentPoolMatchingSer
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<NotificationDispatchJob>();
 builder.Services.AddScoped<ReminderScanJob>();
+builder.Services.AddHttpClient<IGeminiJsonClient, GeminiJsonClient>();
+builder.Services.AddScoped<IProjectMatchingService, ProjectMatchingService>();
 var app = builder.Build();
 
 

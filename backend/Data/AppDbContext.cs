@@ -41,6 +41,11 @@ namespace TalentHub.Data
         public DbSet<EmployeeSkill> EmployeeSkills => Set<EmployeeSkill>();
         public DbSet<EmployeeQualification> EmployeeQualifications => Set<EmployeeQualification>();
         public DbSet<EmployeeExperience> EmployeeExperiences => Set<EmployeeExperience>();
+        public DbSet<HrProfile> HrProfiles => Set<HrProfile>();
+        public DbSet<Project> Projects => Set<Project>();
+        public DbSet<ProjectSkill> ProjectSkills => Set<ProjectSkill>();
+        public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
+        public DbSet<ProjectMatch> ProjectMatches => Set<ProjectMatch>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -358,6 +363,107 @@ namespace TalentHub.Data
                 .HasForeignKey(x => x.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // ---------- HrProfile: one per user ----------
+            modelBuilder.Entity<HrProfile>()
+                .HasIndex(h => h.UserId)
+                .IsUnique();
+
+            modelBuilder.Entity<HrProfile>()
+                .HasOne(h => h.User)
+                .WithOne(u => u.HrProfile)
+                .HasForeignKey<HrProfile>(h => h.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // ---------- Project ----------
+            modelBuilder.Entity<Project>()
+                .Property(p => p.Status)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            modelBuilder.Entity<Project>()
+                .HasOne(p => p.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(p => p.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Project>()
+    .HasOne(p => p.Department)
+    .WithMany()
+    .HasForeignKey(p => p.DepartmentId)
+    .OnDelete(DeleteBehavior.SetNull);
+
+            // ---------- ProjectSkill ----------
+            modelBuilder.Entity<ProjectSkill>()
+                .Property(ps => ps.MinimumLevel)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            modelBuilder.Entity<ProjectSkill>()
+                .HasOne(ps => ps.Project)
+                .WithMany(p => p.ProjectSkills)
+                .HasForeignKey(ps => ps.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Deleting a Skill must not silently strip it from projects
+            modelBuilder.Entity<ProjectSkill>()
+                .HasOne(ps => ps.Skill)
+                .WithMany()
+                .HasForeignKey(ps => ps.SkillId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // A project can't list the same skill twice
+            modelBuilder.Entity<ProjectSkill>()
+                .HasIndex(ps => new { ps.ProjectId, ps.SkillId })
+                .IsUnique();
+
+            // ---------- ProjectMember ----------
+            modelBuilder.Entity<ProjectMember>()
+                .HasOne(m => m.Project)
+                .WithMany(p => p.Members)
+                .HasForeignKey(m => m.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProjectMember>()
+                .HasOne(m => m.Employee)
+                .WithMany(e => e.ProjectMemberships)
+                .HasForeignKey(m => m.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ProjectMember>()
+                .HasOne(m => m.AddedByUser)
+                .WithMany()
+                .HasForeignKey(m => m.AddedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // An employee can only be on a project once
+            modelBuilder.Entity<ProjectMember>()
+                .HasIndex(m => new { m.ProjectId, m.EmployeeId })
+                .IsUnique();
+
+            // ---------- ProjectMatch ----------
+            modelBuilder.Entity<ProjectMatch>()
+                .HasOne(m => m.Project)
+                .WithMany(p => p.Matches)
+                .HasForeignKey(m => m.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProjectMatch>()
+                .HasOne(m => m.Employee)
+                .WithMany()
+                .HasForeignKey(m => m.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProjectMatch>()
+                .HasOne(m => m.DismissedByUser)
+                .WithMany()
+                .HasForeignKey(m => m.DismissedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // One row per project/employee: a re-run updates it, keeping HR's decision
+            modelBuilder.Entity<ProjectMatch>()
+                .HasIndex(m => new { m.ProjectId, m.EmployeeId })
+                .IsUnique();
+
             // convert all enums to strings in the database for readability
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {
@@ -425,6 +531,11 @@ namespace TalentHub.Data
     new NotificationTemplate { NotificationTemplateId = 20, NotificationType = NotificationType.OfferResponseReminder, Channel = NotificationChannel.InApp, Subject = "Reminder: offer response needed", BodyTemplate = "This is a reminder to respond to your offer for {{JobTitle}} before it closes on {{ClosingDate}}.", IsActive = true }
 );
 
+
+            modelBuilder.Entity<NotificationTemplate>().HasData(
+                new NotificationTemplate { NotificationTemplateId = 21, NotificationType = NotificationType.AddedToProject, Channel = NotificationChannel.Email, Subject = "You've been added to a project", BodyTemplate = "You have been added to the project {{ProjectName}} by HR.", IsActive = true },
+                new NotificationTemplate { NotificationTemplateId = 22, NotificationType = NotificationType.AddedToProject, Channel = NotificationChannel.InApp, Subject = "You've been added to a project", BodyTemplate = "You have been added to the project {{ProjectName}} by HR.", IsActive = true }
+            );
         }
 
     }

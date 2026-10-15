@@ -137,6 +137,35 @@ namespace TalentHub.Controllers
                 message = "Recruiter created successfully."
             });
         }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost("create-hr")]
+        public async Task<IActionResult> CreateHr(CreateUserRequest request)
+        {
+            var exists = await _db.Users.AnyAsync(x => x.Email == request.Email);
+
+            if (exists)
+                return Conflict(new { message = "Email already exists." });
+
+            var user = new User
+            {
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Email = request.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                Role = UserRole.HR,
+                MustChangePassword = true,
+                CreatedAt = DateTime.UtcNow,
+                HrProfile = new HrProfile { JobTitle = request.JobTitle ?? string.Empty }
+            };
+
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
+
+            return Ok(new { message = "HR user created successfully." });
+        }
+
+
         [Authorize(Roles = "Admin")]
         [HttpPost("create-admin")]
         public async Task<IActionResult> CreateAdmin(CreateUserRequest request)

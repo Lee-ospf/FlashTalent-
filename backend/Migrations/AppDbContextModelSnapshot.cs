@@ -415,6 +415,9 @@ namespace TalentHub.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<DateTime?>("ProfileUpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int?>("SourceApplicationId")
                         .HasColumnType("int");
 
@@ -592,6 +595,30 @@ namespace TalentHub.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("GoogleCalendarConnections");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.HrProfile", b =>
+                {
+                    b.Property<int>("HrProfileId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HrProfileId"));
+
+                    b.Property<string>("JobTitle")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("HrProfileId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("HrProfiles");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Interview", b =>
@@ -997,6 +1024,24 @@ namespace TalentHub.Migrations
                             IsActive = true,
                             NotificationType = "OfferResponseReminder",
                             Subject = "Reminder: offer response needed"
+                        },
+                        new
+                        {
+                            NotificationTemplateId = 21,
+                            BodyTemplate = "You have been added to the project {{ProjectName}} by HR.",
+                            Channel = "Email",
+                            IsActive = true,
+                            NotificationType = "AddedToProject",
+                            Subject = "You've been added to a project"
+                        },
+                        new
+                        {
+                            NotificationTemplateId = 22,
+                            BodyTemplate = "You have been added to the project {{ProjectName}} by HR.",
+                            Channel = "InApp",
+                            IsActive = true,
+                            NotificationType = "AddedToProject",
+                            Subject = "You've been added to a project"
                         });
                 });
 
@@ -1169,6 +1214,183 @@ namespace TalentHub.Migrations
                     b.HasIndex("UploadedByUserId");
 
                     b.ToTable("PrescreeningTemplates");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.Project", b =>
+                {
+                    b.Property<int>("ProjectId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ProjectId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DepartmentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("EndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastMatchedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("RequiredQualifications")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ProjectId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.ToTable("Projects");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.ProjectMatch", b =>
+                {
+                    b.Property<int>("ProjectMatchId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ProjectMatchId"));
+
+                    b.Property<DateTime>("ComputedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DismissedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DismissedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("GapDetailsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDismissed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ModelVersion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reasoning")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("int");
+
+                    b.HasKey("ProjectMatchId");
+
+                    b.HasIndex("DismissedByUserId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("ProjectId", "EmployeeId")
+                        .IsUnique();
+
+                    b.ToTable("ProjectMatches");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.ProjectMember", b =>
+                {
+                    b.Property<int>("ProjectMemberId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ProjectMemberId"));
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("AddedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("int");
+
+                    b.HasKey("ProjectMemberId");
+
+                    b.HasIndex("AddedByUserId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("ProjectId", "EmployeeId")
+                        .IsUnique();
+
+                    b.ToTable("ProjectMembers");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.ProjectSkill", b =>
+                {
+                    b.Property<int>("ProjectSkillId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ProjectSkillId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("MinimumLevel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SkillId")
+                        .HasColumnType("int");
+
+                    b.HasKey("ProjectSkillId");
+
+                    b.HasIndex("SkillId");
+
+                    b.HasIndex("ProjectId", "SkillId")
+                        .IsUnique();
+
+                    b.ToTable("ProjectSkills");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Recruiter", b =>
@@ -1780,6 +2002,17 @@ namespace TalentHub.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.HrProfile", b =>
+                {
+                    b.HasOne("TalentHub.Models.User", "User")
+                        .WithOne("HrProfile")
+                        .HasForeignKey("TalentHub.Models.HrProfile", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("TalentHub.Models.Interview", b =>
                 {
                     b.HasOne("TalentHub.Models.Application", "Application")
@@ -1879,6 +2112,96 @@ namespace TalentHub.Migrations
                         .IsRequired();
 
                     b.Navigation("UploadedByUser");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.Project", b =>
+                {
+                    b.HasOne("TalentHub.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Department");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.ProjectMatch", b =>
+                {
+                    b.HasOne("TalentHub.Models.User", "DismissedByUser")
+                        .WithMany()
+                        .HasForeignKey("DismissedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TalentHub.Models.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.Project", "Project")
+                        .WithMany("Matches")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DismissedByUser");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.ProjectMember", b =>
+                {
+                    b.HasOne("TalentHub.Models.User", "AddedByUser")
+                        .WithMany()
+                        .HasForeignKey("AddedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.Employee", "Employee")
+                        .WithMany("ProjectMemberships")
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.Project", "Project")
+                        .WithMany("Members")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AddedByUser");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.ProjectSkill", b =>
+                {
+                    b.HasOne("TalentHub.Models.Project", "Project")
+                        .WithMany("ProjectSkills")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.Skill", "Skill")
+                        .WithMany()
+                        .HasForeignKey("SkillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+
+                    b.Navigation("Skill");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Recruiter", b =>
@@ -2045,12 +2368,23 @@ namespace TalentHub.Migrations
 
                     b.Navigation("Experiences");
 
+                    b.Navigation("ProjectMemberships");
+
                     b.Navigation("Qualifications");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Interview", b =>
                 {
                     b.Navigation("RescheduleHistory");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.Project", b =>
+                {
+                    b.Navigation("Matches");
+
+                    b.Navigation("Members");
+
+                    b.Navigation("ProjectSkills");
                 });
 
             modelBuilder.Entity("TalentHub.Models.Recruiter", b =>
@@ -2068,6 +2402,8 @@ namespace TalentHub.Migrations
             modelBuilder.Entity("TalentHub.Models.User", b =>
                 {
                     b.Navigation("Candidate");
+
+                    b.Navigation("HrProfile");
 
                     b.Navigation("Recruiter");
                 });

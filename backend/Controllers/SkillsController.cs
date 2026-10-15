@@ -131,10 +131,13 @@ namespace TalentHub.Controllers
                 return NotFound(new { message = $"No skill found with SkillId {id}." });
             }
 
-            var inUse = await Db.CandidateSkills.AnyAsync(cs => cs.SkillId == id);
+            var inUse = await Db.CandidateSkills.AnyAsync(cs => cs.SkillId == id)
+         || await Db.EmployeeSkills.AnyAsync(es => es.SkillId == id)
+         || await Db.ProjectSkills.AnyAsync(ps => ps.SkillId == id);
+
             if (inUse)
             {
-                return Conflict(new { message = "This skill is assigned to one or more candidates and cannot be deleted. Remove it from those candidates first." });
+                return Conflict(new { message = "This skill is in use by candidates, employees or projects and cannot be deleted." });
             }
 
             Db.Skills.Remove(skill);
