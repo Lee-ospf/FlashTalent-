@@ -79,4 +79,13 @@ namespace TalentHub.DTOs
         public string CreatedByName { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
     }
+
+    public class ProjectDocumentResponse
+    {
+        public int ProjectDocumentId { get; set; }
+        public string FileName { get; set; } = string.Empty;
+        public long SizeBytes { get; set; }
+        public string UploadedByName { get; set; } = string.Empty;
+        public DateTime UploadedAt { get; set; }
+    }
 }

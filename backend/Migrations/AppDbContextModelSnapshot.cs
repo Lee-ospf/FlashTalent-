@@ -1272,6 +1272,50 @@ namespace TalentHub.Migrations
                     b.ToTable("Projects");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.ProjectDocument", b =>
+                {
+                    b.Property<int>("ProjectDocumentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ProjectDocumentId"));
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("int");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StoredFileName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UploadedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("ProjectDocumentId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("UploadedByUserId");
+
+                    b.ToTable("ProjectDocuments");
+                });
+
             modelBuilder.Entity("TalentHub.Models.ProjectMatch", b =>
                 {
                     b.Property<int>("ProjectMatchId")
@@ -2132,6 +2176,25 @@ namespace TalentHub.Migrations
                     b.Navigation("Department");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.ProjectDocument", b =>
+                {
+                    b.HasOne("TalentHub.Models.Project", "Project")
+                        .WithMany("Documents")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.User", "UploadedByUser")
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+
+                    b.Navigation("UploadedByUser");
+                });
+
             modelBuilder.Entity("TalentHub.Models.ProjectMatch", b =>
                 {
                     b.HasOne("TalentHub.Models.User", "DismissedByUser")
@@ -2380,6 +2443,8 @@ namespace TalentHub.Migrations
 
             modelBuilder.Entity("TalentHub.Models.Project", b =>
                 {
+                    b.Navigation("Documents");
+
                     b.Navigation("Matches");
 
                     b.Navigation("Members");

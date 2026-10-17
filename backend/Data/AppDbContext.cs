@@ -45,6 +45,7 @@ namespace TalentHub.Data
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<ProjectSkill> ProjectSkills => Set<ProjectSkill>();
         public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
+        public DbSet<ProjectDocument> ProjectDocuments => Set<ProjectDocument>();
         public DbSet<ProjectMatch> ProjectMatches => Set<ProjectMatch>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -391,6 +392,18 @@ namespace TalentHub.Data
     .WithMany()
     .HasForeignKey(p => p.DepartmentId)
     .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<ProjectDocument>()
+    .HasOne(d => d.Project)
+    .WithMany(p => p.Documents)
+    .HasForeignKey(d => d.ProjectId)
+    .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProjectDocument>()
+                .HasOne(d => d.UploadedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.UploadedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // ---------- ProjectSkill ----------
             modelBuilder.Entity<ProjectSkill>()

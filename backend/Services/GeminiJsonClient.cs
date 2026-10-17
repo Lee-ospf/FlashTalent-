@@ -10,6 +10,9 @@ namespace TalentHub.Services
         string ModelId { get; }
         // Sends a prompt and returns the model's JSON text (markdown fences removed).
         Task<string> GenerateJsonAsync(string prompt, CancellationToken ct = default);
+
+        Task<string> GenerateJsonFromFileAsync(string prompt, byte[] fileBytes, string mimeType, CancellationToken ct = default);
+
     }
 
     public class GeminiJsonClient : IGeminiJsonClient
@@ -29,7 +32,17 @@ namespace TalentHub.Services
             _logger = logger;
         }
 
-        public async Task<string> GenerateJsonAsync(string prompt, CancellationToken ct = default)
+        public Task<string> GenerateJsonAsync(string prompt, CancellationToken ct = default)
+         => SendAsync(new object[] { new { text = prompt } }, ct);
+
+        public Task<string> GenerateJsonFromFileAsync(string prompt, byte[] fileBytes, string mimeType, CancellationToken ct = default)
+            => SendAsync(new object[]
+            {
+        new { text = prompt },
+        new { inline_data = new { mime_type = mimeType, data = Convert.ToBase64String(fileBytes) } }
+            }, ct);
+
+        private async Task<string> SendAsync(object[] parts, CancellationToken ct)
         {
             var apiKey = _config["Gemini:ApiKey"];
             if (string.IsNullOrWhiteSpace(apiKey))
@@ -37,7 +50,7 @@ namespace TalentHub.Services
 
             var body = new
             {
-                contents = new[] { new { parts = new object[] { new { text = prompt } } } },
+                contents = new[] { new { parts } },
                 generationConfig = new { response_mime_type = "application/json", temperature = 0 }
             };
 
@@ -80,6 +93,7 @@ namespace TalentHub.Services
             return StripMarkdownFences(text);
         }
 
+        
         private static string StripMarkdownFences(string text)
         {
             text = text.Trim();

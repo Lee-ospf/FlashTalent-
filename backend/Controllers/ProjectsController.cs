@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using TalentHub.Data;
 using TalentHub.DTOs;
 using TalentHub.Models;
+using TalentHub.Services;
 
 namespace TalentHub.Controllers
 {
@@ -13,7 +14,15 @@ namespace TalentHub.Controllers
     [Authorize(Roles = "HR,Admin")]
     public class ProjectsController : TalentHubControllerBase
     {
-        public ProjectsController(AppDbContext db) : base(db) { }
+        private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+        private static readonly string[] AllowedExtensions = { ".pdf", ".docx" };
+
+        private readonly IProjectDocumentExtractionService _extraction;
+
+        public ProjectsController(AppDbContext db, IProjectDocumentExtractionService extraction) : base(db)
+        {
+            _extraction = extraction;
+        }
 
         // POST api/projects
         [HttpPost]
@@ -200,6 +209,43 @@ namespace TalentHub.Controllers
                 return "The selected department does not exist.";
 
             return null;
+        }
+
+        // POST api/projects/extract  (multipart/form-data, field: file)
+        // Preview only: nothing is saved. HR reviews the draft, then creates the project normally.
+        [HttpPost("extract")]
+        [RequestSizeLimit(MaxFileSizeBytes + 1024)]
+        public async Task<ActionResult<ProjectDraftResponse>> Extract(IFormFile file, CancellationToken ct)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "No file was uploaded." });
+
+            if (file.Length > MaxFileSizeBytes)
+                return BadRequest(new { message = $"File exceeds the maximum size of {MaxFileSizeBytes / (1024 * 1024)} MB." });
+
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!AllowedExtensions.Contains(extension))
+                return BadRequest(new { message = "Only PDF and Word (.docx) files are accepted." });
+
+            byte[] bytes;
+            using (var ms = new MemoryStream())
+            {
+                await file.CopyToAsync(ms, ct);
+                bytes = ms.ToArray();
+            }
+
+            // Check the real content, not just the file name
+            var looksLikePdf = bytes.Length > 4 && bytes[0] == 0x25 && bytes[1] == 0x50 && bytes[2] == 0x44 && bytes[3] == 0x46; // %PDF
+            var looksLikeZip = bytes.Length > 2 && bytes[0] == 0x50 && bytes[1] == 0x4B;                                         // PK
+            if ((extension == ".pdf" && !looksLikePdf) || (extension == ".docx" && !looksLikeZip))
+                return BadRequest(new { message = "The file content doesn't match its extension." });
+
+            try
+            {
+                return Ok(await _extraction.ExtractAsync(bytes, extension, ct));
+            }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+            catch (AiProviderException ex) { return StatusCode(502, new { message = ex.Message }); }
         }
 
         private async Task<ProjectResponse?> LoadResponseAsync(int id)

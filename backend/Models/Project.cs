@@ -47,6 +47,7 @@ namespace TalentHub.Models
         public DateTime? LastMatchedAt { get; set; }
 
         public ICollection<ProjectSkill> ProjectSkills { get; set; } = new List<ProjectSkill>();
+        public ICollection<ProjectDocument> Documents { get; set; } = new List<ProjectDocument>();
         public ICollection<ProjectMember> Members { get; set; } = new List<ProjectMember>();
         public ICollection<ProjectMatch> Matches { get; set; } = new List<ProjectMatch>();
     }
