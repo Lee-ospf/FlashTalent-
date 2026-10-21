@@ -19,7 +19,16 @@ namespace TalentHub.Models
         OfferResponseReminder,
         TalentPoolInvite,
         General,
-        AddedToProject
+        AddedToProject,
+        CertificationExpiring,
+        CertificationExpired,
+        HrComplianceDigest,
+        TrainingAssigned,
+        TrainingDueReminder,
+        TrainingSubmitted,
+        TrainingConfirmed,
+        TrainingRejected
+
     }
 
     public enum NotificationChannel

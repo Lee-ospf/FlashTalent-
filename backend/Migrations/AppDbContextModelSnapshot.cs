@@ -325,6 +325,39 @@ namespace TalentHub.Migrations
                     b.ToTable("CandidateSkills");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.CertificationReminderLog", b =>
+                {
+                    b.Property<int>("CertificationReminderLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CertificationReminderLogId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EmployeeQualificationId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ReminderPoint")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool>("WasSent")
+                        .HasColumnType("bit");
+
+                    b.HasKey("CertificationReminderLogId");
+
+                    b.HasIndex("EmployeeQualificationId", "ExpiryDate", "ReminderPoint")
+                        .IsUnique();
+
+                    b.ToTable("CertificationReminderLogs");
+                });
+
             modelBuilder.Entity("TalentHub.Models.Client", b =>
                 {
                     b.Property<int>("ClientId")
@@ -531,6 +564,8 @@ namespace TalentHub.Migrations
                     b.HasKey("EmployeeQualificationId");
 
                     b.HasIndex("EmployeeId");
+
+                    b.HasIndex("ExpiryDate");
 
                     b.ToTable("EmployeeQualifications");
                 });
@@ -1566,6 +1601,204 @@ namespace TalentHub.Migrations
                     b.ToTable("TalentPoolMatches");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.TrainingAssignment", b =>
+                {
+                    b.Property<int>("TrainingAssignmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TrainingAssignmentId"));
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("AssignedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ConfirmedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("NotCompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ProgressPercent")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("ReminderSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("TrainingIntakeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("TrainingAssignmentId");
+
+                    b.HasIndex("AssignedByUserId");
+
+                    b.HasIndex("ConfirmedByUserId");
+
+                    b.HasIndex("EmployeeId", "Status");
+
+                    b.HasIndex("Status", "DueDate");
+
+                    b.HasIndex("TrainingIntakeId", "EmployeeId")
+                        .IsUnique();
+
+                    b.ToTable("TrainingAssignments");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.TrainingIntake", b =>
+                {
+                    b.Property<int>("TrainingIntakeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TrainingIntakeId"));
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ClosedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("MaxParticipants")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("TrainingProgrammeId")
+                        .HasColumnType("int");
+
+                    b.HasKey("TrainingIntakeId");
+
+                    b.HasIndex("ClosedByUserId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("TrainingProgrammeId", "StartDate");
+
+                    b.ToTable("TrainingIntakes");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.TrainingProgramme", b =>
+                {
+                    b.Property<int>("TrainingProgrammeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TrainingProgrammeId"));
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<decimal?>("DurationHours")
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Url")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("TrainingProgrammeId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.ToTable("TrainingProgrammes");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.TrainingProgrammeSkill", b =>
+                {
+                    b.Property<int>("TrainingProgrammeSkillId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TrainingProgrammeSkillId"));
+
+                    b.Property<int>("SkillId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TrainingProgrammeId")
+                        .HasColumnType("int");
+
+                    b.HasKey("TrainingProgrammeSkillId");
+
+                    b.HasIndex("SkillId");
+
+                    b.HasIndex("TrainingProgrammeId", "SkillId")
+                        .IsUnique();
+
+                    b.ToTable("TrainingProgrammeSkills");
+                });
+
             modelBuilder.Entity("TalentHub.Models.User", b =>
                 {
                     b.Property<int>("UserId")
@@ -1969,6 +2202,17 @@ namespace TalentHub.Migrations
                     b.Navigation("Skill");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.CertificationReminderLog", b =>
+                {
+                    b.HasOne("TalentHub.Models.EmployeeQualification", "Qualification")
+                        .WithMany()
+                        .HasForeignKey("EmployeeQualificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Qualification");
+                });
+
             modelBuilder.Entity("TalentHub.Models.Employee", b =>
                 {
                     b.HasOne("TalentHub.Models.Department", "Department")
@@ -2314,6 +2558,96 @@ namespace TalentHub.Migrations
                     b.Navigation("Vacancy");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.TrainingAssignment", b =>
+                {
+                    b.HasOne("TalentHub.Models.User", "AssignedByUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.User", "ConfirmedByUser")
+                        .WithMany()
+                        .HasForeignKey("ConfirmedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TalentHub.Models.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.TrainingIntake", "Intake")
+                        .WithMany("Assignments")
+                        .HasForeignKey("TrainingIntakeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AssignedByUser");
+
+                    b.Navigation("ConfirmedByUser");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("Intake");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.TrainingIntake", b =>
+                {
+                    b.HasOne("TalentHub.Models.User", "ClosedByUser")
+                        .WithMany()
+                        .HasForeignKey("ClosedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TalentHub.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.TrainingProgramme", "Programme")
+                        .WithMany("Intakes")
+                        .HasForeignKey("TrainingProgrammeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ClosedByUser");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Programme");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.TrainingProgramme", b =>
+                {
+                    b.HasOne("TalentHub.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.TrainingProgrammeSkill", b =>
+                {
+                    b.HasOne("TalentHub.Models.Skill", "Skill")
+                        .WithMany()
+                        .HasForeignKey("SkillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.TrainingProgramme", "Programme")
+                        .WithMany("Skills")
+                        .HasForeignKey("TrainingProgrammeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Programme");
+
+                    b.Navigation("Skill");
+                });
+
             modelBuilder.Entity("TalentHub.Models.UserNotificationPreference", b =>
                 {
                     b.HasOne("TalentHub.Models.User", "User")
@@ -2462,6 +2796,18 @@ namespace TalentHub.Migrations
                     b.Navigation("CandidateSkills");
 
                     b.Navigation("EmployeeSkills");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.TrainingIntake", b =>
+                {
+                    b.Navigation("Assignments");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.TrainingProgramme", b =>
+                {
+                    b.Navigation("Intakes");
+
+                    b.Navigation("Skills");
                 });
 
             modelBuilder.Entity("TalentHub.Models.User", b =>
