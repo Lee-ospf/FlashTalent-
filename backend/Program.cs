@@ -129,6 +129,7 @@ builder.Services.AddHttpClient<ITalentPoolMatchingService, TalentPoolMatchingSer
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<NotificationDispatchJob>();
 builder.Services.AddScoped<ReminderScanJob>();
+builder.Services.AddScoped<CertificationScanJob>();
 builder.Services.AddHttpClient<IGeminiJsonClient, GeminiJsonClient>();
 builder.Services.AddScoped<IProjectMatchingService, ProjectMatchingService>();
 var app = builder.Build();
@@ -175,4 +176,9 @@ RecurringJob.AddOrUpdate<NotificationDispatchJob>(
     "notification-dispatch",
     job => job.RunAsync(),
     "*/2 * * * *");
+
+RecurringJob.AddOrUpdate<CertificationScanJob>(
+  "certification-scan",
+  job => job.RunAsync(),
+  "15 6 * * *");
 app.Run();
