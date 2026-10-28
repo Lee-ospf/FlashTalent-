@@ -1177,10 +1177,7 @@ export class ApplicationsComponent implements OnInit {
   }
 
   // ── File view/download (template + submitted assessment) ──────────
-  // Plain `<a href>` navigation doesn't go through the auth interceptor,
-  // so if the file endpoint needs the bearer token it just silently fails.
-  // Fetching via HttpClient (through PrescreeningService) attaches the
-  // token and gives a real object URL to preview/download instead.
+  
   private sanitizer = inject(DomSanitizer);
   private fileActionKey = signal<string | null>(null);
   previewingFile = signal<{

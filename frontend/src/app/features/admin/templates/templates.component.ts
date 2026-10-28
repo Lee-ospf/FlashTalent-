@@ -434,19 +434,21 @@ import {
                 ></textarea>
 
                 @if (currentPlaceholders(); as tokens) {
-                  <div style="margin-bottom:14px">
-                    <span class="form-note" style="margin-right:6px"
-                      >Insert:</span
-                    >
-                    @for (token of tokens; track token) {
-                      <button
-                        class="nt-token-btn"
-                        (click)="insertToken(bodyInput, token)"
+                  @if (tokens.length) {
+                    <div style="margin-bottom:14px">
+                      <span class="form-note" style="margin-right:6px"
+                        >Insert:</span
                       >
-                        {{ token }}
-                      </button>
-                    }
-                  </div>
+                      @for (token of tokens; track token) {
+                        <button
+                          class="nt-token-btn"
+                          (click)="insertToken(bodyInput, token)"
+                        >
+                          {{ token }}
+                        </button>
+                      }
+                    </div>
+                  }
                 }
               }
 
@@ -903,38 +905,38 @@ import {
         cursor: pointer;
       }
       .nt-group-header td {
-  padding: 10px 6px;
-  font-weight: 700;
-  color: var(--text);
-  border-top: 1px solid var(--border);
-}
-.nt-group-header:first-child td {
-  border-top: none;
-}
-.nt-group-header:hover {
-  background: var(--surface-2);
-}
+        padding: 10px 6px;
+        font-weight: 700;
+        color: var(--text);
+        border-top: 1px solid var(--border);
+      }
+      .nt-group-header:first-child td {
+        border-top: none;
+      }
+      .nt-group-header:hover {
+        background: var(--surface-2);
+      }
 
-.nt-row {
-  border-bottom: 1px solid var(--border);
-}
-.nt-row:hover {
-  filter: brightness(0.98);
-}
+      .nt-row {
+        border-bottom: 1px solid var(--border);
+      }
+      .nt-row:hover {
+        filter: brightness(0.98);
+      }
 
-.nt-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
-.nt-page-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+      .nt-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+      }
+      .nt-page-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
     </style>
   `,
 })
@@ -1088,20 +1090,20 @@ export class TemplatesComponent implements OnInit {
       .map((c) => c.channel);
   }
 
-  currentPlaceholders = computed(() => {
+  currentPlaceholders(): string[] {
     const type =
       this.modalMode() === 'create' ? this.createType : this.modalType;
     return type ? (this.placeholders()[type] ?? []) : [];
-  });
+  }
 
-  renderedPreview = computed(() => {
+  renderedPreview(): { subject: string; body: string } {
     const render = (text: string) =>
       text.replace(/\{\{(\w+)\}\}/g, (_, key) => `[${key}]`);
     return {
       subject: render(this.editSubject || '(no subject)'),
       body: render(this.editBody || ''),
     };
-  });
+  }
 
   openPreviewModal(t: NotificationTemplate): void {
     this.modalType = t.notificationType;
@@ -1121,15 +1123,18 @@ export class TemplatesComponent implements OnInit {
   }
 
   openCreateModal(): void {
+    this.modalType = '';
+    this.modalChannel = '';
+    this.editSubject = '';
     this.editSubject = '';
     this.editBody = '';
     this.createType = null;
     this.createChannel = null;
     this.notificationTemplates_.getAvailableCombinations().subscribe({
-      next: (c) => {
-        this.availableCombinations.set(c);
-        this.modalMode.set('create');
-      },
+     next: (c) => {
+  this.availableCombinations.set(c.filter((x) => x.channel !== 'Both'));
+  this.modalMode.set('create');
+},
       error: (err: Error) => this.toast.show(err.message, 'error'),
     });
   }

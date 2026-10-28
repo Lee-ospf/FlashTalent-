@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { EmployeeListItem } from '../models/index';
 
 // ───────────────────────── Models (match the backend DTOs) ─────────────────────────
 
@@ -184,6 +185,11 @@ export class EmployeeProfileService {
   }
   deleteQualification(id: number): Observable<void> {
     return this.http.delete<void>(`${this.me}/qualifications/${id}`);
+  }
+
+  //employee list
+  getAll(): Observable<EmployeeListItem[]> {
+    return this.http.get<EmployeeListItem[]>(this.base);
   }
 
   // Work history (backend route is singular: /experience)

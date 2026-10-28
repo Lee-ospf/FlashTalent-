@@ -4,6 +4,7 @@ import { DashboardComponent } from './dashboard.component';
 import { StaffDashboardComponent } from './staff-dashboard.component';
 import { AdminDashboardComponent } from './admin-dashboard.component';
 import { EmployeeDashboardComponent } from './employee-dashboard.component';
+import { HrDashboardComponent } from './hr-dashboard.component';
 
 @Component({
   selector: 'app-dashboard-gate',
@@ -13,12 +14,15 @@ import { EmployeeDashboardComponent } from './employee-dashboard.component';
     StaffDashboardComponent,
     AdminDashboardComponent,
     EmployeeDashboardComponent,
+    HrDashboardComponent,
   ],
   template: `
     @if (isAdmin()) {
       <app-admin-dashboard />
     } @else if (isRecruiter()) {
       <app-staff-dashboard />
+    } @else if (isHr()) {
+      <app-hr-dashboard />
     } @else if (isEmployee()) {
       <app-employee-dashboard />
     } @else {
@@ -35,6 +39,10 @@ export class DashboardGateComponent {
 
   isRecruiter(): boolean {
     return this.auth.currentUser()?.role === 'Recruiter';
+  }
+
+  isHr(): boolean {
+    return this.auth.currentUser()?.role === 'HR';
   }
 
   isEmployee(): boolean {

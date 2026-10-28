@@ -8,6 +8,7 @@ import {
   RegisterRequest,
   CreateRecruiterRequest,
   ChangePasswordRequest,
+  CreateUserResponse,
 } from '../models';
 import { ResumeAutofillStoreService } from './resume-autofill-store.service';
 
@@ -38,13 +39,23 @@ export class AuthService {
   }
 
   // Admin only - creates the User account AND the Recruiter profile together in one call.
-  createRecruiter(
-    req: CreateRecruiterRequest,
-  ): Observable<{ message: string }> {
-    return this.http
-      .post<{ message: string }>(`${this.base}/create-recruiter`, req)
-      .pipe(catchError(this.handleError));
-  }
+ createRecruiter(req: CreateRecruiterRequest): Observable<CreateUserResponse> {
+  return this.http
+    .post<CreateUserResponse>(`${this.base}/create-recruiter`, req)
+    .pipe(catchError(this.handleError));
+}
+
+createHr(req: CreateRecruiterRequest): Observable<CreateUserResponse> {
+  return this.http
+    .post<CreateUserResponse>(`${this.base}/create-hr`, req)
+    .pipe(catchError(this.handleError));
+}
+
+resendLogin(userId: number): Observable<CreateUserResponse> {
+  return this.http
+    .post<CreateUserResponse>(`${this.base}/resend-login/${userId}`, {})
+    .pipe(catchError(this.handleError));
+}
 
   login(req: LoginRequest): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.base}/login`, req).pipe(
@@ -104,15 +115,6 @@ export class AuthService {
   }
 
   private handleError(err: HttpErrorResponse) {
-    // Two response shapes to account for here:
-    // 1. Our own controller actions return `{ message: "..." }` directly
-    //    (e.g. "An account with this email already exists.").
-    // 2. ASP.NET's automatic [ApiController] model validation (e.g. the
-    //    RegularExpression on RegisterRequest.Password) short-circuits before
-    //    the controller runs and returns a ValidationProblemDetails body
-    //    instead: { title, status, errors: { Password: ["msg", ...], ... } }.
-    //    Without handling this shape, every validation failure surfaced as a
-    //    generic "An unexpected error occurred."
     let message = err.error?.message as string | undefined;
 
     if (!message && err.error?.errors) {

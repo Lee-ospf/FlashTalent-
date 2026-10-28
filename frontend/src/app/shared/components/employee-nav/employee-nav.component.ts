@@ -36,6 +36,7 @@ import { NotificationService } from '../../../core/services/notification.service
       <nav class="en-tabs" aria-label="Employee navigation">
         <a class="en-tab" routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
         <a class="en-tab" routerLink="/my-profile" routerLinkActive="active">My profile</a>
+        <a class="en-tab" routerLink="/my-projects" routerLinkActive="active">Projects</a>
       </nav>
 
       <button

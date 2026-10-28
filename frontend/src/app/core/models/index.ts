@@ -31,10 +31,12 @@ export interface CreateRecruiterRequest {
   firstName: string;
   lastName: string;
   email: string;
-  password: string;
   jobTitle: string;
 }
-
+export interface CreateUserResponse {
+  message: string;
+  temporaryPassword: string;
+}
 // ── Candidate ─────────────────────────────────────────────────────
 // NOTE: `address` was removed from these DTOs by the backend team.
 // Address is now its own resource — see AddressResponse below.
@@ -69,7 +71,36 @@ export interface CandidateResponse {
   registeredAt: string;
   uploadedDocumentTypes: string[];
 }
+//--- HR--------------------------------
+export type ProjectStatus = 'Active' | 'Closed';
 
+export interface ProjectListItem {
+  projectId: number;
+  name: string;
+  status: ProjectStatus;
+  startDate: string | null;
+  endDate: string | null;
+  skillCount: number;
+  departmentName: string | null;
+  memberCount: number;
+  lastMatchedAt: string | null;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface EmployeeListItem {
+  employeeId: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  jobTitle: string | null;
+  departmentId?: number | null;
+  departmentName?: string | null;
+  hireDate?: string | null;
+  status?: string;
+}
+export const isActiveProject = (p: ProjectListItem): boolean =>
+  p.status === 'Active' || (p.status as unknown) === 0;
 // ── Addresses ─────────────────────────────────────────────────────
 export type AddressType = 'Residential' | 'Postal';
 
@@ -498,7 +529,7 @@ export interface NotificationResponse {
   notificationType: string;
   subject: string;
   body: string;
-  actionUrl?: string; 
+  actionUrl?: string;
   isRead: boolean;
   sentAt: string;
 }

@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { SidebarComponent } from './shared/components/sidebar/sidebar.component';
 import { TopbarComponent } from './shared/components/topbar/topbar.component';
 import { EmployeeNavComponent } from './shared/components/employee-nav/employee-nav.component';
+import { HrNavComponent } from './shared/components/hr-nav/hr-nav.component';
 import { ToastComponent } from './shared/components/toast/toast.component';
 import { TempPasswordBannerComponent } from './shared/components/temp-password-banner/temp-password-banner.component';
 import { AuthService } from './core/services/auth.service';
@@ -20,15 +21,20 @@ const COLLAPSE_BREAKPOINT = 1280;
     SidebarComponent,
     TopbarComponent,
     EmployeeNavComponent,
+    HrNavComponent,
     ToastComponent,
     TempPasswordBannerComponent,
   ],
   template: `
     @if (auth.isLoggedIn()) {
-      @if (isEmployee()) {
-        <!-- Employees: top tabs instead of the sidebar + topbar -->
+      @if (isEmployee() || isHr()) {
+        <!-- Employees and HR: top tabs instead of the sidebar + topbar -->
         <div class="employee-shell">
-          <app-employee-nav />
+          @if (isHr()) {
+            <app-hr-nav />
+          } @else {
+            <app-employee-nav />
+          }
           <app-temp-password-banner />
           <div class="app-content">
             <router-outlet />
@@ -74,6 +80,10 @@ export class AppComponent implements OnInit {
 
   isEmployee(): boolean {
     return this.auth.currentUser()?.role === 'Employee';
+  }
+
+  isHr(): boolean {
+    return this.auth.currentUser()?.role === 'HR';
   }
 
   ngOnInit(): void {

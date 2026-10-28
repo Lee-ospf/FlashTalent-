@@ -785,6 +785,7 @@ export class CandidateProfileComponent implements OnInit {
           this.skills.set(res.skills);
           this.experience.set(res.experience);
           this.qualifications.set(res.qualifications);
+          
           this.documents.set(this.latestPerType(res.documents));
           this.psDoc.set(res.prescreening);
           this.offer.set(res.offer ?? null);

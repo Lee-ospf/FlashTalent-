@@ -101,6 +101,48 @@ export const routes: Routes = [
         (m) => m.ApplicationReviewComponent,
       ),
   },
+//-------------------------HR
+{
+  path: 'admin/employees',
+  canActivate: [roleGuard(['HR', 'Admin'])],
+  loadComponent: () =>
+    import('./features/hr/employee-list/employee-list.component').then(
+      (m) => m.EmployeeListComponent,
+    ),
+},
+
+{
+  path: 'admin/projects/new',
+  canActivate: [roleGuard(['HR', 'Admin'])],
+  loadComponent: () =>
+    import('./features/hr/project-form/project-form.component').then(
+      (m) => m.ProjectFormComponent,
+    ),
+},
+{
+  path: 'admin/projects',
+  canActivate: [roleGuard(['HR', 'Admin'])],
+  loadComponent: () =>
+    import('./features/hr/project-list/project-list.component').then(
+      (m) => m.ProjectListComponent,
+    ),
+},
+{
+  path: 'admin/projects/:id',
+  canActivate: [roleGuard(['HR', 'Admin'])],
+  loadComponent: () =>
+    import('./features/hr/project-detail/project-detail.component').then(
+      (m) => m.ProjectDetailComponent,
+    ),
+},
+{
+  path: 'admin/projects/:id/edit',
+  canActivate: [roleGuard(['HR', 'Admin'])],
+  loadComponent: () =>
+    import('./features/hr/project-form/project-form.component').then(
+      (m) => m.ProjectFormComponent,
+    ),
+},
 
   // ---------- Read-only for Recruiter+Admin, write actions inside these pages should
   // still check isAdmin in the template before showing create/edit/delete buttons ----------
@@ -132,8 +174,8 @@ export const routes: Routes = [
     path: 'admin/recruiters',
     canActivate: [roleGuard(['Recruiter', 'Admin'])],
     loadComponent: () =>
-      import('./features/admin/recruiter-list/recruiter-list.component').then(
-        (m) => m.RecruiterListComponent,
+      import('./features/admin/recruiter-list/user-list.component').then(
+        (m) => m.UserListComponent,
       ),
   },
 
@@ -257,11 +299,19 @@ export const routes: Routes = [
         (m) => m.EmployeeProfileComponent,
       ),
   },
+  {
+  path: 'my-projects',
+  canActivate: [roleGuard(['Employee'])],
+  loadComponent: () =>
+    import('./features/employee/my-projects/my-projects.component').then(
+      (m) => m.MyProjectsComponent,
+    ),
+},
 
   // ---------- HR read-only view of an employee profile ----------
   {
     path: 'admin/employees/:id',
-    canActivate: [roleGuard(['Recruiter', 'Admin'])],
+    canActivate: [roleGuard(['Recruiter','HR', 'Admin'])],
     loadComponent: () =>
       import('./features/employee/employee-profile/employee-profile.component').then(
         (m) => m.EmployeeProfileComponent,
