@@ -9,6 +9,9 @@ namespace TalentHub.Services
         // automatically, so update this alongside any TemplateData change.
         public static readonly Dictionary<NotificationType, string[]> ByType = new()
         {
+            [NotificationType.AddedToProject] = new[] { "ProjectName" },
+            [NotificationType.TemporaryPassword] = new[] { "FirstName", "LoginEmail", "TemporaryPassword" },
+            [NotificationType.WorkEmailAssigned] = new[] { "FirstName", "WorkEmail" },
             [NotificationType.InterviewScheduled] = new[] { "RoundNumber", "ScheduledAt", "VacancyTitle" },
             [NotificationType.InterviewRescheduled] = new[] { "VacancyTitle", "ScheduledAt" },
             [NotificationType.InterviewCancelled] = new[] { "RoundNumber", "VacancyTitle" },
@@ -24,5 +27,11 @@ namespace TalentHub.Services
             [NotificationType.DocumentMissing] = Array.Empty<string>(),
             [NotificationType.General] = Array.Empty<string>(),
         };
+
+        public static readonly HashSet<NotificationType> AlwaysEmail = new()
+{
+    NotificationType.TemporaryPassword,
+    NotificationType.WorkEmailAssigned
+};
     }
 }

@@ -70,6 +70,14 @@ namespace TalentHub.Controllers
                 var validChannels = string.Join(", ", Enum.GetNames(typeof(NotificationChannel)));
                 return BadRequest(new { message = $"Invalid channel '{request.Channel}'. Valid values: {validChannels}." });
             }
+            if (channel == NotificationChannel.Both || channel == NotificationChannel.None)
+            {
+                return BadRequest(new { message = "Templates can only be created for the Email or InApp channel." });
+            }
+            if (NotificationPlaceholders.AlwaysEmail.Contains(type) && channel != NotificationChannel.Email)
+            {
+                return BadRequest(new { message = $"{type} is always sent by email, so only an Email template can be created." });
+            }
             if (string.IsNullOrWhiteSpace(request.BodyTemplate))
             {
                 return BadRequest(new { message = "Body cannot be empty." });
@@ -120,7 +128,8 @@ namespace TalentHub.Controllers
             {
                 foreach (NotificationChannel channel in Enum.GetValues<NotificationChannel>())
                 {
-                    if (channel == NotificationChannel.None) continue; // not a real template channel
+                    if (channel == NotificationChannel.None || channel == NotificationChannel.Both) continue;
+                    if (NotificationPlaceholders.AlwaysEmail.Contains(type) && channel != NotificationChannel.Email) continue;
                     if (!existingSet.Contains((type, channel)))
                     {
                         missing.Add(new AvailableCombinationResponse

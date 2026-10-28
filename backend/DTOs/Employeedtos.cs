@@ -210,4 +210,28 @@ namespace TalentHub.DTOs
 
         public string? ProjectsAndDuties { get; set; }
     }
+
+
+    public class EmployeeProjectSkillResponse
+    {
+        public int SkillId { get; set; }
+        public string SkillName { get; set; } = string.Empty;
+        public bool IsRequired { get; set; }
+        public ProficiencyLevel MinimumLevel { get; set; }
+    }
+
+    // What an employee sees about a project they are a member of.
+    public class EmployeeProjectResponse
+    {
+        public int ProjectId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public ProjectStatus Status { get; set; }
+        public string? DepartmentName { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+        public DateTime AddedAt { get; set; }
+        public int MemberCount { get; set; }
+        public List<EmployeeProjectSkillResponse> Skills { get; set; } = new();
+    }
 }

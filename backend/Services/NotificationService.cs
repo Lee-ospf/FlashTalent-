@@ -1,7 +1,8 @@
-﻿using TalentHub.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using TalentHub.Data;
 using TalentHub.DTOs;
 using TalentHub.Models;
-using Microsoft.EntityFrameworkCore;
+using TalentHub.Services;
 
 public interface INotificationService
 {
@@ -16,7 +17,9 @@ public class NotificationService : INotificationService
 
     public async Task<List<Notification>> Build(NotificationRequest request)
     {
-        var channel = request.Channel ?? await ResolveChannelAsync(request.UserId, request.Type);
+        var channel = NotificationPlaceholders.AlwaysEmail.Contains(request.Type)
+       ? NotificationChannel.Email
+       : (request.Channel ?? await ResolveChannelAsync(request.UserId, request.Type));
 
         var channelsToSend = channel == NotificationChannel.Both
             ? new[] { NotificationChannel.Email, NotificationChannel.InApp }

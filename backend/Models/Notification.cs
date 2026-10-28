@@ -19,7 +19,9 @@ namespace TalentHub.Models
         OfferResponseReminder,
         TalentPoolInvite,
         General,
-        AddedToProject
+        AddedToProject,
+        TemporaryPassword,
+        WorkEmailAssigned
     }
 
     public enum NotificationChannel

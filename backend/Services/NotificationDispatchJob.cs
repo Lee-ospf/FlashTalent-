@@ -1,6 +1,7 @@
-﻿using TalentHub.Data;
-using TalentHub.Models;
+﻿using Hangfire;
 using Microsoft.EntityFrameworkCore;
+using TalentHub.Data;
+using TalentHub.Models;
 
 namespace TalentHub.Services
 {
@@ -15,7 +16,7 @@ namespace TalentHub.Services
             _db = db;
             _emailSender = emailSender;
         }
-
+        [DisableConcurrentExecution(timeoutInSeconds: 60)]
         public async Task RunAsync()
         {
             var pending = await _db.Notifications
@@ -30,19 +31,21 @@ namespace TalentHub.Services
                 if (notification.Channel == NotificationChannel.Email)
                 {
                     var success = await _emailSender.SendAsync(
-                        notification.User!.Email, notification.Subject, notification.Body);
+                        GetRecipient(notification), notification.Subject, notification.Body);
 
                     if (success)
                     {
                         notification.Status = DeliveryStatus.Sent;
                         notification.SentAt = DateTime.UtcNow;
+                        RedactIfCredential(notification);
                     }
                     else if (notification.AttemptCount >= MaxAttempts)
                     {
                         notification.Status = DeliveryStatus.Failed;
                         notification.ErrorMessage = "Email send failed after maximum retry attempts.";
+                        RedactIfCredential(notification);
                     }
-                    // else: stays Pending, picked up again next run — this IS the retry (FR-04)
+                    // else: stays Pending and is retried next run
                 }
                 else // InApp
                 {
@@ -54,6 +57,25 @@ namespace TalentHub.Services
             }
 
             await _db.SaveChangesAsync();
+        }
+
+        // First-login emails go to the personal address when one exists (employees),
+        // because their work-email login isn't something they can read yet.
+        private static string GetRecipient(Notification n)
+        {
+            var user = n.User!;
+            var isFirstLogin = n.NotificationType is NotificationType.TemporaryPassword
+                                                  or NotificationType.WorkEmailAssigned;
+            return isFirstLogin && !string.IsNullOrWhiteSpace(user.PersonalEmail)
+                ? user.PersonalEmail
+                : user.Email;
+        }
+
+        // Don't keep the plaintext temp password once the email has been handled.
+        private static void RedactIfCredential(Notification n)
+        {
+            if (n.NotificationType == NotificationType.TemporaryPassword)
+                n.Body = "A temporary password was emailed to this user. (Redacted after sending.)";
         }
     }
 }
