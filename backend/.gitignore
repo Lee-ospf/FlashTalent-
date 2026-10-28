@@ -8,6 +8,8 @@ obj/
 Uploads/*
 !Uploads/.gitkeep
 
+App_Data/*
+
 ## Rider/VS Code (in case teammates use these)
 .idea/
 .vscode/

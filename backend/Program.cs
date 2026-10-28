@@ -66,6 +66,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<IPrescreeningService, PrescreeningService>();
 builder.Services.Configure<GoogleCalendarOptions>(builder.Configuration.GetSection("GoogleCalendar"));
 builder.Services.AddScoped<IGoogleCalendarService, GoogleCalendarService>();
+builder.Services.AddScoped<IProjectDocumentExtractionService, ProjectDocumentExtractionService>();
 
 // CORS - frontend (Person C/D) runs on a different origin/port, so the browser
 // needs explicit permission to call this API. Tighten this list to your actual
@@ -129,6 +130,7 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IFirstLoginNotifier, FirstLoginNotifier>();
 builder.Services.AddScoped<NotificationDispatchJob>();
 builder.Services.AddScoped<ReminderScanJob>();
+builder.Services.AddScoped<CertificationScanJob>();
 builder.Services.AddHttpClient<IGeminiJsonClient, GeminiJsonClient>();
 builder.Services.AddScoped<IProjectMatchingService, ProjectMatchingService>();
 var app = builder.Build();
@@ -175,4 +177,9 @@ RecurringJob.AddOrUpdate<NotificationDispatchJob>(
     "notification-dispatch",
     job => job.RunAsync(),
     "*/2 * * * *");
+
+RecurringJob.AddOrUpdate<CertificationScanJob>(
+  "certification-scan",
+  job => job.RunAsync(),
+  "15 6 * * *");
 app.Run();

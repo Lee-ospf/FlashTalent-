@@ -21,7 +21,16 @@ namespace TalentHub.Models
         General,
         AddedToProject,
         TemporaryPassword,
-        WorkEmailAssigned
+        WorkEmailAssigned,
+        CertificationExpiring,
+        CertificationExpired,
+        HrComplianceDigest,
+        TrainingAssigned,
+        TrainingDueReminder,
+        TrainingSubmitted,
+        TrainingConfirmed,
+        TrainingRejected
+
     }
 
     public enum NotificationChannel

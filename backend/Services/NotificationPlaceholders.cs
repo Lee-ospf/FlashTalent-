@@ -26,6 +26,16 @@ namespace TalentHub.Services
             [NotificationType.StatusChanged] = Array.Empty<string>(),
             [NotificationType.DocumentMissing] = Array.Empty<string>(),
             [NotificationType.General] = Array.Empty<string>(),
+
+            // ---------- Feature 3: certification alerts and training ----------
+            [NotificationType.CertificationExpiring] = new[] { "EmployeeName", "CertificationName", "ExpiryDate", "DaysLeft" },
+            [NotificationType.CertificationExpired] = new[] { "EmployeeName", "CertificationName", "ExpiryDate" },
+            [NotificationType.HrComplianceDigest] = new[] { "ExpiringCount", "ExpiredCount", "OverdueTrainingCount", "AwaitingConfirmationCount" },
+            [NotificationType.TrainingAssigned] = new[] { "ProgrammeTitle", "IntakeName", "StartDate", "DueDate" },
+            [NotificationType.TrainingDueReminder] = new[] { "ProgrammeTitle", "DueDate" },
+            [NotificationType.TrainingSubmitted] = new[] { "EmployeeName", "ProgrammeTitle" },
+            [NotificationType.TrainingConfirmed] = new[] { "ProgrammeTitle" },
+            [NotificationType.TrainingRejected] = new[] { "ProgrammeTitle", "Reason" },
         };
 
         public static readonly HashSet<NotificationType> AlwaysEmail = new()

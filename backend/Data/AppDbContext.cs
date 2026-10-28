@@ -45,7 +45,14 @@ namespace TalentHub.Data
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<ProjectSkill> ProjectSkills => Set<ProjectSkill>();
         public DbSet<ProjectMember> ProjectMembers => Set<ProjectMember>();
+        public DbSet<ProjectDocument> ProjectDocuments => Set<ProjectDocument>();
         public DbSet<ProjectMatch> ProjectMatches => Set<ProjectMatch>();
+
+        public DbSet<TrainingProgramme> TrainingProgrammes => Set<TrainingProgramme>();
+        public DbSet<TrainingProgrammeSkill> TrainingProgrammeSkills => Set<TrainingProgrammeSkill>();
+        public DbSet<TrainingIntake> TrainingIntakes => Set<TrainingIntake>();
+        public DbSet<TrainingAssignment> TrainingAssignments => Set<TrainingAssignment>();
+        public DbSet<CertificationReminderLog> CertificationReminderLogs => Set<CertificationReminderLog>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -392,6 +399,18 @@ namespace TalentHub.Data
     .HasForeignKey(p => p.DepartmentId)
     .OnDelete(DeleteBehavior.SetNull);
 
+            modelBuilder.Entity<ProjectDocument>()
+    .HasOne(d => d.Project)
+    .WithMany(p => p.Documents)
+    .HasForeignKey(d => d.ProjectId)
+    .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProjectDocument>()
+                .HasOne(d => d.UploadedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.UploadedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // ---------- ProjectSkill ----------
             modelBuilder.Entity<ProjectSkill>()
                 .Property(ps => ps.MinimumLevel)
@@ -463,6 +482,121 @@ namespace TalentHub.Data
             modelBuilder.Entity<ProjectMatch>()
                 .HasIndex(m => new { m.ProjectId, m.EmployeeId })
                 .IsUnique();
+
+            // ---------- TrainingProgramme ----------
+            modelBuilder.Entity<TrainingProgramme>()
+                .HasOne(p => p.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(p => p.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ---------- TrainingProgrammeSkill ----------
+            modelBuilder.Entity<TrainingProgrammeSkill>()
+                .HasOne(ps => ps.Programme)
+                .WithMany(p => p.Skills)
+                .HasForeignKey(ps => ps.TrainingProgrammeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Deleting a Skill must not silently strip it from programmes
+            modelBuilder.Entity<TrainingProgrammeSkill>()
+                .HasOne(ps => ps.Skill)
+                .WithMany()
+                .HasForeignKey(ps => ps.SkillId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // A programme can't list the same skill twice
+            modelBuilder.Entity<TrainingProgrammeSkill>()
+                .HasIndex(ps => new { ps.TrainingProgrammeId, ps.SkillId })
+                .IsUnique();
+
+            // ---------- TrainingIntake ----------
+            // Nothing is deleted: a programme with intakes cannot be removed
+            modelBuilder.Entity<TrainingIntake>()
+                .HasOne(i => i.Programme)
+                .WithMany(p => p.Intakes)
+                .HasForeignKey(i => i.TrainingProgrammeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TrainingIntake>()
+                .HasOne(i => i.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(i => i.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TrainingIntake>()
+                .HasOne(i => i.ClosedByUser)
+                .WithMany()
+                .HasForeignKey(i => i.ClosedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // "Give me this programme's intakes by date"
+            modelBuilder.Entity<TrainingIntake>()
+                .HasIndex(i => new { i.TrainingProgrammeId, i.StartDate });
+
+            // ---------- TrainingAssignment ----------
+            modelBuilder.Entity<TrainingAssignment>()
+                .HasOne(a => a.Intake)
+                .WithMany(i => i.Assignments)
+                .HasForeignKey(a => a.TrainingIntakeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TrainingAssignment>()
+                .HasOne(a => a.Employee)
+                .WithMany()
+                .HasForeignKey(a => a.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TrainingAssignment>()
+                .HasOne(a => a.AssignedByUser)
+                .WithMany()
+                .HasForeignKey(a => a.AssignedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TrainingAssignment>()
+                .HasOne(a => a.ConfirmedByUser)
+                .WithMany()
+                .HasForeignKey(a => a.ConfirmedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TrainingAssignment>()
+                .Property(a => a.Status)
+                .HasConversion<string>()
+                .HasMaxLength(30);
+
+            // An employee can only be in an intake once
+            modelBuilder.Entity<TrainingAssignment>()
+                .HasIndex(a => new { a.TrainingIntakeId, a.EmployeeId })
+                .IsUnique();
+
+            // The training log filters by employee and status
+            modelBuilder.Entity<TrainingAssignment>()
+                .HasIndex(a => new { a.EmployeeId, a.Status });
+
+            // The daily job looks for overdue and due-soon assignments
+            modelBuilder.Entity<TrainingAssignment>()
+                .HasIndex(a => new { a.Status, a.DueDate });
+
+            // ---------- CertificationReminderLog ----------
+            modelBuilder.Entity<CertificationReminderLog>()
+                .HasOne(l => l.Qualification)
+                .WithMany()
+                .HasForeignKey(l => l.EmployeeQualificationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CertificationReminderLog>()
+                .Property(l => l.ReminderPoint)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            // One row per certification, expiry date and reminder point: a changed
+            // expiry date starts a fresh cycle, the same date can never alert twice
+            modelBuilder.Entity<CertificationReminderLog>()
+                .HasIndex(l => new { l.EmployeeQualificationId, l.ExpiryDate, l.ReminderPoint })
+                .IsUnique();
+
+            // The certification scan filters by expiry date
+            modelBuilder.Entity<EmployeeQualification>()
+                .HasIndex(q => q.ExpiryDate);
 
             // convert all enums to strings in the database for readability
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
