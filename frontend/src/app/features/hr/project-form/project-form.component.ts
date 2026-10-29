@@ -3,10 +3,18 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Location } from '@angular/common';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { of } from 'rxjs';
+import { of, firstValueFrom } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { ToastService } from '../../../core/services/toast.service';
-import { ProjectService, ProjectResponse, SaveProjectRequest } from '../../../core/services/project.service';
+import {
+  ProjectService,
+  ProjectResponse,
+  SaveProjectRequest,
+  ProjectDraftResponse,
+  UnmatchedDraftSkill,
+  SkillSuggestion,
+  ProjectDocumentResponse,
+} from '../../../core/services/project.service';
 import {
   EmployeeProfileService,
   SkillOption,
@@ -18,6 +26,9 @@ import { EmployeeListItem } from '../../../core/models/index';
 // The backend DTO has a stray [Range(0, 60)] on RequiredQualifications (a string), so any real text
 // fails validation with a 400. Keep this false until the backend team removes it, then set it to true.
 const QUALIFICATIONS_ENABLED = false;
+
+const MAX_FILES = 10;
+const MAX_BYTES = 10 * 1024 * 1024;
 
 function todayStr(): string {
   const d = new Date();
@@ -46,6 +57,48 @@ interface SkillRow {
         <div class="api-error"><i class="ti ti-alert-circle"></i> {{ loadError() }}</div>
       } @else {
         <form (ngSubmit)="submit()" novalidate>
+          @if (!editId()) {
+            <div class="pf-card">
+              <div class="pf-h">Start from a document (optional)</div>
+              <div class="pf-hint">
+                Upload a project brief (PDF or Word, up to 10 MB) and the AI will fill in
+                the form. Nothing is saved until you click Save project.
+              </div>
+              <input #fileInput type="file" accept=".pdf,.docx" hidden (change)="onFile($event)" />
+              <button class="pf-cancel" type="button" [disabled]="extracting()" (click)="fileInput.click()">
+                @if (extracting()) {
+                  <mat-spinner diameter="14"></mat-spinner> Reading document…
+                } @else {
+                  <i class="ti ti-sparkles"></i> Fill from a document
+                }
+              </button>
+
+              @if (extractError()) { <div class="pf-error" role="alert">{{ extractError() }}</div> }
+              @for (w of draftWarnings(); track w) {
+                <div class="pf-warn"><i class="ti ti-info-circle"></i> {{ w }}</div>
+              }
+@if (extractedName()) {
+  <label class="pf-attach">
+    <input type="checkbox" [checked]="attachBrief()" (change)="attachBrief.set($any($event.target).checked)" />
+    Also attach <b>{{ extractedName() }}</b> to the project after saving
+  </label>
+}
+              @for (u of unmatched(); track $index) {
+                <div class="pf-skillrow">
+                  <div class="pf-grow">
+                    <b>“{{ u.extractedName }}”</b>
+                    <span class="pf-hint">{{ u.isRequired ? 'Required' : 'Nice to have' }} · {{ levelName(u.minimumLevel) }}</span>
+                    <div class="pf-hint">Not in your skills list. Pick the closest match or skip it.</div>
+                  </div>
+                  @for (s of u.suggestions; track s.skillId) {
+                    <button class="pf-cancel" type="button" (click)="mapUnmatched(u, s)">Use {{ s.name }}</button>
+                  }
+                  <button class="pf-cancel" type="button" (click)="skipUnmatched(u)">Skip</button>
+                </div>
+              }
+            </div>
+          }
+
           <div class="pf-card">
             <div class="pf-field">
               <label for="pf-name">Project name *</label>
@@ -129,6 +182,54 @@ interface SkillRow {
             <button class="pf-cancel" type="button" (click)="addRow()"><i class="ti ti-plus"></i> Add skill</button>
           </div>
 
+          @if (editId()) {
+            <div class="pf-card">
+              <div class="pf-h">Project files ({{ docs().length }}/{{ maxFiles }})</div>
+              <div class="pf-hint">
+                PDF or Word, up to 10 MB each. Files are saved straight away. You don’t
+                need to click Save project.
+              </div>
+
+              <input #docInput type="file" accept=".pdf,.docx" multiple hidden
+                     (change)="onDocsChosen($event)" />
+              <div class="pf-drop" role="button" tabindex="0"
+                   [class.pf-over]="dragOver()"
+                   [class.pf-off]="uploading() || docs().length >= maxFiles"
+                   (click)="docInput.click()"
+                   (keydown.enter)="docInput.click()"
+                   (keydown.space)="$event.preventDefault(); docInput.click()"
+                   (dragover)="$event.preventDefault(); dragOver.set(true)"
+                   (dragleave)="dragOver.set(false)"
+                   (drop)="onDrop($event)">
+                @if (uploading()) {
+                  <mat-spinner diameter="18"></mat-spinner> Uploading…
+                } @else {
+                  <i class="ti ti-upload"></i> Drop files here or click to browse
+                }
+              </div>
+
+              @if (docs().length >= maxFiles) {
+                <div class="pf-warn"><i class="ti ti-info-circle"></i> This project has reached the 10 file limit. Delete one to add another.</div>
+              }
+              @if (docError()) { <div class="pf-error" role="alert">{{ docError() }}</div> }
+
+              @for (d of docs(); track d.projectDocumentId) {
+                <div class="pf-skillrow">
+                  <div class="pf-grow">
+                    <b>{{ d.fileName }}</b>
+                    <div class="pf-hint">{{ fileSize(d.sizeBytes) }} · {{ d.uploadedByName }} · {{ fmtDate(d.uploadedAt) }}</div>
+                  </div>
+                  <button class="pf-cancel" type="button" [disabled]="busyDocId() === d.projectDocumentId"
+                          [attr.aria-label]="'Download ' + d.fileName" (click)="downloadDoc(d)">Download</button>
+                  <button class="pf-cancel" type="button" [disabled]="busyDocId() === d.projectDocumentId"
+                          [attr.aria-label]="'Delete ' + d.fileName" (click)="deleteDoc(d)">Delete</button>
+                </div>
+              } @empty {
+                @if (!docsLoading()) { <div class="pf-hint">No files yet.</div> }
+              }
+            </div>
+          }
+
           @if (saveError()) {
             <div class="pf-banner" role="alert"><i class="ti ti-alert-circle"></i> {{ saveError() }}</div>
           }
@@ -172,6 +273,10 @@ interface SkillRow {
       .pf-actions .pf-cancel { margin-top: 0; }
       .pf-spin { display: inline-block; }
       .pf-spin ::ng-deep circle { stroke: #fff; }
+      .pf-drop { display: flex; align-items: center; justify-content: center; gap: 8px; border: 2px dashed var(--border); border-radius: 12px; padding: 18px; margin: 10px 0; font-size: 13px; color: var(--text-muted); cursor: pointer; }
+      .pf-drop:hover, .pf-drop:focus-visible, .pf-over { border-color: var(--navy); background: var(--surface-2); outline: none; }
+      .pf-off { opacity: 0.5; pointer-events: none; }
+     .pf-attach { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 10px 0 4px; min-height: 40px; cursor: pointer; }
       @media (max-width: 640px) { .pf-card { padding: 18px 16px; } .pf-grid { grid-template-columns: 1fr; } }
     </style>
   `,
@@ -187,6 +292,7 @@ export class ProjectFormComponent implements OnInit {
 
   readonly levels = PROFICIENCY_LEVELS;
   readonly qualificationsEnabled = QUALIFICATIONS_ENABLED;
+  readonly maxFiles = MAX_FILES;
 
   editId = signal<number | null>(null);
   loading = signal(true);
@@ -194,6 +300,24 @@ export class ProjectFormComponent implements OnInit {
   saving = signal(false);
   saveError = signal<string | null>(null);
   submitted = signal(false);
+
+  // Extract from document (create only)
+  extracting = signal(false);
+  extractError = signal<string | null>(null);
+  draftWarnings = signal<string[]>([]);
+  unmatched = signal<UnmatchedDraftSkill[]>([]);
+
+  attachBrief = signal(true);
+extractedName = signal<string | null>(null);
+private extractedFile: File | null = null; // kept so it can be attached after the project is created
+
+  // Project files (edit only)
+  docs = signal<ProjectDocumentResponse[]>([]);
+  docsLoading = signal(false);
+  docError = signal<string | null>(null);
+  uploading = signal(false);
+  busyDocId = signal<number | null>(null);
+  dragOver = signal(false);
 
   readonly today = todayStr();
   // The dates the project had when it was opened for editing. An unchanged past date is allowed,
@@ -245,6 +369,7 @@ export class ProjectFormComponent implements OnInit {
           this.loadError.set('A closed project can’t be edited.');
         } else {
           this.fill(p);
+          this.loadDocs(); // only for an editable project
         }
         this.loading.set(false);
       },
@@ -370,11 +495,25 @@ export class ProjectFormComponent implements OnInit {
 
     this.saving.set(true);
     call$.subscribe({
-      next: (saved) => {
-        this.saving.set(false);
-        this.toast.show(id ? 'Project updated.' : 'Project created.', 'success');
-        this.router.navigate(['/admin/projects', saved.projectId]);
-      },
+     
+      next: async (saved) => {
+  // Create only: attach the brief the form was filled from.
+  let attachFailed = false;
+  if (!id && this.attachBrief() && this.extractedFile) {
+    try {
+      await firstValueFrom(this.projects.uploadDocument(saved.projectId, this.extractedFile));
+    } catch {
+      attachFailed = true;
+    }
+  }
+  this.saving.set(false);
+  if (attachFailed) {
+    this.toast.show('Project created, but the brief could not be attached. Add it from Edit.', 'error');
+  } else {
+    this.toast.show(id ? 'Project updated.' : 'Project created.', 'success');
+  }
+  this.router.navigate(['/admin/projects', saved.projectId]);
+},
       error: (err) => {
         this.saving.set(false);
         this.saveError.set(this.errMsg(err, 'Could not save the project.'));
@@ -395,5 +534,198 @@ export class ProjectFormComponent implements OnInit {
       if (first) return String(first);
     }
     return err?.message ?? fallback;
+  }
+
+  // ───────────── Extract project details from a document (create only) ─────────────
+
+  onFile(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ''; // so the same file can be chosen again
+    if (!file || this.extracting()) return;
+
+    this.extractError.set(null);
+    if (!/\.(pdf|docx)$/i.test(file.name)) {
+      this.extractError.set('Only PDF and Word (.docx) files are accepted.');
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      this.extractError.set('File exceeds the maximum size of 10 MB.');
+      return;
+    }
+    const hasInput =
+      !!this.form.name.trim() || !!this.form.description.trim() || this.rows().some((r) => r.skillId != null);
+    if (hasInput && !confirm('Replace what you have entered with the details from the document?')) return;
+
+    this.extracting.set(true);
+    this.projects.extract(file).subscribe({
+    next: (d) => {
+  this.applyDraft(d);
+  this.extractedFile = file;
+  this.extractedName.set(file.name);
+  this.attachBrief.set(true);
+  this.extracting.set(false);
+},
+      error: (err) => {
+        this.extracting.set(false);
+        this.extractError.set(this.errMsg(err, 'Could not read that document. Please fill in the project manually.'));
+      },
+    });
+  }
+
+  private applyDraft(d: ProjectDraftResponse): void {
+    const f = this.form;
+    this.form = {
+      ...f,
+      name: d.name || f.name,
+      description: d.description || f.description,
+      startDate: d.startDate ? d.startDate.slice(0, 10) : f.startDate,
+      endDate: d.endDate ? d.endDate.slice(0, 10) : f.endDate,
+      // requiredQualifications is not copied while QUALIFICATIONS_ENABLED is false (the field is hidden).
+      // When it is switched on, add: requiredQualifications: d.requiredQualifications || f.requiredQualifications,
+    };
+    if (d.skills.length) {
+      this.rows.set(
+        d.skills.map((s) => ({
+          skillId: s.skillId,
+          isRequired: s.isRequired,
+          minimumLevel: this.levelName(s.minimumLevel),
+        })),
+      );
+    }
+    this.draftWarnings.set(d.warnings);
+    this.unmatched.set(d.unmatchedSkills);
+  }
+
+  mapUnmatched(u: UnmatchedDraftSkill, s: SkillSuggestion): void {
+    const already = this.rows().some((r) => r.skillId === s.skillId);
+    if (!already) {
+      const row = { skillId: s.skillId, isRequired: u.isRequired, minimumLevel: this.levelName(u.minimumLevel) };
+      // reuse the empty starter row if there is one
+      const empty = this.rows().findIndex((r) => r.skillId == null);
+      this.rows.update((r) => (empty >= 0 ? r.map((x, i) => (i === empty ? row : x)) : [...r, row]));
+    }
+    this.skipUnmatched(u);
+  }
+
+  skipUnmatched(u: UnmatchedDraftSkill): void {
+    this.unmatched.update((list) => list.filter((x) => x !== u));
+  }
+
+  levelName(v: string | number): string {
+    return typeof v === 'number' ? (this.levels[v] ?? this.levels[0]) : v;
+  }
+
+  // ───────────── Project files (edit only) ─────────────
+
+  private loadDocs(): void {
+    const id = this.editId();
+    if (!id) return;
+    this.docsLoading.set(true);
+    this.projects.getDocuments(id).subscribe({
+      next: (list) => {
+        this.docs.set(list);
+        this.docsLoading.set(false);
+      },
+      error: (err) => {
+        this.docsLoading.set(false);
+        this.docError.set(this.errMsg(err, 'Could not load the project files.'));
+      },
+    });
+  }
+
+  onDocsChosen(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = ''; // lets the same file be picked again
+    void this.uploadFiles(files);
+  }
+
+  onDrop(ev: DragEvent): void {
+    ev.preventDefault();
+    this.dragOver.set(false);
+    void this.uploadFiles(Array.from(ev.dataTransfer?.files ?? []));
+  }
+
+  // Same rules as ProjectDocumentsController.Upload. The server stays the authority.
+  private async uploadFiles(files: File[]): Promise<void> {
+    const id = this.editId();
+    if (!id || !files.length || this.uploading()) return;
+    this.docError.set(null);
+    this.uploading.set(true);
+
+    for (const file of files) {
+      let problem = '';
+      if (this.docs().length >= MAX_FILES) problem = 'A project can have at most 10 files.';
+      else if (!/\.(pdf|docx)$/i.test(file.name)) problem = 'Only PDF and Word (.docx) files are accepted.';
+      else if (file.size === 0) problem = 'No file was uploaded.';
+      else if (file.size > MAX_BYTES) problem = 'File exceeds the maximum size of 10 MB.';
+      if (problem) {
+        this.docError.set(`${file.name}: ${problem}`);
+        break;
+      }
+
+      try {
+        const saved = await firstValueFrom(this.projects.uploadDocument(id, file));
+        this.docs.update((list) => [saved, ...list]);
+        this.toast.show(`${file.name} uploaded.`, 'success');
+      } catch (err: any) {
+        const msg =
+          err?.status === 413 ? 'File exceeds the maximum size of 10 MB.' : this.errMsg(err, 'Could not upload the file.');
+        this.docError.set(`${file.name}: ${msg}`);
+        break; // stop here so the error stays readable
+      }
+    }
+    this.uploading.set(false);
+  }
+
+  downloadDoc(d: ProjectDocumentResponse): void {
+    const id = this.editId();
+    if (!id || this.busyDocId() !== null) return;
+    this.busyDocId.set(d.projectDocumentId);
+    this.projects.downloadDocument(id, d.projectDocumentId).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = d.fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.busyDocId.set(null);
+      },
+      error: (err) => {
+        this.busyDocId.set(null);
+        // The error body of a blob request is a Blob, so show a fixed message.
+        this.docError.set(
+          err?.status === 404 ? 'The file could not be found on the server.' : 'Could not download the file.',
+        );
+      },
+    });
+  }
+
+  deleteDoc(d: ProjectDocumentResponse): void {
+    const id = this.editId();
+    if (!id || this.busyDocId() !== null) return;
+    if (!confirm(`Delete ${d.fileName}? This can’t be undone.`)) return;
+    this.busyDocId.set(d.projectDocumentId);
+    this.projects.deleteDocument(id, d.projectDocumentId).subscribe({
+      next: () => {
+        this.docs.update((list) => list.filter((x) => x.projectDocumentId !== d.projectDocumentId));
+        this.busyDocId.set(null);
+        this.toast.show('File deleted.', 'success');
+      },
+      error: (err) => {
+        this.busyDocId.set(null);
+        this.docError.set(this.errMsg(err, 'Could not delete the file.'));
+      },
+    });
+  }
+
+  fileSize(b: number): string {
+    return b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
+  }
+
+  fmtDate(d: string): string {
+    return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 }

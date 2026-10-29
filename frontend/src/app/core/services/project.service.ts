@@ -109,6 +109,32 @@ export interface ProjectMemberResponse {
   addedByName: string;
   addedAt: string;
 }
+// ── Extract from document ──
+export interface SkillSuggestion { skillId: number; name: string; }
+export interface DraftSkill {
+  skillId: number; skillName: string; isRequired: boolean;
+  minimumLevel: string | number;
+}
+export interface UnmatchedDraftSkill {
+  extractedName: string; isRequired: boolean;
+  minimumLevel: string | number; suggestions: SkillSuggestion[];
+}
+export interface ProjectDraftResponse {
+  name: string; description: string;
+  startDate?: string | null; endDate?: string | null;
+  requiredQualifications: string;
+  skills: DraftSkill[]; unmatchedSkills: UnmatchedDraftSkill[];
+  warnings: string[];
+}
+
+//upload project documents
+export interface ProjectDocumentResponse {
+  projectDocumentId: number;
+  fileName: string;
+  sizeBytes: number;
+  uploadedByName: string;
+  uploadedAt: string;
+}
 
 // ───────────────────────── Service ─────────────────────────
 //
@@ -151,6 +177,13 @@ export class ProjectService {
     return this.http.patch<ProjectResponse>(`${this.base}/${id}/close`, {});
   }
 
+  // POST api/projects/extract. Preview only; nothing is saved.
+extract(file: File): Observable<ProjectDraftResponse> {
+  const body = new FormData();
+  body.append('file', file); // the field name must be "file"
+  return this.http.post<ProjectDraftResponse>(`${this.base}/extract`, body);
+}
+
   // ── Matching ──
   runMatch(id: number): Observable<ProjectMatchRunResponse> {
     return this.http.post<ProjectMatchRunResponse>(`${this.base}/${id}/matches/run`, {});
@@ -181,4 +214,24 @@ export class ProjectService {
   removeMember(id: number, employeeId: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}/members/${employeeId}`);
   }
+
+  // ── Project files (api/projects/{id}/documents) ──
+getDocuments(id: number): Observable<ProjectDocumentResponse[]> {
+  return this.http.get<ProjectDocumentResponse[]>(`${this.base}/${id}/documents`);
+}
+
+uploadDocument(id: number, file: File): Observable<ProjectDocumentResponse> {
+  const body = new FormData();
+  body.append('file', file); // field name must be "file"
+  return this.http.post<ProjectDocumentResponse>(`${this.base}/${id}/documents`, body);
+}
+
+// Blob so the auth interceptor still adds the token (a plain <a href> would not).
+downloadDocument(id: number, documentId: number): Observable<Blob> {
+  return this.http.get(`${this.base}/${id}/documents/${documentId}`, { responseType: 'blob' });
+}
+
+deleteDocument(id: number, documentId: number): Observable<void> {
+  return this.http.delete<void>(`${this.base}/${id}/documents/${documentId}`);
+}
 }

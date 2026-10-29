@@ -8,6 +8,7 @@ import {
   ProjectResponse,
   ProjectMatchResponse,
   ProjectMemberResponse,
+  ProjectDocumentResponse,
   SkillGapItem,
   GapStatus,
 } from '../../../core/services/project.service';
@@ -136,7 +137,38 @@ const NOT_SCORED = 'The AI did not score';
                   </div>
                 }
               </div>
-
+<div class="pd-card">
+  <div class="pd-h">Project files ({{ docs().length }})</div>
+  @if (docError()) {
+    <div class="pd-err" role="alert">{{ docError() }}</div>
+  }
+  @for (d of docs(); track d.projectDocumentId) {
+    <div class="pd-member">
+      <div class="pd-grow">
+        <div class="pd-name pd-file" [title]="d.fileName">{{ d.fileName }}</div>
+        <div class="pd-meta">
+          {{ fileSize(d.sizeBytes) }} · {{ d.uploadedByName }} · {{ fmtDay(d.uploadedAt) }}
+        </div>
+      </div>
+      <button
+        class="pd-btn"
+        type="button"
+        [disabled]="busyDocId() === d.projectDocumentId"
+        [attr.aria-label]="'Download ' + d.fileName"
+        (click)="downloadDoc(d)"
+      >
+        Download
+      </button>
+    </div>
+  } @empty {
+    @if (!docsLoading() && !docError()) {
+      <div class="pd-meta">
+        No files yet.
+        @if (active()) { Add them from Edit. }
+      </div>
+    }
+  }
+</div>
               <div class="pd-card">
                 <div class="pd-h">Team ({{ members().length }})</div>
                 @for (t of members(); track t.employeeId) {
@@ -625,6 +657,8 @@ const NOT_SCORED = 'The AI did not score';
           padding: 14px 16px;
         }
       }
+      .pd-file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pd-err { font-size: 12.5px; color: #b3261e; margin-bottom: 6px; }
     </style>
   `,
 })
@@ -647,6 +681,12 @@ export class ProjectDetailComponent implements OnInit {
   busyId = signal<number | null>(null); // one row action at a time
   showDismissed = signal(false);
   limit = signal(PAGE);
+
+
+  docs = signal<ProjectDocumentResponse[]>([]);
+docsLoading = signal(false);
+docError = signal<string | null>(null);
+busyDocId = signal<number | null>(null);
 
   active = computed(() => {
     const p = this.project();
@@ -678,7 +718,8 @@ export class ProjectDetailComponent implements OnInit {
         this.project.set(p);
         this.loading.set(false);
         this.loadMembers();
-        if (p.lastMatchedAt) this.loadMatches();
+this.loadDocs();
+if (p.lastMatchedAt) this.loadMatches();
       },
       error: (err) => {
         this.loadError.set(this.errMsg(err, 'Could not load the project.'));
@@ -941,4 +982,53 @@ export class ProjectDetailComponent implements OnInit {
     }
     return err?.message ?? fallback;
   }
+  private loadDocs(): void {
+  this.docsLoading.set(true);
+  this.api.getDocuments(this.projectId).subscribe({
+    next: (list) => {
+      this.docs.set(list);
+      this.docsLoading.set(false);
+    },
+    error: (err) => {
+      this.docsLoading.set(false);
+      this.docError.set(this.errMsg(err, 'Could not load the project files.'));
+    },
+  });
+}
+
+downloadDoc(d: ProjectDocumentResponse): void {
+  if (this.busyDocId() !== null) return;
+  this.docError.set(null);
+  this.busyDocId.set(d.projectDocumentId);
+  this.api.downloadDocument(this.projectId, d.projectDocumentId).subscribe({
+    next: (blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = d.fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      this.busyDocId.set(null);
+    },
+    error: (err) => {
+      this.busyDocId.set(null);
+      // A blob request's error body is a Blob, so use fixed messages.
+      this.docError.set(
+        err?.status === 404
+          ? 'The file could not be found on the server.'
+          : 'Could not download the file.',
+      );
+    },
+  });
+}
+
+fileSize(b: number): string {
+  return b >= 1048576
+    ? `${(b / 1048576).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(b / 1024))} KB`;
+}
+
+fmtDay(d: string): string {
+  return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 }
