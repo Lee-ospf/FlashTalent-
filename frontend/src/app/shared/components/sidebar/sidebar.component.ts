@@ -194,7 +194,7 @@ export class SidebarComponent {
       route: '/admin/clients',
     },
     {
-      label: 'Manage Recruiters',
+      label: 'Manage Users',
       icon: 'ti-user-star',
       route: '/admin/recruiters',
     },

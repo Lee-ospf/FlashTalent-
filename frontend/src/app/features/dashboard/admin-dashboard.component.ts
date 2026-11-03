@@ -159,7 +159,7 @@ const STATUS_LABEL: Record<string, string> = {
               class="card-link"
               style="margin-top:12px;display:block"
             >
-              Manage recruiters <i class="ti ti-arrow-right"></i>
+              Manage Users <i class="ti ti-arrow-right"></i>
             </a>
           </mat-card-content>
         </mat-card>

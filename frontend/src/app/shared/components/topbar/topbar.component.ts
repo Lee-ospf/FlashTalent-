@@ -36,7 +36,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/admin/skills': 'Manage Skills',
   '/admin/departments': 'Manage Departments',
   '/admin/clients': 'Manage Clients',
-  '/admin/recruiters': 'Manage Recruiters',
+  '/admin/recruiters': 'Manage Users',
 };
 
 @Component({
