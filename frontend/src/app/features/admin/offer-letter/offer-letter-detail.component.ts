@@ -182,20 +182,26 @@ import { DatePickerTriggerDirective } from '../../../shared/directives/date-pick
                       [(ngModel)]="draftSalary"
                     />
                   </mat-form-field>
+                  
                   <mat-form-field appearance="outline" class="compact-select">
-                    <mat-label>Start date</mat-label>
-                    <input matInput type="date" [(ngModel)]="draftStartDate" />
-                  </mat-form-field>
-                  <mat-form-field appearance="outline" class="compact-select">
-                    <mat-label>Closing date</mat-label>
+                    <mat-label>Submit by</mat-label>
                     <input
                       matInput
                       type="date"
+                      [min]="todayInput()"
                       [(ngModel)]="draftClosingDate"
                     />
                   </mat-form-field>
+                  <mat-form-field appearance="outline" class="compact-select">
+                    <mat-label>Start date</mat-label>
+                    <input matInput type="date" [min]="draftClosingDate || null" [(ngModel)]="draftStartDate" />
+                  </mat-form-field>
                 </div>
-
+@if (startBeforeSubmitBy()) {
+  <div class="api-error" style="margin-top:12px">
+    <i class="ti ti-alert-circle"></i> Start date cannot be before the submit by date.
+  </div>
+}
                 @if (generateError()) {
                   <div class="api-error" style="margin-top:12px">
                     <i class="ti ti-alert-circle"></i> {{ generateError() }}
@@ -626,15 +632,32 @@ export class OfferLetterDetailComponent implements OnInit {
     this.draftStartDate = '';
     this.draftClosingDate = '';
   }
+  todayInput(): string {
+  return new Date().toLocaleDateString('en-CA'); 
+}
 
-  canGenerate(): boolean {
-    return (
-      !!this.draftSalary &&
-      this.draftSalary > 0 &&
-      !!this.draftStartDate &&
-      !!this.draftClosingDate
-    );
-  }
+  startBeforeSubmitBy(): boolean {
+  return (
+    !!this.draftStartDate &&
+    !!this.draftClosingDate &&
+    this.draftStartDate < this.draftClosingDate
+  );
+}
+
+submitByInPast(): boolean {
+  return !!this.draftClosingDate && this.draftClosingDate < this.todayInput();
+}
+
+canGenerate(): boolean {
+  return (
+    !!this.draftSalary &&
+    this.draftSalary > 0 &&
+    !!this.draftStartDate &&
+    !!this.draftClosingDate &&
+    !this.submitByInPast() &&
+    !this.startBeforeSubmitBy()
+  );
+}
 
   generateOffer(): void {
     const app = this.application();

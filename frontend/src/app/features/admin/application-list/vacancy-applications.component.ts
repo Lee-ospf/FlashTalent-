@@ -381,6 +381,7 @@ type ApplicationWithEmployee = ApplicationResponse & {
                   name="externalEmployeeId"
                   type="text"
                   maxlength="50"
+                  placeholder="EMPST000002"
                   [(ngModel)]="onboardForm.externalEmployeeId"
                 />
                 @if (fieldError('externalEmployeeId'); as err) {
@@ -389,17 +390,18 @@ type ApplicationWithEmployee = ApplicationResponse & {
               </div>
 
               <div class="mo-field">
-                <label for="mo-start">Start date *</label>
-                <input
-                  id="mo-start"
-                  name="hireDate"
-                  type="date"
-                  [(ngModel)]="onboardForm.hireDate"
-                />
-                @if (fieldError('hireDate'); as err) {
-                  <div class="mo-field-error">{{ err }}</div>
-                }
-              </div>
+  <label for="mo-start">Start date *</label>
+  <input
+    id="mo-start"
+    name="hireDate"
+    type="date"
+     [min]="todayInput()"
+    [(ngModel)]="onboardForm.hireDate"
+  />
+  @if (fieldError('hireDate'); as err) {
+    <div class="mo-field-error">{{ err }}</div>
+  }
+</div>
 
               <div class="mo-field">
                 <label for="mo-title-input">Job title *</label>
@@ -410,7 +412,6 @@ type ApplicationWithEmployee = ApplicationResponse & {
                   maxlength="100"
                   [(ngModel)]="onboardForm.jobTitle"
                 />
-                <div class="mo-hint">Pre-filled from the vacancy</div>
                 @if (fieldError('jobTitle'); as err) {
                   <div class="mo-field-error">{{ err }}</div>
                 }
@@ -429,7 +430,6 @@ type ApplicationWithEmployee = ApplicationResponse & {
                   }
                 </select>
                 @if (vacancy()?.departmentId) {
-                  <div class="mo-hint">Pre-filled from the vacancy</div>
                 }
                 @if (fieldError('departmentId'); as err) {
                   <div class="mo-field-error">{{ err }}</div>
@@ -446,8 +446,8 @@ type ApplicationWithEmployee = ApplicationResponse & {
                   [(ngModel)]="onboardForm.workEmail"
                 />
                 <div class="mo-hint">
-                  This becomes their login. Their current email is kept as a
-                  personal email, and they must change their password at first
+                  This becomes their login email. Their current email is kept as a
+                  personal email, and they may change their password at first
                   sign-in.
                 </div>
                 @if (fieldError('workEmail'); as err) {
@@ -760,7 +760,7 @@ export class VacancyApplicationsComponent implements OnInit {
   maxRoundsReached = signal<Set<number>>(new Set());
   interviewSubState = signal<Map<number, InterviewSubState>>(new Map());
   offerStatusByApp = signal<Map<number, string>>(new Map());
-
+startDateFromOffer = signal(false);
   // ── AI applicant ranking (Phase 2) - Applied candidates only ─────
   ranking = signal(false);
   rankedMatches = signal<Map<number, AiTalentPoolMatchResponse>>(new Map()); // keyed by candidateId
@@ -988,8 +988,9 @@ export class VacancyApplicationsComponent implements OnInit {
       });
     }
 
-    const offerToCheck = apps.filter((a) => a.status === 'OfferExtended');
-    if (offerToCheck.length) {
+const offerToCheck = apps.filter(
+  (a) => a.status === 'OfferExtended' || a.status === 'Hired',
+);    if (offerToCheck.length) {
       const ids = offerToCheck.map((a) => a.applicationId);
       this.offerLetterService.preload(ids).subscribe(() => {
         const map = new Map<number, string>();
@@ -1001,7 +1002,10 @@ export class VacancyApplicationsComponent implements OnInit {
       });
     }
   }
-
+private toDateInput(d?: string | null): string {
+  const m = d ? /^\d{4}-\d{2}-\d{2}/.exec(d) : null;
+  return m ? m[0] : '';
+}
   private tabKeyFor(status: string): TabKey {
     if (status === 'Applied' || status === 'UnderReview') return 'review';
     if (status === 'Shortlisted' || status === 'PrescreeningStage')
@@ -1090,7 +1094,9 @@ export class VacancyApplicationsComponent implements OnInit {
       minute: '2-digit',
     });
   }
-
+todayInput(): string {
+  return new Date().toLocaleDateString('en-CA'); 
+}
   goBack(): void {
     this.location.back();
   }
@@ -1131,20 +1137,34 @@ export class VacancyApplicationsComponent implements OnInit {
 
   // ── Mark as onboarded modal ──────────────────────────────────────
 
-  openOnboardModal(a: ApplicationResponse): void {
-    const v = this.vacancy();
-    this.onboardForm = {
-      externalEmployeeId: '',
-      hireDate: '',
-      jobTitle: v?.title ?? '',
-      departmentId: v?.departmentId ?? null,
-      workEmail: '',
-    };
-    this.onboardSubmitted.set(false);
-    this.onboardError.set(null);
-    this.onboardTarget.set(a);
-  }
+openOnboardModal(a: ApplicationResponse): void {
+  const v = this.vacancy();
+  const offerStart = this.toDateInput(
+    this.offerLetterService.peek(a.applicationId)?.startDate,
+  );
 
+  this.onboardForm = {
+    externalEmployeeId: '',
+    hireDate: offerStart,
+    jobTitle: v?.title ?? '',
+    departmentId: v?.departmentId ?? null,
+    workEmail: '',
+  };
+  this.startDateFromOffer.set(!!offerStart);
+  this.onboardSubmitted.set(false);
+  this.onboardError.set(null);
+  this.onboardTarget.set(a);
+
+  if (!offerStart) {
+    this.offerLetterService.getLatest(a.applicationId).subscribe((o) => {
+      // Only fill if the modal is still open for this application and HR hasn't typed a date
+      if (this.onboardTarget()?.applicationId !== a.applicationId) return;
+      if (!o || this.onboardForm.hireDate) return;
+      this.onboardForm.hireDate = this.toDateInput(o.startDate);
+      this.startDateFromOffer.set(!!this.onboardForm.hireDate);
+    });
+  }
+}
   closeOnboardModal(): void {
     if (this.onboardSaving()) return;
     this.onboardTarget.set(null);
@@ -1175,8 +1195,13 @@ export class VacancyApplicationsComponent implements OnInit {
             : null;
       }
       case 'hireDate':
-        return f.hireDate ? null : 'Choose a start date.';
-      case 'jobTitle': {
+case 'hireDate':
+  return !f.hireDate
+    ? 'Choose a start date.'
+    : f.hireDate < this.todayInput()
+      ? 'Start date cannot be in the past.'
+      : null;
+            case 'jobTitle': {
         const v = f.jobTitle.trim();
         return !v
           ? 'Enter the job title.'
