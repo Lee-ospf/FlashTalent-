@@ -35,6 +35,26 @@ namespace TalentHub.Controllers
             return Ok(recruiters);
         }
 
+        [HttpGet("hr")]
+        public async Task<IActionResult> GetAllHr()
+        {
+            var hr = await Db.Users
+                .AsNoTracking()
+                .Where(u => u.Role == UserRole.HR)
+                .OrderBy(u => u.LastName).ThenBy(u => u.FirstName)
+                .Select(u => new
+                {
+                    u.UserId,
+                    JobTitle = u.HrProfile != null ? u.HrProfile.JobTitle : null,
+                    FullName = u.FirstName + " " + u.LastName,
+                    u.Email
+                })
+                .ToListAsync();
+
+            return Ok(hr);
+        }
+    
+
         // GET: api/Recruiter/5
         [HttpGet("{id}")]
         public async Task<IActionResult> GetRecruiterById(int id)
@@ -60,9 +80,6 @@ namespace TalentHub.Controllers
 
         // POST: api/Recruiter
         // Admin only. NOTE: this assumes a User row already exists with Role=Recruiter/Admin -
-        // it's a separate path from AuthController's /create-recruiter (which creates the User
-        // AND the Recruiter profile together with a temp password). Worth consolidating these
-        // two paths later so there's only one way to create a recruiter.
         [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> CreateRecruiter([FromBody] CreateRecruiterDto dto)

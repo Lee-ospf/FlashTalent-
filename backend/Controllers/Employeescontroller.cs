@@ -126,5 +126,58 @@ namespace TalentHub.Controllers
 
             return Ok(EmployeeProfileMapper.ToResponse(employee));
         }
+
+        // GET api/employees/me/projects              all projects the signed-in employee is a member of
+        // GET api/employees/me/projects?status=Active   only active ones
+        [Authorize(Roles = "Employee")]
+        [HttpGet("me/projects")]
+        public async Task<ActionResult<List<EmployeeProjectResponse>>> GetMyProjects([FromQuery] ProjectStatus? status)
+        {
+            // The signed-in user's own employee record. The employee id is never taken from the client.
+            var employeeId = await Db.Employees
+                .AsNoTracking()
+                .Where(e => e.UserId == CurrentUserId)
+                .Select(e => (int?)e.EmployeeId)
+                .FirstOrDefaultAsync();
+
+            if (employeeId == null)
+                return Ok(new List<EmployeeProjectResponse>()); // no employee record means no projects
+
+            var query = Db.ProjectMembers
+                .AsNoTracking()
+                .Where(pm => pm.EmployeeId == employeeId.Value);
+
+            if (status.HasValue)
+                query = query.Where(pm => pm.Project!.Status == status.Value);
+
+            var items = await query
+                .OrderByDescending(pm => pm.AddedAt)
+                .Select(pm => new EmployeeProjectResponse
+                {
+                    ProjectId = pm.ProjectId,
+                    Name = pm.Project!.Name,
+                    Description = pm.Project.Description,
+                    Status = pm.Project.Status,
+                    DepartmentName = pm.Project.Department != null ? pm.Project.Department.Name : null,
+                    StartDate = pm.Project.StartDate,
+                    EndDate = pm.Project.EndDate,
+                    AddedAt = pm.AddedAt,
+                    MemberCount = pm.Project.Members.Count,
+                    Skills = pm.Project.ProjectSkills
+                        .OrderByDescending(ps => ps.IsRequired)
+                        .ThenBy(ps => ps.Skill!.Name)
+                        .Select(ps => new EmployeeProjectSkillResponse
+                        {
+                            SkillId = ps.SkillId,
+                            SkillName = ps.Skill!.Name,
+                            IsRequired = ps.IsRequired,
+                            MinimumLevel = ps.MinimumLevel
+                        })
+                        .ToList()
+                })
+                .ToListAsync();
+
+            return Ok(items);
+        }
     }
 }

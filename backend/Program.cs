@@ -127,6 +127,7 @@ builder.Services.AddScoped<IOfferLetterService, OfferLetterService>();
 builder.Services.AddHttpClient<IResumeParsingService, ResumeParsingService>();
 builder.Services.AddHttpClient<ITalentPoolMatchingService, TalentPoolMatchingService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IFirstLoginNotifier, FirstLoginNotifier>();
 builder.Services.AddScoped<NotificationDispatchJob>();
 builder.Services.AddScoped<ReminderScanJob>();
 builder.Services.AddScoped<CertificationScanJob>();

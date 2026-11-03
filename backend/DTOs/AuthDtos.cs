@@ -54,7 +54,7 @@ namespace TalentHub.DTOs
         [EmailAddress]
         public string Email { get; set; } = string.Empty;
 
-        [Required]
+  
         public string Password { get; set; } = string.Empty;
 
         public string? JobTitle { get; set; }
@@ -68,5 +68,12 @@ namespace TalentHub.DTOs
         [Required]
         public string NewPassword { get; set; } = string.Empty;
     }
+    public class CreateUserResponse
+    {
+        public string Message { get; set; } = string.Empty;
+        // Shown to the admin once, as the on-screen fallback. Never log response bodies for these endpoints.
+        public string TemporaryPassword { get; set; } = string.Empty;
+    }
+
 
 }

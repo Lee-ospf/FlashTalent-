@@ -25,22 +25,30 @@ namespace TalentHub.Services
 
         public async Task<bool> SendAsync(string toEmail, string subject, string body)
         {
-            var msg = MailHelper.CreateSingleEmail(
-                new EmailAddress(_fromEmail),
-                new EmailAddress(toEmail),
-                subject,
-                plainTextContent: body,
-                htmlContent: null);
-
-            var response = await _client.SendEmailAsync(msg);
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                var responseBody = await response.Body.ReadAsStringAsync();
-                _logger.LogError(
-                    "SendGrid rejected email to {ToEmail}. Status: {StatusCode}. Body: {Body}",
-                    toEmail, response.StatusCode, responseBody);
+                var msg = MailHelper.CreateSingleEmail(
+                    new EmailAddress(_fromEmail),
+                    new EmailAddress(toEmail),
+                    subject,
+                    plainTextContent: body,
+                    htmlContent: null);
+
+                var response = await _client.SendEmailAsync(msg);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var responseBody = await response.Body.ReadAsStringAsync();
+                    _logger.LogError(
+                        "SendGrid rejected email to {ToEmail}. Status: {StatusCode}. Body: {Body}",
+                        toEmail, response.StatusCode, responseBody);
+                }
+                return response.IsSuccessStatusCode;
             }
-            return response.IsSuccessStatusCode;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Sending email to {ToEmail} failed with an exception.", toEmail);
+                return false;
+            }
         }
     }
 }

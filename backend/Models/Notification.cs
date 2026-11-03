@@ -20,6 +20,8 @@ namespace TalentHub.Models
         TalentPoolInvite,
         General,
         AddedToProject,
+        TemporaryPassword,
+        WorkEmailAssigned,
         CertificationExpiring,
         CertificationExpired,
         HrComplianceDigest,

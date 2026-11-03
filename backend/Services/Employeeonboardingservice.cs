@@ -34,11 +34,16 @@ namespace TalentHub.Services
     {
         private readonly AppDbContext _db;
         private readonly IEmployeeProfileCopyService _copyService;
+        private readonly IFirstLoginNotifier _firstLogin;
+        private readonly ILogger<EmployeeOnboardingService> _logger;
 
-        public EmployeeOnboardingService(AppDbContext db, IEmployeeProfileCopyService copyService)
+        public EmployeeOnboardingService(AppDbContext db, IEmployeeProfileCopyService copyService,
+            IFirstLoginNotifier firstLogin, ILogger<EmployeeOnboardingService> logger)
         {
             _db = db;
             _copyService = copyService;
+            _firstLogin = firstLogin;
+            _logger = logger;
         }
 
         public async Task<OnboardingResult> CompleteAsync(OnboardingCompleteRequest request)
@@ -143,7 +148,7 @@ namespace TalentHub.Services
                 }
 
                 user.Role = UserRole.Employee;
-                user.MustChangePassword = true;
+                user.MustChangePassword = false;
                 user.UpdatedAt = DateTime.UtcNow;
 
                 var employee = new Employee
@@ -166,13 +171,20 @@ namespace TalentHub.Services
 
                 await _db.SaveChangesAsync();
                 await tx.CommitAsync();
-
+                if (emailChanges)
+                {
+                    try { await _firstLogin.SendWorkEmailAsync(user); }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Employee {UserId} onboarded but the work-email notice could not be queued.", user.UserId);
+                    }
+                }
                 return new OnboardingResult
                 {
                     Outcome = OnboardingOutcome.Created,
                     Message = "Employee created.",
                     Data = BuildResponse(employee, user, alreadyOnboarded: false, copied,
-                        "Employee created. The person now signs in with the work email.")
+                        "Employee created. They now sign in with the work email, and a notice was sent to their personal email.")
                 };
             }
             catch (DbUpdateException)
