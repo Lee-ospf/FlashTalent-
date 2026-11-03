@@ -325,6 +325,48 @@ namespace TalentHub.Migrations
                     b.ToTable("CandidateSkills");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.CareerGoal", b =>
+                {
+                    b.Property<int>("CareerGoalId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CareerGoalId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("ShareWithHr")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("TargetDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("TargetRole")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("CareerGoalId");
+
+                    b.HasIndex("EmployeeId", "Status");
+
+                    b.HasIndex("Status", "ShareWithHr");
+
+                    b.ToTable("CareerGoals");
+                });
+
             modelBuilder.Entity("TalentHub.Models.CertificationReminderLog", b =>
                 {
                     b.Property<int>("CertificationReminderLogId")
@@ -1525,6 +1567,155 @@ namespace TalentHub.Migrations
                     b.ToTable("Skills");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.SkillAdvice", b =>
+                {
+                    b.Property<int>("SkillAdviceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SkillAdviceId"));
+
+                    b.Property<int?>("CareerGoalId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("GeneratedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("InputFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ModelVersion")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("ProjectId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.HasKey("SkillAdviceId");
+
+                    b.HasIndex("CareerGoalId")
+                        .IsUnique()
+                        .HasFilter("[CareerGoalId] IS NOT NULL");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("GeneratedByUserId");
+
+                    b.HasIndex("ProjectId", "EmployeeId")
+                        .IsUnique()
+                        .HasFilter("[ProjectId] IS NOT NULL");
+
+                    b.ToTable("SkillAdvices", t =>
+                        {
+                            t.HasCheckConstraint("CK_SkillAdvices_OneSubject", "([CareerGoalId] IS NOT NULL AND [ProjectId] IS NULL) OR ([CareerGoalId] IS NULL AND [ProjectId] IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("TalentHub.Models.SkillAdviceItem", b =>
+                {
+                    b.Property<int>("SkillAdviceItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SkillAdviceItemId"));
+
+                    b.Property<string>("AdviceText")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ExternalIdea")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("SkillAdviceId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SkillId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SkillName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("StatusChangedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TargetLevel")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("TrainingProgrammeId")
+                        .HasColumnType("int");
+
+                    b.HasKey("SkillAdviceItemId");
+
+                    b.HasIndex("SkillId");
+
+                    b.HasIndex("TrainingProgrammeId");
+
+                    b.HasIndex("SkillAdviceId", "SortOrder");
+
+                    b.ToTable("SkillAdviceItems");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.SkillAdviceRun", b =>
+                {
+                    b.Property<int>("SkillAdviceRunId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SkillAdviceRunId"));
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("RequestedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("SkillAdviceRunId");
+
+                    b.HasIndex("RequestedByUserId");
+
+                    b.HasIndex("EmployeeId", "RequestedAt");
+
+                    b.ToTable("SkillAdviceRuns");
+                });
+
             modelBuilder.Entity("TalentHub.Models.TalentPool", b =>
                 {
                     b.Property<int>("TalentPoolId")
@@ -2202,6 +2393,17 @@ namespace TalentHub.Migrations
                     b.Navigation("Skill");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.CareerGoal", b =>
+                {
+                    b.HasOne("TalentHub.Models.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
             modelBuilder.Entity("TalentHub.Models.CertificationReminderLog", b =>
                 {
                     b.HasOne("TalentHub.Models.EmployeeQualification", "Qualification")
@@ -2522,6 +2724,82 @@ namespace TalentHub.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("TalentHub.Models.SkillAdvice", b =>
+                {
+                    b.HasOne("TalentHub.Models.CareerGoal", "CareerGoal")
+                        .WithMany()
+                        .HasForeignKey("CareerGoalId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TalentHub.Models.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.User", "GeneratedByUser")
+                        .WithMany()
+                        .HasForeignKey("GeneratedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TalentHub.Models.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CareerGoal");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("GeneratedByUser");
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.SkillAdviceItem", b =>
+                {
+                    b.HasOne("TalentHub.Models.SkillAdvice", "Advice")
+                        .WithMany("Items")
+                        .HasForeignKey("SkillAdviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.Skill", "Skill")
+                        .WithMany()
+                        .HasForeignKey("SkillId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TalentHub.Models.TrainingProgramme", "Programme")
+                        .WithMany()
+                        .HasForeignKey("TrainingProgrammeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Advice");
+
+                    b.Navigation("Programme");
+
+                    b.Navigation("Skill");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.SkillAdviceRun", b =>
+                {
+                    b.HasOne("TalentHub.Models.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TalentHub.Models.User", "RequestedByUser")
+                        .WithMany()
+                        .HasForeignKey("RequestedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("RequestedByUser");
+                });
+
             modelBuilder.Entity("TalentHub.Models.TalentPool", b =>
                 {
                     b.HasOne("TalentHub.Models.Candidate", "Candidate")
@@ -2796,6 +3074,11 @@ namespace TalentHub.Migrations
                     b.Navigation("CandidateSkills");
 
                     b.Navigation("EmployeeSkills");
+                });
+
+            modelBuilder.Entity("TalentHub.Models.SkillAdvice", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("TalentHub.Models.TrainingIntake", b =>

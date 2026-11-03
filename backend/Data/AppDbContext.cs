@@ -53,6 +53,11 @@ namespace TalentHub.Data
         public DbSet<TrainingIntake> TrainingIntakes => Set<TrainingIntake>();
         public DbSet<TrainingAssignment> TrainingAssignments => Set<TrainingAssignment>();
         public DbSet<CertificationReminderLog> CertificationReminderLogs => Set<CertificationReminderLog>();
+
+        public DbSet<CareerGoal> CareerGoals => Set<CareerGoal>();
+        public DbSet<SkillAdvice> SkillAdvices => Set<SkillAdvice>();
+        public DbSet<SkillAdviceItem> SkillAdviceItems => Set<SkillAdviceItem>();
+        public DbSet<SkillAdviceRun> SkillAdviceRuns => Set<SkillAdviceRun>();
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -597,6 +602,98 @@ namespace TalentHub.Data
             // The certification scan filters by expiry date
             modelBuilder.Entity<EmployeeQualification>()
                 .HasIndex(q => q.ExpiryDate);
+
+            // ---------- CareerGoal ----------
+            modelBuilder.Entity<CareerGoal>()
+                .HasOne(g => g.Employee).WithMany()
+                .HasForeignKey(g => g.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<CareerGoal>()
+                .Property(g => g.Status).HasConversion<string>().HasMaxLength(20);
+
+            modelBuilder.Entity<CareerGoal>()
+                .HasIndex(g => new { g.EmployeeId, g.Status });          // "my active goals", 3-goal limit
+
+            modelBuilder.Entity<CareerGoal>()
+                .HasIndex(g => new { g.Status, g.ShareWithHr });         // HR career-interest report
+
+            // ---------- SkillAdvice ----------
+            modelBuilder.Entity<SkillAdvice>()
+                .HasOne(s => s.Employee).WithMany()
+                .HasForeignKey(s => s.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SkillAdvice>()
+                .HasOne(s => s.CareerGoal).WithMany()
+                .HasForeignKey(s => s.CareerGoalId).OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SkillAdvice>()
+                .HasOne(s => s.Project).WithMany()
+                .HasForeignKey(s => s.ProjectId).OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SkillAdvice>()
+                .HasOne(s => s.GeneratedByUser).WithMany()
+                .HasForeignKey(s => s.GeneratedByUserId).OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SkillAdvice>()
+                .Property(s => s.Source).HasConversion<string>().HasMaxLength(20);
+
+            // One saved result per goal, and one per project + employee (a refresh updates it).
+            // The filters matter: without them SQL Server allows only ONE row with a NULL.
+            modelBuilder.Entity<SkillAdvice>()
+                .HasIndex(s => s.CareerGoalId).IsUnique()
+                .HasFilter("[CareerGoalId] IS NOT NULL");
+
+            modelBuilder.Entity<SkillAdvice>()
+                .HasIndex(s => new { s.ProjectId, s.EmployeeId }).IsUnique()
+                .HasFilter("[ProjectId] IS NOT NULL");
+
+            // Safety net: advice belongs to exactly one thing, a goal OR a project
+            modelBuilder.Entity<SkillAdvice>()
+                .ToTable(t => t.HasCheckConstraint(
+                    "CK_SkillAdvices_OneSubject",
+                    "([CareerGoalId] IS NOT NULL AND [ProjectId] IS NULL) OR ([CareerGoalId] IS NULL AND [ProjectId] IS NOT NULL)"));
+
+            // ---------- SkillAdviceItem ----------
+            modelBuilder.Entity<SkillAdviceItem>()
+                .HasOne(i => i.Advice).WithMany(s => s.Items)
+                .HasForeignKey(i => i.SkillAdviceId).OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<SkillAdviceItem>()
+                .HasOne(i => i.Skill).WithMany()
+                .HasForeignKey(i => i.SkillId).OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SkillAdviceItem>()
+                .HasOne(i => i.Programme).WithMany()
+                .HasForeignKey(i => i.TrainingProgrammeId).OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SkillAdviceItem>()
+                .Property(i => i.Status).HasConversion<string>().HasMaxLength(20);
+
+            // Nullable enums are skipped by the enum-to-string loop (ClrType is Nullable<T>), so convert explicitly
+            modelBuilder.Entity<SkillAdviceItem>()
+                .Property(i => i.TargetLevel).HasConversion<string>().HasMaxLength(20);
+
+            modelBuilder.Entity<SkillAdviceItem>()
+                .HasIndex(i => new { i.SkillAdviceId, i.SortOrder });
+
+            modelBuilder.Entity<SkillAdviceItem>()
+                .HasIndex(i => i.TrainingProgrammeId);
+
+            // ---------- SkillAdviceRun ----------
+            modelBuilder.Entity<SkillAdviceRun>()
+                .HasOne(r => r.Employee).WithMany()
+                .HasForeignKey(r => r.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SkillAdviceRun>()
+                .HasOne(r => r.RequestedByUser).WithMany()
+                .HasForeignKey(r => r.RequestedByUserId).OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SkillAdviceRun>()
+                .Property(r => r.Source).HasConversion<string>().HasMaxLength(20);
+
+            modelBuilder.Entity<SkillAdviceRun>()
+                .HasIndex(r => new { r.EmployeeId, r.RequestedAt });     // "generations today"
 
             // convert all enums to strings in the database for readability
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
