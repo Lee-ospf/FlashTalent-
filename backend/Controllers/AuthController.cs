@@ -155,7 +155,9 @@ namespace TalentHub.Controllers
 
             var user = new User
             {
-                
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Email = request.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword),
                 Role = UserRole.HR,
                 MustChangePassword = true,
