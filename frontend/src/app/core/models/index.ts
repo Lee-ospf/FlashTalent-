@@ -32,6 +32,7 @@ export interface CreateRecruiterRequest {
   lastName: string;
   email: string;
   jobTitle: string;
+  departmentId: number;
 }
 export interface CreateUserResponse {
   message: string;
@@ -98,6 +99,12 @@ export interface EmployeeListItem {
   departmentName?: string | null;
   hireDate?: string | null;
   status?: string;
+}
+export interface DepartmentResponse {
+  departmentId: number;
+  name: string;
+  isActive: boolean;
+  headCount: number;   // new
 }
 export const isActiveProject = (p: ProjectListItem): boolean =>
   p.status === 'Active' || (p.status as unknown) === 0;

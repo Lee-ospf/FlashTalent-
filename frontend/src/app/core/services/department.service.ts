@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Observable, catchError, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { DepartmentResponse } from '../models';
+import { DepartmentResponse, EmployeeListItem } from '../models';
 
 export interface CreateDepartmentRequest {
   name: string;
@@ -14,14 +14,34 @@ export class DepartmentService {
 
   getAll(): Observable<DepartmentResponse[]> {
     return this.http.get<DepartmentResponse[]>(
-      `${environment.apiUrl}/Department`
+      `${environment.apiUrl}/Department`,
     );
   }
 
   create(request: CreateDepartmentRequest): Observable<DepartmentResponse> {
-    return this.http.post<DepartmentResponse>(
-      `${environment.apiUrl}/Department`,
-      request
+    return this.http
+      .post<DepartmentResponse>(`${environment.apiUrl}/Department`, request)
+      .pipe(
+        catchError((err: unknown) => {
+          if (!(err instanceof HttpErrorResponse)) return throwError(() => err);
+
+          const body = err.error;
+          const message =
+            typeof body === 'string' && body
+              ? body
+              : (body?.message ?? 'Something went wrong. Please try again.');
+
+          return throwError(() => new Error(message));
+        }),
+      );
+  }
+  getEmployees(
+    departmentId: number,
+    status = 'Active',
+  ): Observable<EmployeeListItem[]> {
+    return this.http.get<EmployeeListItem[]>(
+      `${environment.apiUrl}/Department/${departmentId}/employees`,
+      { params: { status } },
     );
   }
 }
