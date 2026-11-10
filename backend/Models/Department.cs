@@ -16,5 +16,6 @@ namespace TalentHub.Models
 
         // Navigation
         public ICollection<Vacancy> Vacancies { get; set; } = new List<Vacancy>();
+        public ICollection<Employee> Employees { get; set; } = new List<Employee>();
     }
 }

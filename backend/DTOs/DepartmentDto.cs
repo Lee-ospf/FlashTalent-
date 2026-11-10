@@ -12,5 +12,6 @@ namespace TalentHub.DTOs
         public int DepartmentId { get; set; }
         public string Name { get; set; }
         public bool IsActive { get; set; }
+        public int HeadCount { get; set; }
     }
 }

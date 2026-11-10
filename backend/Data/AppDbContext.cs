@@ -653,7 +653,22 @@ namespace TalentHub.Data
                 .ToTable(t => t.HasCheckConstraint(
                     "CK_SkillAdvices_OneSubject",
                     "([CareerGoalId] IS NOT NULL AND [ProjectId] IS NULL) OR ([CareerGoalId] IS NULL AND [ProjectId] IS NOT NULL)"));
+            // DbContext
+            modelBuilder.Entity<Employee>()
+     .HasOne(e => e.User)
+     .WithOne(u => u.Employee)
+     .HasForeignKey<Employee>(e => e.UserId)
+     .OnDelete(DeleteBehavior.Restrict);        // one employment record per user
 
+            modelBuilder.Entity<Employee>()
+    .HasIndex(e => e.UserId)
+    .IsUnique();
+
+            modelBuilder.Entity<Employee>()
+                .HasOne(e => e.Department)
+                .WithMany(d => d.Employees)
+                .HasForeignKey(e => e.DepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);           // can't delete a department that has people
             // ---------- SkillAdviceItem ----------
             modelBuilder.Entity<SkillAdviceItem>()
                 .HasOne(i => i.Advice).WithMany(s => s.Items)

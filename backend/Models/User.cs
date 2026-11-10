@@ -46,6 +46,7 @@ namespace TalentHub.Models
         public bool MustChangePassword { get; set; } = false;
 
 
+
         [MaxLength(20)]
         public string? Phone { get; set; }
 
@@ -68,6 +69,7 @@ namespace TalentHub.Models
         public Candidate? Candidate { get; set; }
         public Recruiter? Recruiter { get; set; }
         public HrProfile? HrProfile { get; set; }
+        public Employee? Employee { get; set; }
 
     }
 }

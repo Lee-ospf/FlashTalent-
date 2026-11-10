@@ -2418,9 +2418,9 @@ namespace TalentHub.Migrations
             modelBuilder.Entity("TalentHub.Models.Employee", b =>
                 {
                     b.HasOne("TalentHub.Models.Department", "Department")
-                        .WithMany()
+                        .WithMany("Employees")
                         .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("TalentHub.Models.Application", "SourceApplication")
                         .WithMany()
@@ -2428,8 +2428,8 @@ namespace TalentHub.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("TalentHub.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
+                        .WithOne("Employee")
+                        .HasForeignKey("TalentHub.Models.Employee", "UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -3034,6 +3034,8 @@ namespace TalentHub.Migrations
 
             modelBuilder.Entity("TalentHub.Models.Department", b =>
                 {
+                    b.Navigation("Employees");
+
                     b.Navigation("Vacancies");
                 });
 
@@ -3096,6 +3098,8 @@ namespace TalentHub.Migrations
             modelBuilder.Entity("TalentHub.Models.User", b =>
                 {
                     b.Navigation("Candidate");
+
+                    b.Navigation("Employee");
 
                     b.Navigation("HrProfile");
 
