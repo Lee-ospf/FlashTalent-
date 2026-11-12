@@ -50,6 +50,9 @@ import { NotificationService } from '../../../core/services/notification.service
         <a class="en-tab" routerLink="/admin/projects" routerLinkActive="active"
           >Projects</a
         >
+        <a class="en-tab" routerLink="/admin/training" routerLinkActive="active"
+          >Training</a
+        >
       </nav>
 
       <button
@@ -281,7 +284,7 @@ export class HrNavComponent implements OnInit, OnDestroy {
     if (!this.auth.isLoggedIn()) return;
     this.notificationService.getUnreadCount().subscribe({
       next: (r) => this.unreadCount.set(r.unreadCount),
-      error: () => {}, // non-critical
+      error: () => { }, // non-critical
     });
   }
 

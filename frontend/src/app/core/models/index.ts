@@ -104,7 +104,7 @@ export interface DepartmentResponse {
   departmentId: number;
   name: string;
   isActive: boolean;
-  headCount: number;   // new
+  headCount: number; // new
 }
 export const isActiveProject = (p: ProjectListItem): boolean =>
   p.status === 'Active' || (p.status as unknown) === 0;
@@ -614,4 +614,331 @@ export interface TalentPoolInviteSummaryResponse {
   totalInvited: number;
   totalApplied: number;
   invitees: InvitedCandidateRow[];
+}
+
+//trailning models
+// Training module types. The API serialises enums as strings.
+
+export type AssignmentStatus =
+  | 'NotStarted'
+  | 'InProgress'
+  | 'AwaitingConfirmation'
+  | 'Completed'
+  | 'NotCompleted';
+
+export type IntakeState = 'Upcoming' | 'Running' | 'Ended';
+
+// ── Programmes ──────────────────────────────────────────────
+export interface ProgrammeListItem {
+  trainingProgrammeId: number;
+  title: string;
+  provider: string | null;
+  category: string | null;
+  durationHours: number | null;
+  isActive: boolean;
+  skillCount: number;
+  intakeCount: number;
+  openIntakeCount: number;
+  createdAt: string;
+}
+
+export interface ProgrammeSkill {
+  skillId: number;
+  skillName: string;
+}
+
+export interface ProgrammeResponse {
+  trainingProgrammeId: number;
+  title: string;
+  description: string | null;
+  provider: string | null;
+  category: string | null;
+  durationHours: number | null;
+  url: string | null;
+  isActive: boolean;
+  createdByUserId: number;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string | null;
+  intakeCount: number;
+  openIntakeCount: number;
+  skills: ProgrammeSkill[];
+}
+
+export interface SaveProgrammeRequest {
+  title: string;
+  description: string | null;
+  provider: string | null;
+  category: string | null;
+  durationHours: number | null;
+  url: string | null;
+  skillIds: number[];
+}
+
+// ── Intakes ─────────────────────────────────────────────────
+export interface IntakeListItem {
+  trainingIntakeId: number;
+  trainingProgrammeId: number;
+  programmeTitle: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  state: IntakeState;
+  maxParticipants: number | null;
+  assignmentCount: number;
+  completedCount: number;
+}
+
+export interface IntakeResponse {
+  trainingIntakeId: number;
+  trainingProgrammeId: number;
+  programmeTitle: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  state: IntakeState;
+  maxParticipants: number | null;
+  spotsLeft: number | null; // null = no maximum
+  assignmentCount: number;
+  completedCount: number;
+  awaitingConfirmationCount: number;
+  closedAt: string | null;
+  closedByName: string | null;
+  createdByUserId: number;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface SaveIntakeRequest {
+  name: string;
+  startDate: string | null;
+  endDate: string | null;
+  maxParticipants: number | null;
+}
+
+export interface CreateIntakeRequest extends SaveIntakeRequest {
+  trainingProgrammeId: number;
+}
+
+// ── Assignments (HR) ────────────────────────────────────────
+export interface AssignmentListItem {
+  trainingAssignmentId: number;
+  trainingIntakeId: number;
+  employeeId: number;
+  employeeName: string;
+  jobTitle: string | null;
+  departmentName: string | null;
+  status: AssignmentStatus;
+  progressPercent: number;
+  dueDate: string;
+  isOverdue: boolean;
+  assignedAt: string;
+  submittedAt: string | null;
+  confirmedAt: string | null;
+  rejectionReason: string | null;
+}
+
+export interface AssignEmployeesRequest {
+  employeeIds: number[];
+  dueDate: string | null; // null = the intake's end date
+}
+
+export interface AssignedEmployee {
+  employeeId: number;
+  employeeName: string;
+  trainingAssignmentId: number;
+  dueDate: string;
+}
+
+export interface SkippedEmployee {
+  employeeId: number;
+  employeeName: string | null;
+  reason: string;
+}
+
+export interface AssignEmployeesResponse {
+  added: AssignedEmployee[];
+  skipped: SkippedEmployee[];
+}
+
+export interface AwaitingConfirmationItem {
+  trainingAssignmentId: number;
+  employeeId: number;
+  employeeName: string;
+  jobTitle: string | null;
+  departmentName: string | null;
+  trainingProgrammeId: number;
+  programmeTitle: string;
+  trainingIntakeId: number;
+  intakeName: string;
+  dueDate: string;
+  submittedAt: string; // UTC, no Z
+  daysWaiting: number;
+  wasRejectedBefore: boolean;
+  previousRejectionReason: string | null;
+}
+
+export interface TrainingReviewResponse {
+  trainingAssignmentId: number;
+  status: AssignmentStatus;
+  confirmedAt: string | null;
+  confirmedByUserId: number | null;
+  rejectedAt: string | null;
+  rejectionReason: string | null;
+}
+
+export interface NeedsResolutionItem {
+  trainingAssignmentId: number;
+  employeeId: number;
+  employeeName: string;
+  jobTitle: string | null;
+  departmentName: string | null;
+  trainingProgrammeId: number;
+  programmeTitle: string;
+  trainingIntakeId: number;
+  intakeName: string;
+  intakeEndDate: string;
+  intakeClosedEarly: boolean;
+  status: AssignmentStatus;
+  progressPercent: number;
+  dueDate: string;
+  isOverdue: boolean;
+}
+
+export interface MoveToIntakeRequest {
+  targetIntakeId: number;
+  dueDate: string | null;
+}
+
+export interface TrainingResolutionResponse {
+  trainingAssignmentId: number;
+  status: AssignmentStatus;
+  notCompletedAt: string | null;
+  newTrainingAssignmentId: number | null;
+  newTrainingIntakeId: number | null;
+  newDueDate: string | null;
+}
+
+// ── Compliance ──────────────────────────────────────────────
+export interface OverdueTrainingItem {
+  trainingAssignmentId: number;
+  employeeId: number;
+  employeeName: string;
+  jobTitle: string | null;
+  departmentName: string | null;
+  trainingProgrammeId: number;
+  programmeTitle: string;
+  trainingIntakeId: number;
+  intakeName: string;
+  status: AssignmentStatus;
+  progressPercent: number;
+  dueDate: string;
+  daysOverdue: number;
+}
+
+export interface ComplianceSummary {
+  expiringIn90Days: number;
+  expiringIn30Days: number;
+  expiringIn7Days: number;
+  expired: number;
+  certificatesWithNoExpiryDate: number;
+  overdueTraining: number;
+  awaitingConfirmation: number;
+}
+
+// ── Employee self-service ───────────────────────────────────
+export interface MyTraining {
+  trainingAssignmentId: number;
+  trainingProgrammeId: number;
+  programmeTitle: string;
+  provider: string | null;
+  category: string | null;
+  durationHours: number | null;
+  url: string | null;
+  trainingIntakeId: number;
+  intakeName: string;
+  intakeStartDate: string;
+  intakeEndDate: string;
+  intakeState: IntakeState;
+  status: AssignmentStatus;
+  progressPercent: number;
+  dueDate: string;
+  isOverdue: boolean;
+  assignedAt: string;
+  startedAt: string | null;
+  submittedAt: string | null;
+  confirmedAt: string | null;
+  rejectedAt: string | null;
+  rejectionReason: string | null;
+  canUpdateProgress: boolean;
+  canSubmit: boolean;
+  canWithdraw: boolean;
+}
+
+export type CareerGoalStatus = 'Active' | 'Achieved' | 'Archived';
+export type AdviceStatus = 'Suggested' | 'Accepted' | 'Dismissed';
+export type AdviceLevel = 'Beginner' | 'Intermediate' | 'Expert';
+
+export interface CareerGoalResponse {
+  careerGoalId: number;
+  employeeId: number;
+  targetRole: string;
+  targetDate: string | null;
+  status: CareerGoalStatus;
+  shareWithHr: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+  hasAdvice: boolean;
+  adviceGeneratedAt: string | null;
+}
+
+export interface SaveCareerGoalRequest {
+  targetRole: string;
+  targetDate: string | null;
+  shareWithHr: boolean;
+}
+
+export interface AdviceIntake {
+  trainingIntakeId: number;
+  name: string;
+  startDate: string;
+  endDate: string;
+  spotsLeft: number | null; // null = no maximum
+}
+
+export interface AdviceProgramme {
+  trainingProgrammeId: number;
+  title: string;
+  provider: string | null;
+  category: string | null;
+  durationHours: number | null;
+  isActive: boolean;
+  nextOpenIntake: AdviceIntake | null;
+}
+
+export interface AdviceItem {
+  skillSuggestionItemId: number; // the id used by PATCH skill-advice-items/{id}/status
+  sortOrder: number;
+  skillId: number | null;
+  skillName: string;
+  targetLevel: AdviceLevel | null;
+  advice: string;
+  status: AdviceStatus;
+  programme: AdviceProgramme | null;
+  isAlreadyAssigned: boolean;
+  externalIdea: string | null;
+}
+
+export interface AdviceResponse {
+  skillSuggestionId: number;
+  source: 'CareerGoal' | 'Project';
+  employeeId: number;
+  careerGoalId: number | null;
+  projectId: number | null;
+  summary: string | null;
+  generatedAt: string;
+  modelVersion: string | null;
+  isStale: boolean;
+  generationsLeft: number;
+  items: AdviceItem[];
 }

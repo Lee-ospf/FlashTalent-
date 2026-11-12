@@ -101,48 +101,48 @@ export const routes: Routes = [
         (m) => m.ApplicationReviewComponent,
       ),
   },
-//-------------------------HR
-{
-  path: 'admin/employees',
-  canActivate: [roleGuard(['HR', 'Admin'])],
-  loadComponent: () =>
-    import('./features/hr/employee-list/employee-list.component').then(
-      (m) => m.EmployeeListComponent,
-    ),
-},
+  //-------------------------HR
+  {
+    path: 'admin/employees',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/employee-list/employee-list.component').then(
+        (m) => m.EmployeeListComponent,
+      ),
+  },
 
-{
-  path: 'admin/projects/new',
-  canActivate: [roleGuard(['HR', 'Admin'])],
-  loadComponent: () =>
-    import('./features/hr/project-form/project-form.component').then(
-      (m) => m.ProjectFormComponent,
-    ),
-},
-{
-  path: 'admin/projects',
-  canActivate: [roleGuard(['HR', 'Admin'])],
-  loadComponent: () =>
-    import('./features/hr/project-list/project-list.component').then(
-      (m) => m.ProjectListComponent,
-    ),
-},
-{
-  path: 'admin/projects/:id',
-  canActivate: [roleGuard(['HR', 'Admin'])],
-  loadComponent: () =>
-    import('./features/hr/project-detail/project-detail.component').then(
-      (m) => m.ProjectDetailComponent,
-    ),
-},
-{
-  path: 'admin/projects/:id/edit',
-  canActivate: [roleGuard(['HR', 'Admin'])],
-  loadComponent: () =>
-    import('./features/hr/project-form/project-form.component').then(
-      (m) => m.ProjectFormComponent,
-    ),
-},
+  {
+    path: 'admin/projects/new',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/project-form/project-form.component').then(
+        (m) => m.ProjectFormComponent,
+      ),
+  },
+  {
+    path: 'admin/projects',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/project-list/project-list.component').then(
+        (m) => m.ProjectListComponent,
+      ),
+  },
+  {
+    path: 'admin/projects/:id',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/project-detail/project-detail.component').then(
+        (m) => m.ProjectDetailComponent,
+      ),
+  },
+  {
+    path: 'admin/projects/:id/edit',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/project-form/project-form.component').then(
+        (m) => m.ProjectFormComponent,
+      ),
+  },
 
   // ---------- Read-only for Recruiter+Admin, write actions inside these pages should
   // still check isAdmin in the template before showing create/edit/delete buttons ----------
@@ -300,22 +300,110 @@ export const routes: Routes = [
       ),
   },
   {
-  path: 'my-projects',
-  canActivate: [roleGuard(['Employee'])],
-  loadComponent: () =>
-    import('./features/employee/my-projects/my-projects.component').then(
-      (m) => m.MyProjectsComponent,
-    ),
-},
+    path: 'my-projects',
+    canActivate: [roleGuard(['Employee'])],
+    loadComponent: () =>
+      import('./features/employee/my-projects/my-projects.component').then(
+        (m) => m.MyProjectsComponent,
+      ),
+  },
+  {
+    path: 'my-training',
+    canActivate: [roleGuard(['Employee'])],
+    loadComponent: () =>
+      import('./features/employee/training/my-training.component').then(
+        (m) => m.MyTrainingComponent,
+      ),
+  },
 
   // ---------- HR read-only view of an employee profile ----------
   {
     path: 'admin/employees/:id',
-    canActivate: [roleGuard(['Recruiter','HR', 'Admin'])],
+    canActivate: [roleGuard(['Recruiter', 'HR', 'Admin'])],
     loadComponent: () =>
       import('./features/employee/employee-profile/employee-profile.component').then(
         (m) => m.EmployeeProfileComponent,
       ),
+  },
+  // Programme and intake pages (added in the next steps)
+  {
+    path: 'admin/training/programmes/new',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/training/training-programme-form.component').then(
+        (m) => m.TrainingProgrammeFormComponent,
+      ),
+  },
+  {
+    path: 'admin/training/programmes/:id/edit',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/training/training-programme-form.component').then(
+        (m) => m.TrainingProgrammeFormComponent,
+      ),
+  },
+  {
+    path: 'admin/training/programmes/:id',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/training/training-programme-detail.component').then(
+        (m) => m.TrainingProgrammeDetailComponent,
+      ),
+  },
+  {
+    path: 'admin/training/intakes/:id',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/training/training-intake-detail.component').then(
+        (m) => m.TrainingIntakeDetailComponent,
+      ),
+  },
+  // The shell with its five tabs
+  {
+    path: 'admin/training',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/training/training-shell.component').then(
+        (m) => m.TrainingShellComponent,
+      ),
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('./features/hr/training/training-programmes.component').then(
+            (m) => m.TrainingProgrammesComponent,
+          ),
+      },
+      {
+        path: 'intakes',
+        loadComponent: () =>
+          import('./features/hr/training/training-intakes.component').then(
+            (m) => m.TrainingIntakesComponent,
+          ),
+      },
+      {
+        path: 'review',
+        loadComponent: () =>
+          import('./features/hr/training/training-review.component').then(
+            (m) => m.TrainingReviewComponent,
+          ),
+      },
+      {
+        path: 'resolve',
+        loadComponent: () =>
+          import('./features/hr/training/training-resolve.component').then(
+            (m) => m.TrainingResolveComponent,
+          ),
+      },
+      {
+        path: 'overdue',
+        loadComponent: () =>
+          import('./features/hr/training/training-overdue.component').then(
+            (m) => m.TrainingOverdueComponent,
+          ),
+      },
+    ],
   },
   // ---------- Public ----------
   {

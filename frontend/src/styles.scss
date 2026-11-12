@@ -2047,3 +2047,32 @@ a {
     color: var(--text-muted) !important;
   }
 }
+//traiing scss
+.tc-chip {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.tc-grey {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.tc-blue {
+  background: #e3ecfb;
+  color: #1a3d8f;
+}
+.tc-amber {
+  background: #fff3e0;
+  color: #8a5a00;
+}
+.tc-green {
+  background: #e8f5e9;
+  color: #1a5c35;
+}
+.tc-red {
+  background: #fdecea;
+  color: #b3261e;
+}
