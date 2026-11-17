@@ -114,6 +114,9 @@ namespace TalentHub.Controllers
             if (exists)
                 return Conflict(new { message = "Email already exists." });
 
+            var deptError = await ValidateDepartmentAsync(request.DepartmentId);
+            if (deptError is not null) return deptError;
+
             var tempPassword = TempPassword.Generate();
 
             var user = new User
@@ -124,14 +127,18 @@ namespace TalentHub.Controllers
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword),
                 Role = UserRole.Recruiter,
                 MustChangePassword = true,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                Recruiter = new Recruiter { JobTitle = request.JobTitle ?? string.Empty },
+                Employee = new Employee
+                {
+                    DepartmentId = request.DepartmentId,
+                    JobTitle = request.JobTitle,
+                    HireDate = DateTime.UtcNow,
+                    Status = "Active"
+                }
             };
 
             _db.Users.Add(user);
-            await _db.SaveChangesAsync();
-
-            var recruiter = new Recruiter { UserId = user.UserId, JobTitle = request.JobTitle };
-            _db.Recruiters.Add(recruiter);
             await _db.SaveChangesAsync();
 
             await TryQueueTempPasswordAsync(user, tempPassword);
@@ -147,10 +154,12 @@ namespace TalentHub.Controllers
         [HttpPost("create-hr")]
         public async Task<IActionResult> CreateHr(CreateUserRequest request)
         {
-            var exists = await _db.Users.AnyAsync(x => x.Email == request.Email);
-
-            if (exists)
+            if (await _db.Users.AnyAsync(x => x.Email == request.Email))
                 return Conflict(new { message = "Email already exists." });
+
+            var deptError = await ValidateDepartmentAsync(request.DepartmentId);
+            if (deptError is not null) return deptError;
+
             var tempPassword = TempPassword.Generate();
 
             var user = new User
@@ -162,7 +171,14 @@ namespace TalentHub.Controllers
                 Role = UserRole.HR,
                 MustChangePassword = true,
                 CreatedAt = DateTime.UtcNow,
-                HrProfile = new HrProfile { JobTitle = request.JobTitle ?? string.Empty }
+                HrProfile = new HrProfile { JobTitle = request.JobTitle ?? string.Empty },
+                Employee = new Employee
+                {
+                    DepartmentId = request.DepartmentId,
+                    JobTitle = request.JobTitle,
+                    HireDate = DateTime.UtcNow,
+                    Status = "Active"
+                }
             };
 
             _db.Users.Add(user);
@@ -176,7 +192,6 @@ namespace TalentHub.Controllers
                 TemporaryPassword = tempPassword
             });
         }
-
 
         [Authorize(Roles = "Admin")]
         [HttpPost("create-admin")]
@@ -270,6 +285,19 @@ namespace TalentHub.Controllers
             {
                 _logger.LogError(ex, "User {UserId} created but the temporary password email could not be queued.", user.UserId);
             }
+        }
+        // returns null when valid, or the error response to return
+        private async Task<IActionResult?> ValidateDepartmentAsync(int? departmentId)
+        {
+            if (departmentId is null)
+                return BadRequest(new { message = "DepartmentId is required." });
+
+            var exists = await _db.Departments
+                .AnyAsync(d => d.DepartmentId == departmentId && d.IsActive);
+
+            return exists
+                ? null
+                : BadRequest(new { message = "Department not found or inactive." });
         }
 
     }

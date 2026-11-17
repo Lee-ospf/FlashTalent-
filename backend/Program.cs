@@ -118,7 +118,7 @@ builder.Services.AddScoped<IDocumentValidationService, DocumentValidationService
 builder.Services.AddScoped<IApplicationStatusRules, ApplicationStatusRules>();
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<VacancyClosingDateService>();
-
+builder.Services.AddScoped<ISkillSuggestionService, SkillSuggestionService>();
 builder.Services.AddScoped<IDocumentValidationService, DocumentValidationService>();
 builder.Services.AddScoped<IApplicationStatusRules, ApplicationStatusRules>();
 builder.Services.AddScoped<ITalentPoolService, TalentPoolService>();

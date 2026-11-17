@@ -56,6 +56,7 @@ namespace TalentHub.DTOs
 
   
         public string Password { get; set; } = string.Empty;
+        public int? DepartmentId { get; set; }
 
         public string? JobTitle { get; set; }
     }
