@@ -133,6 +133,8 @@ builder.Services.AddScoped<ReminderScanJob>();
 builder.Services.AddScoped<CertificationScanJob>();
 builder.Services.AddHttpClient<IGeminiJsonClient, GeminiJsonClient>();
 builder.Services.AddScoped<IProjectMatchingService, ProjectMatchingService>();
+builder.Services.AddScoped<ISkillSuggestionService, SkillSuggestionService>();
+
 var app = builder.Build();
 
 
