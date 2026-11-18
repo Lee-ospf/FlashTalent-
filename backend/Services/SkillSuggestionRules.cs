@@ -33,15 +33,19 @@ namespace TalentHub.Services
         public bool HasOpenIntake => NextOpenIntake != null;
     }
 
-    // One step exactly as the AI returned it. Nothing here is trusted yet.
-    public record AiSuggestionItem(
-        string? Skill, string? Advice, string? TargetLevel, int? ProgrammeId, string? ExternalIdea);
+  
+    // A skill step exactly as the AI returned it.
+    public record AiSkillStep(string? Skill, string? Advice, string? TargetLevel);
+
+    // A course step exactly as the AI returned it
+    public record AiCourseStep(string? Skill, string? Why, int? ProgrammeId, string? ExternalIdea);
 
     // One step after checking, ready to save
     public class CleanedSuggestionItem
     {
-        public int SortOrder { get; set; }
-        public int? SkillId { get; set; }          // null = skill not in the Skills table
+        public AdviceItemKind Kind { get; set; }
+        public int SortOrder { get; set; }            // numbered 1, 2, 3 within its kind
+        public int? SkillId { get; set; }             // null = skill not in the Skills table
         public string SkillName { get; set; } = string.Empty;
         public ProficiencyLevel? TargetLevel { get; set; }
         public string Advice { get; set; } = string.Empty;
@@ -115,7 +119,8 @@ namespace TalentHub.Services
         public const int MaxActiveGoals = 3;
         public const int MaxGoalTextLength = 200;
         public const int MaxShortlist = 12;          // programmes offered to the AI
-        public const int MaxItems = 8;               // steps kept from the AI
+        public const int MaxSkillItems = 5;          // skills to build, kept from the AI
+        public const int MaxCourseItems = 3;         
 
         private const int MaxSkillNameLength = 100;
         private const int MaxAdviceLength = 1000;
@@ -236,24 +241,28 @@ namespace TalentHub.Services
         // ---------- Checking what the AI returned ----------
 
         // The AI's answer is never trusted. This keeps only what is safe to save:
+        //  - at most 5 skills and 3 courses, each numbered from 1
         //  - a programme ID is kept only if it was actually offered to the AI (validProgrammeIds)
         //  - a skill name is matched to the Skills table, or kept as plain text with no SkillId
-        //  - a step with a real programme drops its external idea (the catalogue wins)
-        //  - text is trimmed and cut to the column sizes, duplicates are removed,
-        //    and at most MaxItems steps are kept, numbered 1, 2, 3...
-        public static CleanedSuggestionResult CleanItems(
-            IEnumerable<AiSuggestionItem>? raw,
+        //  - a course needs a real programme or an external idea, and a real programme wins
+        //  - text is trimmed and cut to the column sizes, and duplicates are removed
+        public static CleanedSuggestionResult CleanAdvice(
+            IEnumerable<AiSkillStep>? skills,
+            IEnumerable<AiCourseStep>? courses,
             SkillNameMatcher matcher,
             IReadOnlySet<int> validProgrammeIds,
-            int max = MaxItems)
+            int maxSkills = MaxSkillItems,
+            int maxCourses = MaxCourseItems)
         {
             var result = new CleanedSuggestionResult();
             var seen = new HashSet<string>();
+            var skillCount = 0;
+            var courseCount = 0;
 
-            foreach (var item in raw ?? Enumerable.Empty<AiSuggestionItem>())
+            foreach (var step in skills ?? Enumerable.Empty<AiSkillStep>())
             {
-                var skillText = Truncate(item.Skill, MaxSkillNameLength);
-                var advice = Truncate(item.Advice, MaxAdviceLength);
+                var skillText = Truncate(step.Skill, MaxSkillNameLength);
+                var advice = Truncate(step.Advice, MaxAdviceLength);
 
                 if (string.IsNullOrEmpty(skillText) || string.IsNullOrEmpty(advice))
                 {
@@ -261,32 +270,74 @@ namespace TalentHub.Services
                     continue;
                 }
 
-                int? programmeId = null;
-                if (item.ProgrammeId.HasValue)
-                {
-                    if (validProgrammeIds.Contains(item.ProgrammeId.Value))
-                        programmeId = item.ProgrammeId.Value;
-                    else
-                        result.DroppedProgrammeIds++;
-                }
-
                 var matched = matcher.Match(skillText);
-                var external = programmeId == null ? Truncate(item.ExternalIdea, MaxExternalLength) : null;
+                var name = matched?.Name ?? skillText;
+                var key = ItemKey(AdviceItemKind.Skill, matched?.SkillId, name, null, null);
 
-                var duplicateKey = ItemKey(matched?.SkillId, matched?.Name ?? skillText, programmeId);
-                if (!seen.Add(duplicateKey) || result.Items.Count >= max)
+                if (skillCount >= maxSkills || !seen.Add(key))
                 {
                     result.DroppedItems++;
                     continue;
                 }
 
+                skillCount++;
                 result.Items.Add(new CleanedSuggestionItem
                 {
-                    SortOrder = result.Items.Count + 1,
+                    Kind = AdviceItemKind.Skill,
+                    SortOrder = skillCount,
+                    SkillId = matched?.SkillId,
+                    SkillName = name,
+                    TargetLevel = ParseLevel(step.TargetLevel),
+                    Advice = advice
+                });
+            }
+
+            foreach (var step in courses ?? Enumerable.Empty<AiCourseStep>())
+            {
+                var skillText = Truncate(step.Skill, MaxSkillNameLength);
+                var why = Truncate(step.Why, MaxAdviceLength);
+
+                if (string.IsNullOrEmpty(skillText) || string.IsNullOrEmpty(why))
+                {
+                    result.DroppedItems++;
+                    continue;
+                }
+
+                int? programmeId = null;
+                if (step.ProgrammeId.HasValue)
+                {
+                    if (validProgrammeIds.Contains(step.ProgrammeId.Value))
+                        programmeId = step.ProgrammeId.Value;
+                    else
+                        result.DroppedProgrammeIds++;
+                }
+
+                var external = programmeId == null ? Truncate(step.ExternalIdea, MaxExternalLength) : null;
+
+                // A course must be either a real programme or an idea
+                if (programmeId == null && string.IsNullOrEmpty(external))
+                {
+                    result.DroppedItems++;
+                    continue;
+                }
+
+                var matched = matcher.Match(skillText);
+                var key = ItemKey(AdviceItemKind.Course, matched?.SkillId, matched?.Name ?? skillText, programmeId, external);
+
+                if (courseCount >= maxCourses || !seen.Add(key))
+                {
+                    result.DroppedItems++;
+                    continue;
+                }
+
+                courseCount++;
+                result.Items.Add(new CleanedSuggestionItem
+                {
+                    Kind = AdviceItemKind.Course,
+                    SortOrder = courseCount,
                     SkillId = matched?.SkillId,
                     SkillName = matched?.Name ?? skillText,
-                    TargetLevel = ParseLevel(item.TargetLevel),
-                    Advice = advice,
+                    Advice = why,
                     TrainingProgrammeId = programmeId,
                     ExternalIdea = string.IsNullOrEmpty(external) ? null : external
                 });
@@ -295,11 +346,18 @@ namespace TalentHub.Services
             return result;
         }
 
-        // Identifies "the same step" across refreshes: same skill and same programme.
-        // Used to remove duplicates, and to keep an employee's Accepted or Dismissed choice
-        // when advice is regenerated.
-        public static string ItemKey(int? skillId, string skillName, int? programmeId)
-            => (skillId?.ToString(CultureInfo.InvariantCulture) ?? "n:" + NameKey(skillName)) + "|" + programmeId;
+        // Identifies "the same step" across refreshes. A skill is identified by the skill,
+        // a course by the programme (or by the idea's text). Used to remove duplicates, and to keep
+        // an employee's Accepted or Dismissed choice when advice is regenerated.
+        public static string ItemKey(AdviceItemKind kind, int? skillId, string skillName, int? programmeId, string? externalIdea)
+        {
+            if (kind == AdviceItemKind.Course)
+                return "c|" + (programmeId?.ToString(CultureInfo.InvariantCulture) ?? "x:" + NameKey(externalIdea));
+
+            return "s|" + (skillId?.ToString(CultureInfo.InvariantCulture) ?? "n:" + NameKey(skillName));
+        }
+
+
 
         public static string? CleanSummary(string? summary)
         {

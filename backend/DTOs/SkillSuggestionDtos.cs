@@ -30,8 +30,8 @@ namespace TalentHub.DTOs
         public SuggestionIntakeResponse? NextOpenIntake { get; set; }
     }
 
-    // One step of the learning path
-    public class SuggestionItemResponse
+    // A skill to build
+    public class SuggestionSkillResponse
     {
         // The id used by PATCH api/skill-advice-items/{id}/status
         public int SkillSuggestionItemId { get; set; }
@@ -42,18 +42,38 @@ namespace TalentHub.DTOs
         public string SkillName { get; set; } = string.Empty;
         public ProficiencyLevel? TargetLevel { get; set; }
 
+        // How to build the skill
         public string Advice { get; set; } = string.Empty;
+        public SuggestionItemStatus Status { get; set; }
+    }
+
+    // A course to take
+    public class SuggestionCourseResponse
+    {
+        public int SkillSuggestionItemId { get; set; }
+        public int SortOrder { get; set; }
+
+        // The main skill this course helps with. null SkillId = not in the system.
+        public int? SkillId { get; set; }
+        public string SkillName { get; set; } = string.Empty;
+
+        // Why this course helps
+        public string Why { get; set; } = string.Empty;
         public SuggestionItemStatus Status { get; set; }
 
         // A real catalogue course, or null
         public SuggestionProgrammeResponse? Programme { get; set; }
 
-        // true if the employee already has unfinished training of that programme
+        // true if the employee has unfinished training of that programme
         public bool IsAlreadyAssigned { get; set; }
+
+        // true if the employee finished it after this advice was written
+        public bool IsAlreadyCompleted { get; set; }
 
         // An idea from outside the catalogue. Show it as "AI suggestion, not verified"; it is never a link.
         public string? ExternalIdea { get; set; }
     }
+
 
     public class SkillSuggestionResponse
     {
@@ -73,7 +93,9 @@ namespace TalentHub.DTOs
         // How many more times advice can be generated for this employee in the next 24 hours
         public int GenerationsLeft { get; set; }
 
-        public List<SuggestionItemResponse> Items { get; set; } = new();
+        // At most 5 skills and 3 courses, shown in separate sections
+        public List<SuggestionSkillResponse> Skills { get; set; } = new();
+        public List<SuggestionCourseResponse> Courses { get; set; } = new();
     }
 
     // The code-only view of a project gap (no AI involved)

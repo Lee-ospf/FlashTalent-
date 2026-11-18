@@ -10,6 +10,13 @@ namespace TalentHub.Models
         Archived
     }
 
+    // Skill = something to build, Course = somewhere to learn it.
+    public enum AdviceItemKind
+    {
+        Skill,
+        Course
+    }
+
     // What a piece of advice was generated for
     public enum SuggestionSource
     {
@@ -111,6 +118,9 @@ namespace TalentHub.Models
 
         [Required, ForeignKey(nameof(Advice))]
         public int SkillAdviceId { get; set; }
+
+        [Required]
+        public AdviceItemKind Kind { get; set; } = AdviceItemKind.Skill;
         public SkillAdvice? Advice { get; set; }
 
         // Order in the path: 1 is first

@@ -234,7 +234,7 @@ namespace TalentHub.Controllers
             // Project advice always counts. Career-goal advice counts only if the goal is shared
             // and not archived, so a private goal never shows up in a report.
             var steps = await Db.SkillAdviceItems.AsNoTracking()
-                .Where(i => i.SkillId == null
+                .Where(i => i.Kind == AdviceItemKind.Skill  && i.SkillId == null
                          && i.Advice!.Employee!.Status == "Active"
                          && (i.Advice.Source == SuggestionSource.Project
                              || (i.Advice.CareerGoal != null

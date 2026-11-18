@@ -695,6 +695,8 @@ namespace TalentHub.Data
             modelBuilder.Entity<SkillAdviceItem>()
                 .HasIndex(i => i.TrainingProgrammeId);
 
+            modelBuilder.Entity<SkillAdviceItem>()
+    .Property(i => i.Kind).HasConversion<string>().HasMaxLength(20);
             // ---------- SkillAdviceRun ----------
             modelBuilder.Entity<SkillAdviceRun>()
                 .HasOne(r => r.Employee).WithMany()

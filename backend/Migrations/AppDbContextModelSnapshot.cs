@@ -1645,6 +1645,11 @@ namespace TalentHub.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<int>("SkillAdviceId")
                         .HasColumnType("int");
 
