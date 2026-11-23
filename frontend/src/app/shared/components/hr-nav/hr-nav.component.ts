@@ -17,7 +17,7 @@ import { CandidateStateService } from '../../../core/services/candidate-state.se
 import { NotificationService } from '../../../core/services/notification.service';
 
 // Replaces the sidebar + topbar for the HR role (rendered by AppComponent), same layout as EmployeeNavComponent.
-// Tabs: Dashboard (/dashboard), Employees (/admin/employees), Projects (/admin/projects).
+// Tabs: Dashboard (/dashboard), Employees (/admin/employees), Projects (/admin/projects) and report.
 @Component({
   selector: 'app-hr-nav',
   standalone: true,
@@ -53,6 +53,10 @@ import { NotificationService } from '../../../core/services/notification.service
         <a class="en-tab" routerLink="/admin/training" routerLinkActive="active"
           >Training</a
         >
+    <a class="en-tab" routerLink="/admin/reports" routerLinkActive="active"
+  >Reports</a
+>
+        
       </nav>
 
       <button

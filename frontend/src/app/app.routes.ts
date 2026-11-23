@@ -144,6 +144,23 @@ export const routes: Routes = [
       ),
   },
 
+    {
+    path: 'admin/reports',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/reports/reports-hub.component').then(
+        (m) => m.ReportsHubComponent,
+      ),
+  },
+  {
+    path: 'admin/reports/skills',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/reports/skills-report.component').then(
+        (m) => m.SkillsReportComponent,
+      ),
+  },
+
   // ---------- Read-only for Recruiter+Admin, write actions inside these pages should
   // still check isAdmin in the template before showing create/edit/delete buttons ----------
   {
