@@ -104,7 +104,7 @@ export interface DepartmentResponse {
   departmentId: number;
   name: string;
   isActive: boolean;
-  headCount: number; // new
+  headCount: number; 
 }
 export const isActiveProject = (p: ProjectListItem): boolean =>
   p.status === 'Active' || (p.status as unknown) === 0;
@@ -331,12 +331,6 @@ export interface SkillResponse {
   skillId: number;
   name: string;
   category: string;
-}
-
-export interface DepartmentResponse {
-  departmentId: number;
-  name: string;
-  isActive: boolean;
 }
 
 export interface ClientResponse {
@@ -916,16 +910,26 @@ export interface AdviceProgramme {
   nextOpenIntake: AdviceIntake | null;
 }
 
-export interface AdviceItem {
-  skillSuggestionItemId: number; // the id used by PATCH skill-advice-items/{id}/status
+export interface AdviceSkill {
+  skillSuggestionItemId: number;
   sortOrder: number;
   skillId: number | null;
   skillName: string;
   targetLevel: AdviceLevel | null;
-  advice: string;
+  advice: string; // how to build the skill
+  status: AdviceStatus;
+}
+
+export interface AdviceCourse {
+  skillSuggestionItemId: number;
+  sortOrder: number;
+  skillId: number | null; // the main skill the course helps with
+  skillName: string;
+  why: string;
   status: AdviceStatus;
   programme: AdviceProgramme | null;
   isAlreadyAssigned: boolean;
+  isAlreadyCompleted: boolean;
   externalIdea: string | null;
 }
 
@@ -940,5 +944,6 @@ export interface AdviceResponse {
   modelVersion: string | null;
   isStale: boolean;
   generationsLeft: number;
-  items: AdviceItem[];
+  skills: AdviceSkill[];
+  courses: AdviceCourse[];
 }

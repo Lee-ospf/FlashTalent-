@@ -17,11 +17,8 @@ import {
   fmtDate,
   fmtDay,
 } from '../../../core/utils/training-format';
-import { MyRecommendedComponent } from './my-recommended.component';
-
-type Tab = 'assigned' | 'recommended' | 'completed';
-const TABS: Tab[] = ['assigned', 'recommended', 'completed'];
-
+type Tab = 'assigned' | 'completed';
+const TABS: Tab[] = ['assigned', 'completed'];
 // ───────────── Progress dialog (only used on this page) ─────────────
 
 export interface ProgressDialogData {
@@ -160,13 +157,12 @@ export class MyTrainingProgressDialogComponent {
 @Component({
   selector: 'app-my-training',
   standalone: true,
-  imports: [MatProgressSpinnerModule, MyRecommendedComponent],
+  imports: [MatProgressSpinnerModule],
   template: `
     <div class="page-container mt-page">
-      <div class="mt-title">My training</div>
+      <div class="mt-title">Training &amp; Development</div>
       <div class="mt-sub">
-        Track what HR assigned you, get suggestions and see what you’ve
-        finished.
+        Manage your learning journey and skill development
       </div>
 
       <nav class="mt-tabs" role="tablist" aria-label="Training sections">
@@ -178,20 +174,10 @@ export class MyTrainingProgressDialogComponent {
           [attr.aria-selected]="tab() === 'assigned'"
           (click)="setTab('assigned')"
         >
-          Assigned training
+          Assigned Training
           @if (items() !== null) {
             <span class="mt-pill">{{ assigned().length }}</span>
           }
-        </button>
-        <button
-          class="mt-tab"
-          type="button"
-          role="tab"
-          [class.mt-on]="tab() === 'recommended'"
-          [attr.aria-selected]="tab() === 'recommended'"
-          (click)="setTab('recommended')"
-        >
-          Recommended training
         </button>
         <button
           class="mt-tab"
@@ -208,9 +194,7 @@ export class MyTrainingProgressDialogComponent {
         </button>
       </nav>
 
-      @if (tab() === 'recommended') {
-        <app-my-recommended />
-      } @else if (failed()) {
+     @if (failed()) {
         <div class="api-error">
           <i class="ti ti-alert-circle"></i> {{ failed() }}
           <a class="mt-link" (click)="load()">Try again</a>
@@ -599,11 +583,15 @@ export class MyTrainingComponent implements OnInit {
       ),
   );
 
-  ngOnInit(): void {
-    const t = this.route.snapshot.queryParamMap.get('tab') as Tab | null;
-    if (t && TABS.includes(t)) this.tab.set(t);
-    this.load();
+ngOnInit(): void {
+  const raw = this.route.snapshot.queryParamMap.get('tab');
+  if (raw === 'recommended' || raw === 'goals') {
+    this.router.navigate(['/my-career-goals'], { replaceUrl: true });
+    return;
   }
+  if (raw && TABS.includes(raw as Tab)) this.tab.set(raw as Tab);
+  this.load();
+}
 
   load(): void {
     this.failed.set(null);

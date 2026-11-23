@@ -193,6 +193,10 @@ const NOT_SCORED = 'The AI did not score';
                       >
                         Remove
                       </button>
+                      <button class="pd-btn" type="button"
+        [routerLink]="['/admin/projects', p.projectId, 'employees', t.employeeId, 'gaps']">
+  Gap &amp; training
+</button>
                     }
                   </div>
                 } @empty {
@@ -282,6 +286,10 @@ const NOT_SCORED = 'The AI did not score';
                     </div>
                   </div>
                   <div class="pd-btns">
+                    <button class="pd-btn" type="button"
+        [routerLink]="['/admin/projects', p.projectId, 'employees', m.employeeId, 'gaps']">
+  Gap &amp; training
+</button>
                     <button
                       class="pd-btn"
                       type="button"

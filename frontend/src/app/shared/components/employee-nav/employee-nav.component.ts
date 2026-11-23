@@ -38,6 +38,7 @@ import { NotificationService } from '../../../core/services/notification.service
         <a class="en-tab" routerLink="/my-profile" routerLinkActive="active">My profile</a>
         <a class="en-tab" routerLink="/my-projects" routerLinkActive="active">Projects</a>
         <a class="en-tab" routerLink="/my-training" routerLinkActive="active">Training</a>
+        <a class="en-tab" routerLink="/my-career-goals" routerLinkActive="active">Career goals</a>
       </nav>
 
       <button
