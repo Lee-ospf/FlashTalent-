@@ -330,11 +330,20 @@ namespace TalentHub.Services
 
             var steps = await AskAsync<StepsAi>(BuildAdvicePrompt(context), ct);
 
+            // What each shortlisted programme covers, used when the AI doesn't tag a course's skills
+            var programmeSkillNames = shortlist.ToDictionary(
+                p => p.ProgrammeId,
+                p => (IReadOnlyList<string>)p.CoveredGapSkillIds
+                    .Where(skillNameById.ContainsKey)
+                    .Select(id => skillNameById[id])
+                    .ToList());
+
             var cleaned = SkillSuggestionRules.CleanAdvice(
                 steps.Skills?.Select(s => new AiSkillStep(s.Skill, s.Advice, s.TargetLevel)),
-                steps.Courses?.Select(c => new AiCourseStep(c.Skill, c.Why, c.ProgrammeId, c.ExternalIdea)),
+                steps.Courses?.Select(c => new AiCourseStep(c.Title, c.Provider, c.Why, c.ProgrammeId, c.Description, c.Skills)),
                 matcher,
-                shortlist.Select(p => p.ProgrammeId).ToHashSet());
+                shortlist.Select(p => p.ProgrammeId).ToHashSet(),
+                programmeSkillNames);
 
             if (cleaned.DroppedProgrammeIds > 0 || cleaned.DroppedItems > 0)
                 _logger.LogWarning(
@@ -365,7 +374,7 @@ namespace TalentHub.Services
             {
                 foreach (var old in advice.Items)
                     previous.TryAdd(
-                        SkillSuggestionRules.ItemKey(old.Kind, old.SkillId, old.SkillName, old.TrainingProgrammeId, old.ExternalIdea),
+                        SkillSuggestionRules.ItemKey(old.Kind, old.SkillId, old.SkillName, old.TrainingProgrammeId, old.CourseTitle),
                         old);
 
                 // A refresh replaces the steps
@@ -402,11 +411,14 @@ namespace TalentHub.Services
                     AdviceText = item.Advice,
                     TrainingProgrammeId = item.TrainingProgrammeId,
                     ExternalIdea = item.ExternalIdea,
+                    CourseTitle = item.CourseTitle,
+                    CourseProvider = item.CourseProvider,
+                    SkillsGainedJson = item.SkillsGained.Count == 0 ? null : JsonSerializer.Serialize(item.SkillsGained),
                     Status = SuggestionItemStatus.Suggested
                 };
 
                 var key = SkillSuggestionRules.ItemKey(
-                    item.Kind, item.SkillId, item.SkillName, item.TrainingProgrammeId, item.ExternalIdea);
+                     item.Kind, item.SkillId, item.SkillName, item.TrainingProgrammeId, item.CourseTitle);
                 if (previous.TryGetValue(key, out var before) && before.Status != SuggestionItemStatus.Suggested)
                 {
                     entity.Status = before.Status;
@@ -450,6 +462,8 @@ namespace TalentHub.Services
         private static bool IsUniqueViolation(DbUpdateException ex)
             => ex.InnerException is SqlException sql && (sql.Number == 2601 || sql.Number == 2627);
 
+
+
         private async Task<SkillSuggestionResponse> BuildResponseAsync(
             SkillAdvice saved, bool isStale, CancellationToken ct)
         {
@@ -485,6 +499,12 @@ namespace TalentHub.Services
                 })
                 .ToList();
 
+            // Skill steps of this advice, so a course's "skills gained" can point at them
+            var skillIdByKey = ordered
+                .Where(i => i.Kind == AdviceItemKind.Skill)
+                .GroupBy(i => SkillSuggestionRules.NameKey(i.SkillName))
+                .ToDictionary(g => g.Key, g => g.First().SkillId);
+
             var courses = ordered
                 .Where(i => i.Kind == AdviceItemKind.Course)
                 .Select(i =>
@@ -516,9 +536,17 @@ namespace TalentHub.Services
                     {
                         SkillSuggestionItemId = i.SkillAdviceItemId,
                         SortOrder = i.SortOrder,
-                        SkillId = i.SkillId,
-                        SkillName = i.SkillName,
+                        Title = programme?.Title ?? i.CourseTitle ?? i.SkillName,
+                        Provider = programme?.Provider ?? i.CourseProvider,
+                        IsFromCatalogue = programme != null,
                         Why = i.AdviceText,
+                        SkillsGained = ParseGained(i.SkillsGainedJson)
+                            .Select(n => new SuggestionGainedSkill
+                            {
+                                SkillId = skillIdByKey.GetValueOrDefault(SkillSuggestionRules.NameKey(n)),
+                                SkillName = n
+                            })
+                            .ToList(),
                         Status = i.Status,
                         Programme = programme,
                         IsAlreadyAssigned = i.TrainingProgrammeId != null && assigned.Contains(i.TrainingProgrammeId.Value),
@@ -527,6 +555,8 @@ namespace TalentHub.Services
                     };
                 })
                 .ToList();
+
+
 
             return new SkillSuggestionResponse
             {
@@ -543,6 +573,12 @@ namespace TalentHub.Services
                 Skills = skills,
                 Courses = courses
             };
+        }
+        private static List<string> ParseGained(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+            try { return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>(); }
+            catch (JsonException) { return new List<string>(); }
         }
 
         // ================= Loading data =================
@@ -827,7 +863,8 @@ namespace TalentHub.Services
                 { "skill": string, "targetLevel": "Beginner" | "Intermediate" | "Expert" | null, "advice": string }
               ],
               "courses": [
-                { "skill": string, "why": string, "programmeId": number | null, "externalIdea": string | null }
+                { "title": string, "provider": string | null, "why": string, "programmeId": number | null,
+                  "description": string | null, "skills": [ string ] }
               ]
             }
 
@@ -839,15 +876,20 @@ namespace TalentHub.Services
               skills first). One item per skill. You may include skills from "otherSkills".
               "advice" is one or two short, practical sentences on how to build that skill (practice, a small
               project, working with a mentor). Do not mention courses in "advice".
-            - "courses": at most 3, only the ones that help most. "skill" is the main gap skill the course
-              helps with. "why" is one short sentence.
-            - "programmeId" must be one of the ids in "catalogue". Use it only if that programme genuinely
-              helps. NEVER invent an id. Prefer a catalogue course.
+            - "courses": at most 5 real courses, certifications or training programmes. Each one is a thing a
+              person enrols in, with its own name. A course is NOT a skill: never use a skill name as a title.
+            - Prefer a course from "catalogue". For those, set "programmeId" to its id and "title" to its exact
+              title. NEVER invent an id.
+            - If no catalogue course fits, suggest a well-known outside course or certification. Set
+              "programmeId" to null, "title" to its real name (for example "Salesforce Certified Administrator"),
+              "provider" to who offers it if you are certain, and "description" to one short sentence (under 25
+              words). Only name a course or certification if you are certain it exists. If you are not certain,
+              use a generic title such as "Introductory system design course". No links.
+            - "skills" in a course: the skills it will build. Each entry must be written EXACTLY like a "skill"
+              value in your own "skills" list above. Every course must build at least one of them.
+            - "why": one short sentence on what the employee will gain from this course.
             - If a catalogue programme has no "nextOpenIntake", you may still suggest it, and say in "why"
               that HR needs to schedule a session.
-            - If no catalogue course fits a skill that needs one, use "externalIdea" instead, with programmeId
-              null: a short description of a type of course, certification or practice activity, under 25 words.
-              No links, and no provider or product names unless you are certain they exist.
             - "completedTrainings" lists trainings the employee has already finished. Never suggest them again.
               If one of them covers a skill in "gaps", say in that skill's "advice" to practise it and to review
               their skill level on their profile.
@@ -890,10 +932,12 @@ namespace TalentHub.Services
 
         private class CourseStepAi
         {
-            public string? Skill { get; set; }
+            public string? Title { get; set; }
+            public string? Provider { get; set; }
             public string? Why { get; set; }
             public int? ProgrammeId { get; set; }
-            public string? ExternalIdea { get; set; }
+            public string? Description { get; set; }
+            public List<string>? Skills { get; set; }
         }
 
         private class StepsAi

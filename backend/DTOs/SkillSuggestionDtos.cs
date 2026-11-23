@@ -47,21 +47,36 @@ namespace TalentHub.DTOs
         public SuggestionItemStatus Status { get; set; }
     }
 
+    // A skill a course helps build. SkillId is set when it matches one of the plan's skill steps
+    // that is in the Skills table, so the screen can link it to the Skills section.
+    public class SuggestionGainedSkill
+    {
+        public int? SkillId { get; set; }
+        public string SkillName { get; set; } = string.Empty;
+    }
+
     // A course to take
     public class SuggestionCourseResponse
     {
         public int SkillSuggestionItemId { get; set; }
         public int SortOrder { get; set; }
 
-        // The main skill this course helps with. null SkillId = not in the system.
-        public int? SkillId { get; set; }
-        public string SkillName { get; set; } = string.Empty;
+        // The course's own name: the catalogue title, or the title the AI gave an outside course
+        public string Title { get; set; } = string.Empty;
+        public string? Provider { get; set; }
 
-        // Why this course helps
+        // true = one of our training programmes. false = an AI suggestion, not verified.
+        public bool IsFromCatalogue { get; set; }
+
+        // One short sentence on what the employee gains
         public string Why { get; set; } = string.Empty;
+
+        // The skills from the Skills section that this course builds
+        public List<SuggestionGainedSkill> SkillsGained { get; set; } = new();
+
         public SuggestionItemStatus Status { get; set; }
 
-        // A real catalogue course, or null
+        // The catalogue programme with live intake details, or null for an outside course
         public SuggestionProgrammeResponse? Programme { get; set; }
 
         // true if the employee has unfinished training of that programme
@@ -70,7 +85,7 @@ namespace TalentHub.DTOs
         // true if the employee finished it after this advice was written
         public bool IsAlreadyCompleted { get; set; }
 
-        // An idea from outside the catalogue. Show it as "AI suggestion, not verified"; it is never a link.
+        // Outside course only: a short description. Show it as "AI suggestion, not verified"; it is never a link.
         public string? ExternalIdea { get; set; }
     }
 

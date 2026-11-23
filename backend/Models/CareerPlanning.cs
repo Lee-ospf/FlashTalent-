@@ -143,6 +143,18 @@ namespace TalentHub.Models
         [Required, MaxLength(1000)]
         public string AdviceText { get; set; } = string.Empty;
 
+        // Course steps only. A catalogue course takes its title from the programme, so these stay null.
+        // An outside course keeps the title the AI gave it. ExternalIdea then holds its short description.
+        [MaxLength(200)]
+        public string? CourseTitle { get; set; }
+
+        [MaxLength(200)]
+        public string? CourseProvider { get; set; }
+
+        // JSON array of the skill names this course builds, taken from the advice's own skill steps
+        [MaxLength(1000)]
+        public string? SkillsGainedJson { get; set; }
+
         // A real course from the catalogue, checked in code before saving
         [ForeignKey(nameof(Programme))]
         public int? TrainingProgrammeId { get; set; }
@@ -151,7 +163,7 @@ namespace TalentHub.Models
         // An idea from outside the catalogue. Shown as "AI suggestion, not verified", never a link.
         [MaxLength(300)]
         public string? ExternalIdea { get; set; }
-
+        
         [Required]
         public SuggestionItemStatus Status { get; set; } = SuggestionItemStatus.Suggested;
 

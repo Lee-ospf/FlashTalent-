@@ -38,19 +38,26 @@ namespace TalentHub.Services
     public record AiSkillStep(string? Skill, string? Advice, string? TargetLevel);
 
     // A course step exactly as the AI returned it
-    public record AiCourseStep(string? Skill, string? Why, int? ProgrammeId, string? ExternalIdea);
+    public record AiCourseStep(
+        string? Title, string? Provider, string? Why, int? ProgrammeId, string? Description,
+        IReadOnlyList<string>? Skills);
 
     // One step after checking, ready to save
     public class CleanedSuggestionItem
     {
         public AdviceItemKind Kind { get; set; }
         public int SortOrder { get; set; }            // numbered 1, 2, 3 within its kind
-        public int? SkillId { get; set; }             // null = skill not in the Skills table
+        public int? SkillId { get; set; }             // skill steps only; null = skill not in the Skills table
         public string SkillName { get; set; } = string.Empty;
         public ProficiencyLevel? TargetLevel { get; set; }
-        public string Advice { get; set; } = string.Empty;
+        public string Advice { get; set; } = string.Empty;   // skill step: how to build it. course step: why it helps
         public int? TrainingProgrammeId { get; set; }
-        public string? ExternalIdea { get; set; }
+        public string? ExternalIdea { get; set; }     // outside course: short description
+
+        // Course steps only
+        public string? CourseTitle { get; set; }
+        public string? CourseProvider { get; set; }
+        public List<string> SkillsGained { get; set; } = new();
     }
 
     public class CleanedSuggestionResult
@@ -126,6 +133,9 @@ namespace TalentHub.Services
         private const int MaxAdviceLength = 1000;
         private const int MaxExternalLength = 300;
         private const int MaxSummaryLength = 2000;
+
+        private const int MaxTitleLength = 200;
+        private const int MaxProviderLength = 200;
 
         // ---------- Skill name matching ----------
 
@@ -241,21 +251,25 @@ namespace TalentHub.Services
         // ---------- Checking what the AI returned ----------
 
         // The AI's answer is never trusted. This keeps only what is safe to save:
-        //  - at most 5 skills and 3 courses, each numbered from 1
+        //  - at most 5 skills and 5 courses, each numbered from 1
         //  - a programme ID is kept only if it was actually offered to the AI (validProgrammeIds)
         //  - a skill name is matched to the Skills table, or kept as plain text with no SkillId
-        //  - a course needs a real programme or an external idea, and a real programme wins
+        //  - a course is either a real catalogue programme or an outside course with its own title
+        //  - a course title that is just a skill name is dropped (that is a skill, not a course)
+        //  - a course must build at least one of the skills suggested above, and lists only those
         //  - text is trimmed and cut to the column sizes, and duplicates are removed
         public static CleanedSuggestionResult CleanAdvice(
             IEnumerable<AiSkillStep>? skills,
             IEnumerable<AiCourseStep>? courses,
             SkillNameMatcher matcher,
             IReadOnlySet<int> validProgrammeIds,
+            IReadOnlyDictionary<int, IReadOnlyList<string>> programmeSkillNames,
             int maxSkills = MaxSkillItems,
             int maxCourses = MaxCourseItems)
         {
             var result = new CleanedSuggestionResult();
             var seen = new HashSet<string>();
+            var suggested = new Dictionary<string, string>();   // NameKey -> the skill name as saved
             var skillCount = 0;
             var courseCount = 0;
 
@@ -281,6 +295,7 @@ namespace TalentHub.Services
                 }
 
                 skillCount++;
+                suggested.TryAdd(NameKey(name), name);
                 result.Items.Add(new CleanedSuggestionItem
                 {
                     Kind = AdviceItemKind.Skill,
@@ -294,10 +309,8 @@ namespace TalentHub.Services
 
             foreach (var step in courses ?? Enumerable.Empty<AiCourseStep>())
             {
-                var skillText = Truncate(step.Skill, MaxSkillNameLength);
                 var why = Truncate(step.Why, MaxAdviceLength);
-
-                if (string.IsNullOrEmpty(skillText) || string.IsNullOrEmpty(why))
+                if (string.IsNullOrEmpty(why))
                 {
                     result.DroppedItems++;
                     continue;
@@ -312,18 +325,50 @@ namespace TalentHub.Services
                         result.DroppedProgrammeIds++;
                 }
 
-                var external = programmeId == null ? Truncate(step.ExternalIdea, MaxExternalLength) : null;
+                string? title = null, provider = null, description = null;
+                if (programmeId == null)
+                {
+                    title = Truncate(step.Title, MaxTitleLength);
+                    provider = Truncate(step.Provider, MaxProviderLength);
+                    description = Truncate(step.Description, MaxExternalLength);
 
-                // A course must be either a real programme or an idea
-                if (programmeId == null && string.IsNullOrEmpty(external))
+                    if (string.IsNullOrEmpty(title))
+                    {
+                        result.DroppedItems++;
+                        continue;
+                    }
+
+                    // A course must be a course, not a skill name such as "API"
+                    if (suggested.ContainsKey(NameKey(title)) || matcher.Match(title) != null)
+                    {
+                        result.DroppedItems++;
+                        continue;
+                    }
+                }
+
+                // Skills gained: only skills the AI itself suggested above
+                var gained = new List<string>();
+                foreach (var name in step.Skills ?? Array.Empty<string>())
+                    if (suggested.TryGetValue(NameKey(name), out var canonical) && !gained.Contains(canonical))
+                        gained.Add(canonical);
+
+                // A catalogue course may not have been tagged by the AI: fall back to what the programme covers
+                if (gained.Count == 0 && programmeId != null
+                    && programmeSkillNames.TryGetValue(programmeId.Value, out var covered))
+                {
+                    foreach (var name in covered)
+                        if (suggested.TryGetValue(NameKey(name), out var canonical) && !gained.Contains(canonical))
+                            gained.Add(canonical);
+                }
+
+                // A course that builds none of the suggested skills isn't part of this plan
+                if (gained.Count == 0)
                 {
                     result.DroppedItems++;
                     continue;
                 }
 
-                var matched = matcher.Match(skillText);
-                var key = ItemKey(AdviceItemKind.Course, matched?.SkillId, matched?.Name ?? skillText, programmeId, external);
-
+                var key = ItemKey(AdviceItemKind.Course, null, gained[0], programmeId, title);
                 if (courseCount >= maxCourses || !seen.Add(key))
                 {
                     result.DroppedItems++;
@@ -335,28 +380,29 @@ namespace TalentHub.Services
                 {
                     Kind = AdviceItemKind.Course,
                     SortOrder = courseCount,
-                    SkillId = matched?.SkillId,
-                    SkillName = matched?.Name ?? skillText,
+                    SkillName = gained[0],
                     Advice = why,
                     TrainingProgrammeId = programmeId,
-                    ExternalIdea = string.IsNullOrEmpty(external) ? null : external
+                    CourseTitle = string.IsNullOrEmpty(title) ? null : title,
+                    CourseProvider = string.IsNullOrEmpty(provider) ? null : provider,
+                    ExternalIdea = string.IsNullOrEmpty(description) ? null : description,
+                    SkillsGained = gained
                 });
             }
 
             return result;
         }
 
-        // Identifies "the same step" across refreshes. A skill is identified by the skill,
-        // a course by the programme (or by the idea's text). Used to remove duplicates, and to keep
-        // an employee's Accepted or Dismissed choice when advice is regenerated.
-        public static string ItemKey(AdviceItemKind kind, int? skillId, string skillName, int? programmeId, string? externalIdea)
+        // Identifies "the same step" across refreshes. A skill is identified by the skill, a course by
+        // the programme (or by its title when it is an outside course). Used to remove duplicates, and
+        // to keep an employee's Accepted or Dismissed choice when advice is regenerated.
+        public static string ItemKey(AdviceItemKind kind, int? skillId, string skillName, int? programmeId, string? courseTitle)
         {
             if (kind == AdviceItemKind.Course)
-                return "c|" + (programmeId?.ToString(CultureInfo.InvariantCulture) ?? "x:" + NameKey(externalIdea));
+                return "c|" + (programmeId?.ToString(CultureInfo.InvariantCulture) ?? "x:" + NameKey(courseTitle));
 
             return "s|" + (skillId?.ToString(CultureInfo.InvariantCulture) ?? "n:" + NameKey(skillName));
         }
-
 
 
         public static string? CleanSummary(string? summary)
