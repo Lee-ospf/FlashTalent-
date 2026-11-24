@@ -144,13 +144,16 @@ const STATUSES = ['Met', 'BelowLevel', 'Missing'];
   @for (c of a.courses; track c.skillSuggestionItemId) {
     <div class="pg-step" [class.pg-done]="c.status !== 'Suggested'">
       <div class="pg-top">
-        <div>
-          <b>{{ c.programme?.title ?? c.skillName }}</b>
-          <span class="tc-chip tc-grey">Helps with {{ c.skillName }}</span>
-          @if (c.status !== 'Suggested') {
-            <span [class]="c.status === 'Accepted' ? 'tc-chip tc-green' : 'tc-chip tc-grey'">{{ c.status }}</span>
-          }
-        </div>
+       <div>
+  <b>{{ c.title }}</b>
+  @if (!c.isFromCatalogue) { <span class="tc-chip tc-grey">AI suggestion, not verified</span> }
+  @for (g of c.skillsGained; track g.skillName) {
+    <span class="tc-chip tc-grey">Builds {{ g.skillName }}</span>
+  }
+  @if (c.status !== 'Suggested') {
+    <span [class]="c.status === 'Accepted' ? 'tc-chip tc-green' : 'tc-chip tc-grey'">{{ c.status }}</span>
+  }
+</div>
         <div class="pg-acts">
           @if (c.status === 'Suggested') {
             <button class="pg-btn" type="button" (click)="setStatus(c, 'Accepted')">Accept</button>

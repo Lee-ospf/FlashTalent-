@@ -144,7 +144,7 @@ export const routes: Routes = [
       ),
   },
 
-    {
+  {
     path: 'admin/reports',
     canActivate: [roleGuard(['HR', 'Admin'])],
     loadComponent: () =>
@@ -333,13 +333,13 @@ export const routes: Routes = [
       ),
   },
   {
-  path: 'my-career-goals',
-  canActivate: [roleGuard(['Employee'])],
-  loadComponent: () =>
-    import('./features/employee/training/my-career-goals').then(
-      (m) => m.MyCareerGoalsComponent,
-    ),
-},
+    path: 'my-career-goals',
+    canActivate: [roleGuard(['Employee'])],
+    loadComponent: () =>
+      import('./features/employee/training/my-career-goals').then(
+        (m) => m.MyCareerGoalsComponent,
+      ),
+  },
   // ---------- HR read-only view of an employee profile ----------
   {
     path: 'admin/employees/:id',
@@ -350,14 +350,22 @@ export const routes: Routes = [
       ),
   },
   {
-  path: 'admin/projects/:id/employees/:employeeId/gaps',
-  canActivate: [roleGuard(['HR', 'Admin'])],
-  loadComponent: () =>
-    import('./features/hr/project-gap/project-gap.component').then(
-      (m) => m.ProjectGapComponent,
-    ),
-},
-  
+    path: 'admin/certifications',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/certifications/certifications.component').then(
+        (m) => m.CertificationsComponent,
+      ),
+  },
+  {
+    path: 'admin/projects/:id/employees/:employeeId/gaps',
+    canActivate: [roleGuard(['HR', 'Admin'])],
+    loadComponent: () =>
+      import('./features/hr/project-gap/project-gap.component').then(
+        (m) => m.ProjectGapComponent,
+      ),
+  },
+
   {
     path: 'admin/training/programmes/new',
     canActivate: [roleGuard(['HR', 'Admin'])],

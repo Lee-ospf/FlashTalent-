@@ -487,26 +487,24 @@ const STATE_LABEL: Record<SkillState, string> = {
                 >
                   <div class="cg-top">
                     <div>
-                      @if (c.programme; as p) {
-                        <div class="cg-h3">{{ p.title }}</div>
-                        <div class="cg-meta cg-row">
-                          @if (p.durationHours) {
-                            <span
-                              ><i class="ti ti-clock"></i>
-                              {{ p.durationHours }} hours</span
-                            >
-                          }
-                          @if (p.provider) {
-                            <span>{{ p.provider }}</span>
-                          }
-                          @if (p.category) {
-                            <span>{{ p.category }}</span>
-                          }
-                        </div>
-                      } @else {
-                        <div class="cg-h3">{{ c.skillName }}</div>
-                        <div class="cg-meta">AI suggestion, not verified</div>
-                      }
+                      <div class="cg-h3">{{ c.title }}</div>
+                      <div class="cg-meta cg-row">
+                        @if (c.programme?.durationHours) {
+                          <span
+                            ><i class="ti ti-clock"></i>
+                            {{ c.programme?.durationHours }} hours</span
+                          >
+                        }
+                        @if (c.provider) {
+                          <span>{{ c.provider }}</span>
+                        }
+                        @if (c.programme?.category) {
+                          <span>{{ c.programme?.category }}</span>
+                        }
+                        @if (!c.isFromCatalogue) {
+                          <span>AI suggestion, not verified</span>
+                        }
+                      </div>
                     </div>
                     <div class="cg-chips">
                       <span class="cg-goalchip"
@@ -530,13 +528,18 @@ const STATE_LABEL: Record<SkillState, string> = {
                     </div>
                   </div>
 
-                  <div class="cg-covers">
-                    <span class="cg-meta">Helps with:</span>
-                    <span class="cg-skill">{{ c.skillName }}</span>
-                  </div>
-                  <p class="cg-text">
-                    {{ c.programme ? c.why : c.externalIdea || c.why }}
-                  </p>
+                  @if (c.skillsGained.length) {
+                    <div class="cg-covers">
+                      <span class="cg-meta">Builds:</span>
+                      @for (g of c.skillsGained; track g.skillName) {
+                        <span class="cg-skill">{{ g.skillName }}</span>
+                      }
+                    </div>
+                  }
+                  <p class="cg-text">{{ c.why }}</p>
+                  @if (c.externalIdea) {
+                    <p class="cg-text">{{ c.externalIdea }}</p>
+                  }
 
                   @if (c.programme) {
                     <div class="cg-avail">
@@ -1072,10 +1075,10 @@ export class MyCareerGoalsComponent implements OnInit {
       // Which of this goal's courses are for which skill
       const trainingFor = new Map<string, string[]>();
       for (const c of active) {
-        const k = this.keyOf(c.skillId, c.skillName);
-        const label =
-          c.programme?.title ?? 'Idea: ' + (c.externalIdea ?? c.skillName);
-        trainingFor.set(k, [...(trainingFor.get(k) ?? []), label]);
+        for (const g of c.skillsGained) {
+          const k = this.keyOf(g.skillId, g.skillName);
+          trainingFor.set(k, [...(trainingFor.get(k) ?? []), c.title]);
+        }
       }
 
       const rows = a.skills.map((s): SkillRow => {

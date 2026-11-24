@@ -920,17 +920,24 @@ export interface AdviceSkill {
   status: AdviceStatus;
 }
 
+export interface AdviceGainedSkill {
+  skillId: number | null;
+  skillName: string;
+}
+
 export interface AdviceCourse {
   skillSuggestionItemId: number;
   sortOrder: number;
-  skillId: number | null; // the main skill the course helps with
-  skillName: string;
+  title: string; // catalogue title, or the AI's name for an outside course
+  provider: string | null;
+  isFromCatalogue: boolean; // false = AI suggestion, not verified
   why: string;
+  skillsGained: AdviceGainedSkill[];
   status: AdviceStatus;
-  programme: AdviceProgramme | null;
+  programme: AdviceProgramme | null; // live intake details, null for an outside course
   isAlreadyAssigned: boolean;
   isAlreadyCompleted: boolean;
-  externalIdea: string | null;
+  externalIdea: string | null; // outside course: a short description
 }
 
 export interface AdviceResponse {
@@ -946,4 +953,58 @@ export interface AdviceResponse {
   generationsLeft: number;
   skills: AdviceSkill[];
   courses: AdviceCourse[];
+}
+export type CertificationExpiryStatus =
+  | 'NoExpiryDate'
+  | 'Valid'
+  | 'ExpiringIn90'
+  | 'ExpiringIn30'
+  | 'ExpiringIn7'
+  | 'Expired';
+
+// The values GET certifications/expiring accepts as ?status=
+export type ExpiryFilterStatus = 'ExpiringIn90' | 'ExpiringIn30' | 'ExpiringIn7' | 'Expired';
+
+export const EXPIRY_FILTERS: ExpiryFilterStatus[] = [
+  'ExpiringIn90',
+  'ExpiringIn30',
+  'ExpiringIn7',
+  'Expired',
+];
+
+export interface CertificationExpiryItem {
+  employeeQualificationId: number;
+  employeeId: number;
+  employeeName: string;
+  jobTitle: string | null;
+  departmentName: string | null;
+  certificationName: string;
+  institution: string;
+  expiryDate: string;
+  // Calendar days until expiry. Negative once expired.
+  daysLeft: number;
+  status: CertificationExpiryStatus;
+  // Expired longer ago than the alert window, so the daily job sends nothing for it
+  isPastAlertWindow: boolean;
+}
+
+export interface CertificationNoExpiryItem {
+  employeeQualificationId: number;
+  employeeId: number;
+  employeeName: string;
+  jobTitle: string | null;
+  departmentName: string | null;
+  certificationName: string;
+  institution: string;
+  obtainedOn: string;
+}
+
+export interface ComplianceSummary {
+  expiringIn90Days: number; // 31 to 90 days left
+  expiringIn30Days: number; // 8 to 30 days left
+  expiringIn7Days: number; // 1 to 7 days left
+  expired: number; // expiry date today or earlier (includes long-expired)
+  certificatesWithNoExpiryDate: number;
+  overdueTraining: number;
+  awaitingConfirmation: number;
 }
